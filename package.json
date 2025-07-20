@@ -10,6 +10,7 @@
   },
   "dependencies": {
     "expo": "~50.0.0",
+    "ngrok": "~4.1.0",
     "expo-router": "^5.1.1",
     "expo-status-bar": "~1.10.0",
     "react": "18.2.0",
