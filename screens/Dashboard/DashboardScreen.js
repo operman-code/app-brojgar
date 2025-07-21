@@ -166,29 +166,45 @@ const DashboardScreen = () => {
     <TouchableOpacity
       style={[styles.tabButton, activeTab === tabId && styles.activeTabButton]}
       onPress={() => setActiveTab(tabId)}
+      activeOpacity={0.7}
     >
-      <Text style={[styles.tabIcon, activeTab === tabId && styles.activeTabIcon]}>{icon}</Text>
+      <View style={[styles.tabIconContainer, activeTab === tabId && styles.activeTabIconContainer]}>
+        <Text style={[styles.tabIcon, activeTab === tabId && styles.activeTabIcon]}>{icon}</Text>
+      </View>
       <Text style={[styles.tabTitle, activeTab === tabId && styles.activeTabTitle]}>{title}</Text>
+      {activeTab === tabId && <View style={styles.tabIndicator} />}
     </TouchableOpacity>
   );
 
   return (
     <SafeAreaView style={styles.container}>
-      <StatusBar barStyle="dark-content" backgroundColor="#ffffff" />
+      <StatusBar barStyle="light-content" backgroundColor="#1e40af" />
       
-      {/* Header */}
+      {/* Enhanced Header */}
       <Animated.View style={[styles.header, { opacity: fadeAnim }]}>
-        <View style={styles.headerLeft}>
-          <Text style={styles.businessName}>{businessProfile.businessName}</Text>
-          <Text style={styles.headerSubtitle}>Welcome back, {businessProfile.ownerName}</Text>
-          <View style={styles.statusContainer}>
-            <View style={[styles.statusDot, { backgroundColor: "#10b981" }]} />
-            <Text style={styles.summaryText}>{dashboardSummary.statusMessage}</Text>
+        <View style={styles.headerContent}>
+          <View style={styles.headerLeft}>
+            <Text style={styles.businessName}>{businessProfile.businessName}</Text>
+            <Text style={styles.headerSubtitle}>Welcome back, {businessProfile.ownerName}</Text>
+            <View style={styles.statusContainer}>
+              <View style={[styles.statusDot, { backgroundColor: "#10b981" }]} />
+              <Text style={styles.summaryText}>{dashboardSummary.statusMessage}</Text>
+            </View>
+          </View>
+          <View style={styles.headerRight}>
+            <TouchableOpacity style={styles.notificationButton} onPress={() => Alert.alert("Notifications", "Feature coming soon!")}>
+              <Text style={styles.notificationIcon}>🔔</Text>
+              {notifications.length > 0 && (
+                <View style={styles.notificationBadge}>
+                  <Text style={styles.badgeText}>{notifications.length}</Text>
+                </View>
+              )}
+            </TouchableOpacity>
+            <TouchableOpacity style={styles.profileIconContainer} onPress={handleProfilePress}>
+              <Text style={styles.profileIconText}>👤</Text>
+            </TouchableOpacity>
           </View>
         </View>
-        <TouchableOpacity style={styles.profileIcon} onPress={handleProfilePress}>
-          <Text style={styles.profileIconText}>👤</Text>
-        </TouchableOpacity>
       </Animated.View>
 
       {/* Tab Navigation */}
@@ -342,26 +358,30 @@ const DashboardScreen = () => {
         </Animated.View>
       </ScrollView>
       
-      {/* Floating Action Buttons */}
-      <View style={styles.floatingButtonsContainer}>
+      {/* Enhanced Floating Action Buttons */}
+      <Animated.View style={[styles.floatingButtonsContainer, { opacity: fadeAnim }]}>
         <TouchableOpacity
           style={[styles.floatingButton, styles.secondaryButton]}
           onPress={() => handleQuickAction('receive_payment')}
-          activeOpacity={0.8}
+          activeOpacity={0.9}
         >
-          <Text style={styles.floatingButtonIcon}>💰</Text>
+          <View style={styles.floatingButtonIconContainer}>
+            <Text style={styles.floatingButtonIcon}>💰</Text>
+          </View>
           <Text style={styles.floatingButtonText}>Receive Payment</Text>
         </TouchableOpacity>
         
         <TouchableOpacity
           style={[styles.floatingButton, styles.primaryButton]}
           onPress={() => handleQuickAction('new_invoice')}
-          activeOpacity={0.8}
+          activeOpacity={0.9}
         >
-          <Text style={styles.floatingButtonIcon}>📝</Text>
+          <View style={styles.floatingButtonIconContainer}>
+            <Text style={styles.floatingButtonIcon}>📝</Text>
+          </View>
           <Text style={styles.floatingButtonText}>New Invoice</Text>
         </TouchableOpacity>
-      </View>
+      </Animated.View>
     </SafeAreaView>
   );
 };
@@ -372,30 +392,34 @@ const styles = StyleSheet.create({
     backgroundColor: "#f8fafc",
   },
   header: {
+    paddingHorizontal: 20,
+    paddingTop: 20,
+    paddingBottom: 25,
+    backgroundColor: "#1e40af",
+    borderBottomLeftRadius: 25,
+    borderBottomRightRadius: 25,
+    shadowColor: "#1e40af",
+    shadowOffset: { width: 0, height: 8 },
+    shadowOpacity: 0.3,
+    shadowRadius: 10,
+    elevation: 15,
+  },
+  headerContent: {
     flexDirection: "row",
     justifyContent: "space-between",
-    alignItems: "center",
-    padding: 20,
-    backgroundColor: "#ffffff",
-    borderBottomWidth: 1,
-    borderBottomColor: "#e5e7eb",
-    shadowColor: "#000",
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.1,
-    shadowRadius: 3.84,
-    elevation: 5,
+    alignItems: "flex-start",
   },
   headerLeft: {
     flex: 1,
   },
   businessName: {
-    fontSize: 22,
+    fontSize: 24,
     fontWeight: "bold",
-    color: "#111827",
+    color: "#ffffff",
   },
   headerSubtitle: {
     fontSize: 14,
-    color: "#6b7280",
+    color: "#e0f2fe",
     marginTop: 2,
   },
   statusContainer: {
@@ -411,8 +435,49 @@ const styles = StyleSheet.create({
   },
   summaryText: {
     fontSize: 12,
-    color: "#059669",
+    color: "#e0f2fe",
     fontWeight: "500",
+  },
+  headerRight: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 12,
+  },
+  notificationButton: {
+    position: "relative",
+    padding: 8,
+    borderRadius: 20,
+    backgroundColor: "rgba(255,255,255,0.1)",
+  },
+  notificationIcon: {
+    fontSize: 20,
+  },
+  notificationBadge: {
+    position: "absolute",
+    top: 4,
+    right: 4,
+    backgroundColor: "#ef4444",
+    borderRadius: 10,
+    width: 20,
+    height: 20,
+    justifyContent: "center",
+    alignItems: "center",
+  },
+  badgeText: {
+    fontSize: 10,
+    color: "#ffffff",
+    fontWeight: "bold",
+  },
+  profileIconContainer: {
+    width: 44,
+    height: 44,
+    borderRadius: 22,
+    backgroundColor: "rgba(255,255,255,0.1)",
+    justifyContent: "center",
+    alignItems: "center",
+  },
+  profileIconText: {
+    fontSize: 20,
   },
   profileIcon: {
     width: 44,
@@ -433,28 +498,53 @@ const styles = StyleSheet.create({
   tabContainer: {
     flexDirection: "row",
     backgroundColor: "#ffffff",
-    paddingHorizontal: 20,
-    paddingVertical: 12,
-    borderBottomWidth: 1,
-    borderBottomColor: "#e5e7eb",
+    marginHorizontal: 20,
+    marginTop: -10,
+    borderRadius: 16,
+    padding: 6,
+    shadowColor: "#000",
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.15,
+    shadowRadius: 8,
+    elevation: 8,
   },
   tabButton: {
     flex: 1,
     alignItems: "center",
-    paddingVertical: 8,
-    paddingHorizontal: 12,
-    borderRadius: 8,
-    marginHorizontal: 4,
+    paddingVertical: 12,
+    paddingHorizontal: 8,
+    borderRadius: 12,
+    position: "relative",
   },
   activeTabButton: {
     backgroundColor: "#eff6ff",
   },
-  tabIcon: {
-    fontSize: 16,
+  tabIconContainer: {
+    width: 36,
+    height: 36,
+    borderRadius: 18,
+    justifyContent: "center",
+    alignItems: "center",
+    backgroundColor: "transparent",
     marginBottom: 4,
+  },
+  activeTabIconContainer: {
+    backgroundColor: "#3b82f6",
+  },
+  tabIndicator: {
+    position: "absolute",
+    bottom: 4,
+    width: 20,
+    height: 3,
+    backgroundColor: "#3b82f6",
+    borderRadius: 2,
+  },
+  tabIcon: {
+    fontSize: 18,
   },
   activeTabIcon: {
     fontSize: 18,
+    color: "#ffffff",
   },
   tabTitle: {
     fontSize: 12,
@@ -590,15 +680,24 @@ const styles = StyleSheet.create({
   floatingButton: {
     flexDirection: "row",
     alignItems: "center",
-    paddingHorizontal: 16,
-    paddingVertical: 12,
-    borderRadius: 25,
+    paddingHorizontal: 18,
+    paddingVertical: 14,
+    borderRadius: 28,
     shadowColor: "#000",
-    shadowOffset: { width: 0, height: 4 },
-    shadowOpacity: 0.3,
-    shadowRadius: 4.65,
-    elevation: 8,
-    minWidth: 140,
+    shadowOffset: { width: 0, height: 6 },
+    shadowOpacity: 0.4,
+    shadowRadius: 8,
+    elevation: 12,
+    minWidth: 160,
+  },
+  floatingButtonIconContainer: {
+    width: 28,
+    height: 28,
+    borderRadius: 14,
+    backgroundColor: "rgba(255,255,255,0.2)",
+    justifyContent: "center",
+    alignItems: "center",
+    marginRight: 10,
   },
   primaryButton: {
     backgroundColor: "#3b82f6",
@@ -608,7 +707,6 @@ const styles = StyleSheet.create({
   },
   floatingButtonIcon: {
     fontSize: 16,
-    marginRight: 8,
   },
   floatingButtonText: {
     color: "#ffffff",
