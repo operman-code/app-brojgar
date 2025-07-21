@@ -8,36 +8,6 @@ import {
   ScrollView,
   SafeAreaView,
   FlatList,
-  RefreshControl,
-  TextInput,
-  Animated,
-  Dimensions,
-  Alert,
-  StatusBar,
-} from "react-native";
-
-// Import components with error handling
-let KPICard, QuickActionButton, TransactionItem, ChartCard, NotificationCard, DashboardService;
-
-try {
-  KPICard = require("./components/KPICard").default;
-  QuickActionButton = require("./components/QuickActionButton").default;
-  TransactionItem = require("./components/TransactionItem").default;
-  ChartCard = require("./components/ChartCard").default;
-  NotificationCard = require("./components/NotificationCard").default;
-  DashboardService = require("./services/DashboardService").default;
-} catch (error) {
-  console.error("Error importing components:", error);
-  // Fallback components
-  KPICard = ({ label, value }) => (
-    <View style={{ padding: 16, backgroundColor: '#f0f0f0', margin: 8, borderRadius: 8 }}>
-      <Text>{label}: {value}</Text>
-    </View>
-  );
-  QuickActionButton = ({ title, onPress }) => (
-    <TouchableOpacity onPress={onPress} style={{ padding: 12, backgroundColor: '#007AFF', margin: 4, borderRadius: 6 }}>
-      <Text style={{ color: 'white' }}>{title}</Text>
-    </TouchableOpacity>
   );
   TransactionItem = ({ transaction }) => (
     <View style={{ padding: 12, borderBottomWidth: 1, borderBottomColor: '#eee' }}>
@@ -157,21 +127,6 @@ const DashboardScreen = () => {
     Alert.alert("Report", `Opening ${report.title}`, [{ text: "OK" }]);
   };
 
-  const handleNotificationPress = (notification) => {
-    Alert.alert(notification.title, notification.message, [{ text: "OK" }]);
-  };
-
-  const dismissNotification = (notificationId) => {
-    setNotifications(prev => prev.filter(n => n.id !== notificationId));
-  };
-
-  const renderTransactionItem = ({ item }) => (
-    <TransactionItem 
-      transaction={item} 
-      onPress={() => Alert.alert("Transaction", `Viewing ${item.reference}`, [{ text: "OK" }])}
-    />
-  );
-
   const renderReportShortcut = ({ item }) => (
     <TouchableOpacity 
       style={[styles.reportCard, { borderLeftColor: item.color }]}
@@ -276,11 +231,6 @@ const DashboardScreen = () => {
                 </View>
               </View>
 
-              {/* Sales Chart */}
-              <View style={styles.section}>
-                <Text style={styles.sectionTitle}>📊 Sales Trend (Last 7 Days)</Text>
-                <ChartCard data={salesChartData} />
-              </View>
 
               {/* Quick Actions */}
               <View style={styles.section}>
@@ -475,59 +425,27 @@ const styles = StyleSheet.create({
     fontSize: 18,
     fontWeight: "600",
     color: "#111827",
-    marginBottom: 16,
+
   },
   sectionHeader: {
     flexDirection: "row",
     justifyContent: "space-between",
     alignItems: "center",
-    marginBottom: 16,
+
   },
   viewAllText: {
     fontSize: 14,
     color: "#3b82f6",
     fontWeight: "500",
   },
-  notificationsList: {
-    marginHorizontal: -20,
-    paddingHorizontal: 20,
-  },
-  searchContainer: {
-    position: "relative",
-  },
-  searchInput: {
-    backgroundColor: "#ffffff",
-    borderRadius: 12,
-    paddingHorizontal: 16,
-    paddingVertical: 12,
-    fontSize: 16,
-    borderWidth: 1,
-    borderColor: "#e5e7eb",
-    color: "#374151",
-  },
-  clearButton: {
-    position: "absolute",
-    right: 12,
-    top: "50%",
-    transform: [{ translateY: -10 }],
-    width: 20,
-    height: 20,
-    justifyContent: "center",
-    alignItems: "center",
-    backgroundColor: "#f3f4f6",
-    borderRadius: 10,
-  },
-  clearButtonText: {
-    color: "#6b7280",
-    fontSize: 12,
-    fontWeight: "bold",
-  },
+
   kpiContainer: {
     gap: 12,
   },
   kpiRow: {
     flexDirection: "row",
     gap: 12,
+
   },
   actionsContainer: {
     flexDirection: "row",

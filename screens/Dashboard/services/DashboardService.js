@@ -291,49 +291,6 @@ class DashboardService {
     };
   }
 
-  // Additional utility methods
-  static getTopCustomers() {
-    return [
-      { name: "Mumbai Traders", amount: 45000, transactions: 12 },
-      { name: "Delhi Electronics", amount: 38500, transactions: 8 },
-      { name: "Rajesh Kumar", amount: 25000, transactions: 15 },
-      { name: "Sunita Electronics", amount: 22000, transactions: 6 },
-      { name: "Amit Singh", amount: 18000, transactions: 9 },
-    ];
-  }
-
-  static getTopProducts() {
-    return [
-      { name: "Product A", sold: 125, revenue: 25000 },
-      { name: "Product B", sold: 98, revenue: 19600 },
-      { name: "Product C", sold: 87, revenue: 17400 },
-      { name: "Product D", sold: 76, revenue: 15200 },
-      { name: "Product E", sold: 65, revenue: 13000 },
-    ];
-  }
-
-  static getBusinessInsights() {
-    return [
-      {
-        type: "positive",
-        title: "Sales Growth",
-        message: "Your sales have increased by 12.5% this week compared to last week.",
-        suggestion: "Consider expanding your marketing efforts to maintain this growth."
-      },
-      {
-        type: "warning",
-        title: "Inventory Management",
-        message: "5 products are running low in stock.",
-        suggestion: "Review your inventory levels and place orders for fast-moving items."
-      },
-      {
-        type: "info",
-        title: "Customer Behavior",
-        message: "Your top 5 customers contribute to 60% of your total revenue.",
-        suggestion: "Consider loyalty programs for your top customers."
-      }
-    ];
-  }
 }
 
 export default DashboardService;
