@@ -137,7 +137,15 @@ const InventoryScreen = () => {
     setStockQuantity("");
     setStockModalVisible(true);
   };
-
+  
+  // Auto-generate barcode function
+  const generateBarcode = () => {
+    const timestamp = Date.now().toString();
+    const random = Math.floor(Math.random() * 1000).toString().padStart(3, '0');
+    const barcode = `${timestamp.slice(-8)}${random}`;
+    setFormData({ ...formData, barcode: barcode });
+  };
+  
   const handleSave = async () => {
     if (!formData.name.trim()) {
       Alert.alert("Validation Error", "Item name is required");
@@ -506,13 +514,21 @@ const InventoryScreen = () => {
               </View>
               <View style={[styles.formGroup, { flex: 1 }]}>
                 <Text style={styles.formLabel}>Barcode</Text>
-                <TextInput
-                  style={styles.formInput}
-                  value={formData.barcode}
-                  onChangeText={(text) => setFormData({ ...formData, barcode: text })}
-                  placeholder="Barcode"
-                  placeholderTextColor="#9ca3af"
-                />
+                <View style={styles.barcodeInputContainer}>
+                  <TextInput
+                    style={styles.barcodeInput}
+                    value={formData.barcode}
+                    onChangeText={(text) => setFormData({ ...formData, barcode: text })}
+                    placeholder="Barcode"
+                    placeholderTextColor="#9ca3af"
+                  />
+                  <TouchableOpacity
+                    style={styles.generateBarcodeButton}
+                    onPress={generateBarcode}
+                  >
+                    <Text style={styles.generateBarcodeText}>Auto</Text>
+                  </TouchableOpacity>
+                </View>
               </View>
             </View>
 
@@ -737,10 +753,11 @@ const styles = StyleSheet.create({
     backgroundColor: "#f8fafc",
   },
   header: {
-    padding: 20,
+    paddingHorizontal: 20,
+    paddingVertical: 16,
     backgroundColor: "#ffffff",
     borderBottomWidth: 1,
-    borderBottomColor: "#e5e7eb",
+    borderBottomColor: "#f3f4f6",
   },
   headerTitle: {
     fontSize: 24,
@@ -756,15 +773,15 @@ const styles = StyleSheet.create({
     flexDirection: "row",
     alignItems: "center",
     backgroundColor: "#ffffff",
-    margin: 20,
-    marginBottom: 0,
-    borderRadius: 12,
+    marginHorizontal: 20,
+    marginTop: 12,
+    borderRadius: 8,
     paddingHorizontal: 16,
     shadowColor: "#000",
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.1,
-    shadowRadius: 3.84,
-    elevation: 3,
+    shadowOffset: { width: 0, height: 1 },
+    shadowOpacity: 0.08,
+    shadowRadius: 2,
+    elevation: 2,
   },
   searchInput: {
     flex: 1,
@@ -788,7 +805,7 @@ const styles = StyleSheet.create({
   },
   categoryContainer: {
     marginHorizontal: 20,
-    marginTop: 16,
+    marginTop: 12,
   },
   categoryContent: {
     paddingRight: 20,
@@ -815,19 +832,20 @@ const styles = StyleSheet.create({
     flexDirection: "row",
     backgroundColor: "#ffffff",
     marginHorizontal: 20,
-    marginTop: 16,
-    borderRadius: 12,
+    marginTop: 12,
+    marginBottom: 8,
+    borderRadius: 8,
     overflow: "hidden",
     shadowColor: "#000",
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.1,
-    shadowRadius: 3.84,
-    elevation: 3,
+    shadowOffset: { width: 0, height: 1 },
+    shadowOpacity: 0.08,
+    shadowRadius: 2,
+    elevation: 2,
   },
   tabButton: {
     flex: 1,
     alignItems: "center",
-    paddingVertical: 12,
+    paddingVertical: 8,
     backgroundColor: "#f9fafb",
   },
   activeTabButton: {
@@ -851,7 +869,7 @@ const styles = StyleSheet.create({
   },
   addButtonContainer: {
     paddingHorizontal: 20,
-    paddingTop: 16,
+    paddingTop: 8,
   },
   addButton: {
     flexDirection: "row",
@@ -1084,6 +1102,36 @@ const styles = StyleSheet.create({
     fontSize: 16,
     color: "#111827",
     backgroundColor: "#ffffff",
+  },
+  barcodeInputContainer: {
+    flexDirection: "row",
+    alignItems: "center",
+  },
+  barcodeInput: {
+    flex: 1,
+    borderWidth: 1,
+    borderColor: "#d1d5db",
+    borderRadius: 8,
+    paddingHorizontal: 12,
+    paddingVertical: 12,
+    fontSize: 16,
+    color: "#111827",
+    backgroundColor: "#ffffff",
+    marginRight: 8,
+  },
+  generateBarcodeButton: {
+    backgroundColor: "#3b82f6",
+    paddingHorizontal: 12,
+    paddingVertical: 12,
+    borderRadius: 6,
+    minWidth: 50,
+    alignItems: "center",
+    justifyContent: "center",
+  },
+  generateBarcodeText: {
+    color: "#ffffff",
+    fontSize: 12,
+    fontWeight: "600",
   },
   textArea: {
     height: 80,
