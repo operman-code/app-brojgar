@@ -102,6 +102,12 @@ const DashboardScreen = () => {
   };
 
   const handleQuickAction = (action) => {
+    if (action === 'new_invoice') {
+      toggleQuickMenu(); // Close menu first
+      navigation.navigate("Invoice");
+      return;
+    }
+    
     const result = DashboardService.handleQuickAction(action);
     Alert.alert("Action", result.message, [{ text: "OK" }]);
     toggleQuickMenu(); // Close menu after action
