@@ -2,8 +2,10 @@ import React from "react";
 import { createBottomTabNavigator } from "@react-navigation/bottom-tabs";
 import DashboardScreen from "../screens/Dashboard/DashboardScreen";
 import PartiesScreen from "../screens/Parties/PartiesScreen";
-
-import { View, Text } from "react-native";
+import InventoryScreen from "../screens/Inventory/InventoryScreen";
+import ReportsScreen from "../screens/Reports/ReportsScreen";
+import SettingsScreen from "../screens/Settings/SettingsScreen";
+import { View, Text, TouchableOpacity } from "react-native";
 
 const Tab = createBottomTabNavigator();
 
@@ -45,47 +47,74 @@ const PlaceholderScreen = ({ name }) => (
 const BottomTabNavigator = () => {
   return (
     <Tab.Navigator
-      screenOptions={{
+      screenOptions={({ route }) => ({
         headerShown: false,
         tabBarActiveTintColor: "#3b82f6",
-        tabBarInactiveTintColor: "#6b7280",
+        tabBarInactiveTintColor: "#9ca3af",
         tabBarStyle: {
           backgroundColor: "#ffffff",
-          borderTopWidth: 1,
-          borderTopColor: "#e5e7eb",
-          paddingTop: 8,
-          paddingBottom: 8,
-          height: 65,
+          borderTopWidth: 0,
+          paddingTop: 12,
+          paddingBottom: 12,
+          height: 75,
           shadowColor: "#000",
           shadowOffset: {
             width: 0,
-            height: -2,
+            height: -4,
           },
-          shadowOpacity: 0.1,
-          shadowRadius: 3.84,
-          elevation: 5,
+          shadowOpacity: 0.15,
+          shadowRadius: 8,
+          elevation: 10,
+          borderTopLeftRadius: 20,
+          borderTopRightRadius: 20,
         },
         tabBarLabelStyle: {
-          fontSize: 12,
-          fontWeight: "500",
+          fontSize: 11,
+          fontWeight: "600",
           marginTop: 4,
         },
         tabBarIconStyle: {
           marginBottom: 2,
         },
-      }}
+        tabBarItemStyle: {
+          paddingVertical: 4,
+        },
+        tabBarButton: (props) => (
+          <TouchableOpacity
+            {...props}
+            style={[
+              props.style,
+              {
+                flex: 1,
+                alignItems: 'center',
+                justifyContent: 'center',
+              }
+            ]}
+          />
+        ),
+      })}
     >
       <Tab.Screen 
         name="Dashboard" 
         component={DashboardScreen}
         options={{
           tabBarIcon: ({ color, focused }) => (
-            <Text style={{ 
-              fontSize: focused ? 22 : 20, 
-              opacity: focused ? 1 : 0.7 
+            <View style={{
+              alignItems: 'center',
+              justifyContent: 'center',
+              width: 50,
+              height: 50,
+              borderRadius: 25,
+              backgroundColor: focused ? '#eff6ff' : 'transparent',
             }}>
-              🏠
-            </Text>
+              <Text style={{ 
+                fontSize: focused ? 24 : 20, 
+                opacity: focused ? 1 : 0.6,
+                transform: [{ scale: focused ? 1.1 : 1 }]
+              }}>
+                🏠
+              </Text>
+            </View>
           ),
         }}
       />
@@ -94,12 +123,22 @@ const BottomTabNavigator = () => {
         component={PartiesScreen}
         options={{
           tabBarIcon: ({ color, focused }) => (
-            <Text style={{ 
-              fontSize: focused ? 22 : 20, 
-              opacity: focused ? 1 : 0.7 
+            <View style={{
+              alignItems: 'center',
+              justifyContent: 'center',
+              width: 50,
+              height: 50,
+              borderRadius: 25,
+              backgroundColor: focused ? '#eff6ff' : 'transparent',
             }}>
-              👥
-            </Text>
+              <Text style={{ 
+                fontSize: focused ? 24 : 20, 
+                opacity: focused ? 1 : 0.6,
+                transform: [{ scale: focused ? 1.1 : 1 }]
+              }}>
+                👥
+              </Text>
+            </View>
           ),
         }}
       />
@@ -108,12 +147,22 @@ const BottomTabNavigator = () => {
         component={InventoryScreen}
         options={{
           tabBarIcon: ({ color, focused }) => (
-            <Text style={{ 
-              fontSize: focused ? 22 : 20, 
-              opacity: focused ? 1 : 0.7 
+            <View style={{
+              alignItems: 'center',
+              justifyContent: 'center',
+              width: 50,
+              height: 50,
+              borderRadius: 25,
+              backgroundColor: focused ? '#eff6ff' : 'transparent',
             }}>
-              📦
-            </Text>
+              <Text style={{ 
+                fontSize: focused ? 24 : 20, 
+                opacity: focused ? 1 : 0.6,
+                transform: [{ scale: focused ? 1.1 : 1 }]
+              }}>
+                📦
+              </Text>
+            </View>
           ),
         }}
       />
@@ -122,12 +171,22 @@ const BottomTabNavigator = () => {
         component={ReportsScreen}
         options={{
           tabBarIcon: ({ color, focused }) => (
-            <Text style={{ 
-              fontSize: focused ? 22 : 20, 
-              opacity: focused ? 1 : 0.7 
+            <View style={{
+              alignItems: 'center',
+              justifyContent: 'center',
+              width: 50,
+              height: 50,
+              borderRadius: 25,
+              backgroundColor: focused ? '#eff6ff' : 'transparent',
             }}>
-              📊
-            </Text>
+              <Text style={{ 
+                fontSize: focused ? 24 : 20, 
+                opacity: focused ? 1 : 0.6,
+                transform: [{ scale: focused ? 1.1 : 1 }]
+              }}>
+                📊
+              </Text>
+            </View>
           ),
         }}
       />
@@ -136,12 +195,22 @@ const BottomTabNavigator = () => {
         component={SettingsScreen}
         options={{
           tabBarIcon: ({ color, focused }) => (
-            <Text style={{ 
-              fontSize: focused ? 22 : 20, 
-              opacity: focused ? 1 : 0.7 
+            <View style={{
+              alignItems: 'center',
+              justifyContent: 'center',
+              width: 50,
+              height: 50,
+              borderRadius: 25,
+              backgroundColor: focused ? '#eff6ff' : 'transparent',
             }}>
-              ⚙️
-            </Text>
+              <Text style={{ 
+                fontSize: focused ? 24 : 20, 
+                opacity: focused ? 1 : 0.6,
+                transform: [{ scale: focused ? 1.1 : 1 }]
+              }}>
+                ⚙️
+              </Text>
+            </View>
           ),
         }}
       />
