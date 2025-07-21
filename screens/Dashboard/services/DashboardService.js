@@ -1,6 +1,4 @@
-// Service to manage dashboard data
-class DashboardService {
-  // Mock data that simulates real business data
+
   static getKPIData() {
     return {
       toCollect: 25000,      // Outstanding receivables
@@ -166,7 +164,6 @@ class DashboardService {
     }
   }
 
-  // Method to get dashboard summary text
   static getDashboardSummary() {
     const kpi = this.getKPIData();
     const netPosition = kpi.toCollect - kpi.toPay;
@@ -181,6 +178,7 @@ class DashboardService {
         : "Monitor cash flow closely"
     };
   }
+
 }
 
 export default DashboardService;
