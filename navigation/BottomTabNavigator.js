@@ -1,6 +1,7 @@
 import React from "react";
 import { createBottomTabNavigator } from "@react-navigation/bottom-tabs";
 import DashboardScreen from "../screens/Dashboard/DashboardScreen";
+import PartiesScreen from "../screens/Parties/PartiesScreen";
 import { View, Text } from "react-native";
 
 const Tab = createBottomTabNavigator();
@@ -89,7 +90,7 @@ const BottomTabNavigator = () => {
       />
       <Tab.Screen 
         name="Parties" 
-        children={() => <PlaceholderScreen name="Parties/Customers" />}
+        component={PartiesScreen}
         options={{
           tabBarIcon: ({ color, focused }) => (
             <Text style={{ 
