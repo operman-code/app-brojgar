@@ -8,63 +8,13 @@ import {
   ScrollView,
   SafeAreaView,
   FlatList,
-  Alert,
-} from "react-native";
-import KPICard from "./components/KPICard";
-import QuickActionButton from "./components/QuickActionButton";
-import TransactionItem from "./components/TransactionItem";
-import DashboardService from "./services/DashboardService";
 
-const DashboardScreen = () => {
-  // Get data from service
-  const kpiData = DashboardService.getKPIData();
-  const recentTransactions = DashboardService.getRecentTransactions();
-  const reportShortcuts = DashboardService.getReportShortcuts();
-  const quickActions = DashboardService.getQuickActions();
-  const businessProfile = DashboardService.getBusinessProfile();
-  const dashboardSummary = DashboardService.getDashboardSummary();
-
-  // Event handlers
-  const handleQuickAction = (action) => {
-    const result = DashboardService.handleQuickAction(action);
-    Alert.alert("Action", result.message);
-  };
-
-  const handleTransactionPress = (transaction) => {
-    Alert.alert(
-      "Transaction Details",
-      `${transaction.type}: ${transaction.reference}\nAmount: ₹${transaction.amount.toLocaleString("en-IN")}\nStatus: ${transaction.status}`
-    );
-  };
-
-  const handleReportPress = (report) => {
-    Alert.alert("Report", `Opening ${report.title}`);
-  };
-
-  const handleViewAllTransactions = () => {
-    Alert.alert("Transactions", "Opening all transactions view");
-  };
-
-  const handleProfilePress = () => {
-    Alert.alert("Profile", `Business: ${businessProfile.businessName}\nOwner: ${businessProfile.ownerName}`);
-  };
-
-  const renderTransactionItem = ({ item }) => (
-    <TransactionItem 
-      transaction={item} 
-      onPress={() => handleTransactionPress(item)}
-    />
   );
 
   const renderReportShortcut = ({ item }) => (
-    <TouchableOpacity 
-      style={[styles.reportCard, { borderLeftColor: item.color }]}
-      onPress={() => handleReportPress(item)}
-      activeOpacity={0.7}
-    >
+    <TouchableOpacity style={[styles.reportCard, { borderLeftColor: item.color }]}>
       <Text style={styles.reportIcon}>{item.icon}</Text>
       <Text style={styles.reportTitle}>{item.title}</Text>
-      <Text style={styles.reportDescription}>{item.description}</Text>
     </TouchableOpacity>
   );
 
@@ -74,91 +24,96 @@ const DashboardScreen = () => {
         {/* Business Profile Header */}
         <View style={styles.header}>
           <View style={styles.headerLeft}>
-            <Text style={styles.businessName}>{businessProfile.businessName}</Text>
+            <Text style={styles.businessName}>Brojgar Business</Text>
             <Text style={styles.headerSubtitle}>Dashboard Overview</Text>
-            <Text style={styles.summaryText}>{dashboardSummary.statusMessage}</Text>
           </View>
-          <TouchableOpacity style={styles.profileIcon} onPress={handleProfilePress}>
+          <TouchableOpacity style={styles.profileIcon}>
             <Text style={styles.profileIconText}>👤</Text>
           </TouchableOpacity>
         </View>
 
-                  {/* KPI Summary Cards */}
-          <View style={styles.section}>
-            <Text style={styles.sectionTitle}>Business Overview</Text>
-            <View style={styles.kpiContainer}>
-              <View style={styles.kpiRow}>
-                <KPICard 
-                  label="To Collect"
-                  value={kpiData.toCollect}
-                  backgroundColor="#fee2e2"
-                  textColor="#dc2626"
-                />
-                <KPICard 
-                  label="To Pay"
-                  value={kpiData.toPay}
-                  backgroundColor="#fef3c7"
-                  textColor="#d97706"
-                />
+        {/* KPI Summary Cards */}
+        <View style={styles.section}>
+          <Text style={styles.sectionTitle}>Business Overview</Text>
+          <View style={styles.kpiContainer}>
+            <View style={styles.kpiRow}>
+              <View style={[styles.kpiCard, { backgroundColor: "#fee2e2" }]}>
+                <Text style={styles.kpiLabel}>To Collect</Text>
+                <Text style={[styles.kpiValue, { color: "#dc2626" }]}>
+                  {formatCurrency(kpiData.toCollect)}
+                </Text>
               </View>
-              <View style={styles.kpiRow}>
-                <KPICard 
-                  label="Stock Value"
-                  value={kpiData.stockValue}
-                  backgroundColor="#d1fae5"
-                  textColor="#059669"
-                />
-                <KPICard 
-                  label="Week's Sale"
-                  value={kpiData.weekSales}
-                  backgroundColor="#dbeafe"
-                  textColor="#2563eb"
-                />
+              <View style={[styles.kpiCard, { backgroundColor: "#fef3c7" }]}>
+                <Text style={styles.kpiLabel}>To Pay</Text>
+                <Text style={[styles.kpiValue, { color: "#d97706" }]}>
+                  {formatCurrency(kpiData.toPay)}
+                </Text>
               </View>
-              <View style={styles.kpiFullWidth}>
-                <KPICard 
-                  label="Total Balance"
-                  value={kpiData.totalBalance}
-                  backgroundColor="#f3f4f6"
-                  textColor="#374151"
-                  isLarge={true}
-                />
+            </View>
+            <View style={styles.kpiRow}>
+              <View style={[styles.kpiCard, { backgroundColor: "#d1fae5" }]}>
+                <Text style={styles.kpiLabel}>Stock Value</Text>
+                <Text style={[styles.kpiValue, { color: "#059669" }]}>
+                  {formatCurrency(kpiData.stockValue)}
+                </Text>
+              </View>
+              <View style={[styles.kpiCard, { backgroundColor: "#dbeafe" }]}>
+                <Text style={styles.kpiLabel}>Week's Sale</Text>
+                <Text style={[styles.kpiValue, { color: "#2563eb" }]}>
+                  {formatCurrency(kpiData.weekSales)}
+                </Text>
+              </View>
+            </View>
+            <View style={styles.kpiFullWidth}>
+              <View style={[styles.kpiCard, { backgroundColor: "#f3f4f6" }]}>
+                <Text style={styles.kpiLabel}>Total Balance</Text>
+                <Text style={[styles.kpiValue, { color: "#374151", fontSize: 24 }]}>
+                  {formatCurrency(kpiData.totalBalance)}
+                </Text>
               </View>
             </View>
           </View>
+        </View>
 
-                  {/* Quick Actions */}
-          <View style={styles.section}>
-            <Text style={styles.sectionTitle}>Quick Actions</Text>
-            <View style={styles.actionsContainer}>
-              {quickActions.map((action) => (
-                <QuickActionButton
-                  key={action.id}
-                  icon={action.icon}
-                  title={action.title}
-                  backgroundColor={action.backgroundColor}
-                  onPress={() => handleQuickAction(action.action)}
-                />
-              ))}
-            </View>
+        {/* Quick Actions */}
+        <View style={styles.section}>
+          <Text style={styles.sectionTitle}>Quick Actions</Text>
+          <View style={styles.actionsContainer}>
+            <TouchableOpacity style={[styles.actionButton, { backgroundColor: "#10b981" }]}>
+              <Text style={styles.actionIcon}>📄</Text>
+              <Text style={styles.actionText}>New Invoice</Text>
+            </TouchableOpacity>
+            <TouchableOpacity style={[styles.actionButton, { backgroundColor: "#3b82f6" }]}>
+              <Text style={styles.actionIcon}>💰</Text>
+              <Text style={styles.actionText}>Received Payment</Text>
+            </TouchableOpacity>
+            <TouchableOpacity style={[styles.actionButton, { backgroundColor: "#8b5cf6" }]}>
+              <Text style={styles.actionIcon}>🛒</Text>
+              <Text style={styles.actionText}>Quick Sale</Text>
+            </TouchableOpacity>
+            <TouchableOpacity style={[styles.actionButton, { backgroundColor: "#f59e0b" }]}>
+              <Text style={styles.actionIcon}>📦</Text>
+              <Text style={styles.actionText}>Add Stock</Text>
+            </TouchableOpacity>
           </View>
+        </View>
 
-                  {/* Recent Transactions */}
-          <View style={styles.section}>
-            <View style={styles.sectionHeader}>
-              <Text style={styles.sectionTitle}>Recent Activity</Text>
-              <TouchableOpacity onPress={handleViewAllTransactions}>
-                <Text style={styles.viewAllText}>View All</Text>
-              </TouchableOpacity>
-            </View>
-            <FlatList
-              data={recentTransactions.slice(0, 4)} // Show only first 4 transactions
-              renderItem={renderTransactionItem}
-              keyExtractor={(item) => item.id}
-              style={styles.transactionsList}
-              scrollEnabled={false}
-            />
+        {/* Recent Transactions */}
+        <View style={styles.section}>
+          <View style={styles.sectionHeader}>
+            <Text style={styles.sectionTitle}>Recent Activity</Text>
+            <TouchableOpacity>
+              <Text style={styles.viewAllText}>View All</Text>
+            </TouchableOpacity>
           </View>
+          <FlatList
+            data={recentTransactions}
+            renderItem={renderTransactionItem}
+            keyExtractor={(item) => item.id}
+            style={styles.transactionsList}
+            scrollEnabled={false}
+          />
+        </View>
 
         {/* Report Shortcuts */}
         <View style={styles.section}>
@@ -205,12 +160,6 @@ const styles = StyleSheet.create({
     color: "#6b7280",
     marginTop: 2,
   },
-  summaryText: {
-    fontSize: 12,
-    color: "#059669",
-    marginTop: 4,
-    fontWeight: "500",
-  },
   profileIcon: {
     width: 40,
     height: 40,
@@ -230,25 +179,7 @@ const styles = StyleSheet.create({
     fontWeight: "600",
     color: "#111827",
     marginBottom: 15,
-  },
-  sectionHeader: {
-    flexDirection: "row",
-    justifyContent: "space-between",
-    alignItems: "center",
-    marginBottom: 15,
-  },
-  viewAllText: {
-    color: "#3b82f6",
-    fontSize: 14,
-    fontWeight: "500",
-  },
-  kpiContainer: {
-    gap: 12,
-  },
-  kpiRow: {
-    flexDirection: "row",
-    gap: 12,
-  },
+
   kpiFullWidth: {
     width: "100%",
   },
@@ -371,12 +302,6 @@ const styles = StyleSheet.create({
     fontWeight: "600",
     color: "#374151",
     textAlign: "center",
-  },
-  reportDescription: {
-    fontSize: 12,
-    color: "#6b7280",
-    textAlign: "center",
-    marginTop: 4,
   },
 });
 
