@@ -8,58 +8,9 @@ import {
   ScrollView,
   SafeAreaView,
   FlatList,
-  Alert,
-} from "react-native";
-import KPICard from "./components/KPICard";
-import QuickActionButton from "./components/QuickActionButton";
-import TransactionItem from "./components/TransactionItem";
-import DashboardService from "./services/DashboardService";
-
-const DashboardScreen = () => {
-  // Get data from service
-  const kpiData = DashboardService.getKPIData();
-  const recentTransactions = DashboardService.getRecentTransactions();
-  const reportShortcuts = DashboardService.getReportShortcuts();
-  const quickActions = DashboardService.getQuickActions();
-  const businessProfile = DashboardService.getBusinessProfile();
-  const dashboardSummary = DashboardService.getDashboardSummary();
-
-  // Event handlers
-  const handleQuickAction = (action) => {
-    const result = DashboardService.handleQuickAction(action);
-    Alert.alert("Action", result.message);
-  };
-
-  const handleTransactionPress = (transaction) => {
-    Alert.alert(
-      "Transaction Details",
-      `${transaction.type}: ${transaction.reference}\nAmount: ${DashboardService.formatCurrency(transaction.amount)}\nStatus: ${transaction.status}`
-    );
-  };
-
-  const handleReportPress = (report) => {
-    Alert.alert("Report", `Opening ${report.title}`);
-  };
-
-  const handleViewAllTransactions = () => {
-    Alert.alert("Transactions", "Opening all transactions view");
-  };
-
-  const handleProfilePress = () => {
-    Alert.alert(
-      "Business Profile", 
-      `Business: ${businessProfile.businessName}\nOwner: ${businessProfile.ownerName}\nLocation: ${businessProfile.location}`
-    );
-  };
-
-  const renderTransactionItem = ({ item }) => (
-    <TransactionItem 
-      transaction={item} 
-      onPress={() => handleTransactionPress(item)}
-    />
   );
 
-  const renderReportShortcut = ({ item }) => (
+ const renderReportShortcut = ({ item }) => (
     <TouchableOpacity 
       style={[styles.reportCard, { borderLeftColor: item.color }]}
       onPress={() => handleReportPress(item)}
@@ -267,25 +218,7 @@ const styles = StyleSheet.create({
     fontWeight: "600",
     color: "#111827",
     marginBottom: 15,
-  },
-  sectionHeader: {
-    flexDirection: "row",
-    justifyContent: "space-between",
-    alignItems: "center",
-    marginBottom: 15,
-  },
-  viewAllText: {
-    color: "#3b82f6",
-    fontSize: 14,
-    fontWeight: "500",
-  },
-  kpiContainer: {
-    gap: 12,
-  },
-  kpiRow: {
-    flexDirection: "row",
-    gap: 12,
-  },
+
   kpiFullWidth: {
     width: "100%",
   },

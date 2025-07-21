@@ -1,6 +1,4 @@
-// Service to manage dashboard data and business logic
-class DashboardService {
-  // Mock data that simulates real business data for small businesses
+
   static getKPIData() {
     return {
       toCollect: 25000,      // Outstanding receivables
@@ -166,7 +164,6 @@ class DashboardService {
     }
   }
 
-  // Method to get dashboard summary insights
   static getDashboardSummary() {
     const kpi = this.getKPIData();
     const netPosition = kpi.toCollect - kpi.toPay;
@@ -182,25 +179,6 @@ class DashboardService {
     };
   }
 
-  // Utility method for currency formatting
-  static formatCurrency(amount) {
-    return `₹${amount.toLocaleString("en-IN")}`;
-  }
-
-  // Method to get status-based styling
-  static getStatusStyling(status) {
-    switch (status) {
-      case "Paid":
-      case "Received":
-        return { color: "#10b981", backgroundColor: "#d1fae5" };
-      case "Pending":
-        return { color: "#f59e0b", backgroundColor: "#fef3c7" };
-      case "Overdue":
-        return { color: "#ef4444", backgroundColor: "#fee2e2" };
-      default:
-        return { color: "#6b7280", backgroundColor: "#f3f4f6" };
-    }
-  }
 }
 
 export default DashboardService;
