@@ -146,7 +146,7 @@ const DashboardScreen = () => {
           </View>
           <View style={styles.transactionsList}>
             <FlatList
-              data={recentTransactions.slice(0, 4)} // Show only first 4 transactions
+              data={recentTransactions.slice(0, 4)}
               renderItem={renderTransactionItem}
               keyExtractor={(item) => item.id}
               scrollEnabled={false}
