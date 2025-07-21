@@ -8,9 +8,48 @@ import {
   ScrollView,
   SafeAreaView,
   FlatList,
+} from "react-native";
+
+import KPICard from "./components/KPICard";
+import QuickActionButton from "./components/QuickActionButton";
+import TransactionItem from "./components/TransactionItem";
+import DashboardService from "./services/DashboardService";
+
+const DashboardScreen = () => {
+  // Get data from service
+  const kpiData = DashboardService.getKPIData();
+  const recentTransactions = DashboardService.getRecentTransactions();
+  const reportShortcuts = DashboardService.getReportShortcuts();
+  const quickActions = DashboardService.getQuickActions();
+  const businessProfile = DashboardService.getBusinessProfile();
+  const dashboardSummary = DashboardService.getDashboardSummary();
+
+  // Event handlers
+  const handleProfilePress = () => {
+    console.log("Profile pressed");
+  };
+
+  const handleQuickAction = (action) => {
+    const result = DashboardService.handleQuickAction(action);
+    console.log(result.message);
+  };
+
+  const handleViewAllTransactions = () => {
+    console.log("View all transactions");
+  };
+
+  const handleReportPress = (report) => {
+    console.log(`Report pressed: ${report.title}`);
+  };
+
+  const renderTransactionItem = ({ item }) => (
+    <TransactionItem 
+      transaction={item} 
+      onPress={() => console.log(`Transaction pressed: ${item.id}`)}
+    />
   );
 
- const renderReportShortcut = ({ item }) => (
+  const renderReportShortcut = ({ item }) => (
     <TouchableOpacity 
       style={[styles.reportCard, { borderLeftColor: item.color }]}
       onPress={() => handleReportPress(item)}
@@ -218,7 +257,25 @@ const styles = StyleSheet.create({
     fontWeight: "600",
     color: "#111827",
     marginBottom: 15,
-
+  },
+  sectionHeader: {
+    flexDirection: "row",
+    justifyContent: "space-between",
+    alignItems: "center",
+    marginBottom: 15,
+  },
+  viewAllText: {
+    fontSize: 14,
+    color: "#3b82f6",
+    fontWeight: "500",
+  },
+  kpiContainer: {
+    gap: 12,
+  },
+  kpiRow: {
+    flexDirection: "row",
+    gap: 12,
+  },
   kpiFullWidth: {
     width: "100%",
   },
