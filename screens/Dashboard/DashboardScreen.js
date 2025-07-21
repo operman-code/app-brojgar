@@ -8,37 +8,22 @@ import {
   ScrollView,
   SafeAreaView,
   FlatList,
-  );
-  TransactionItem = ({ transaction }) => (
-    <View style={{ padding: 12, borderBottomWidth: 1, borderBottomColor: '#eee' }}>
-      <Text>{transaction.reference} - {transaction.amount}</Text>
-    </View>
-  );
-  ChartCard = () => (
-    <View style={{ padding: 16, backgroundColor: '#f0f0f0', margin: 8, borderRadius: 8 }}>
-      <Text>Chart Component</Text>
-    </View>
-  );
-  NotificationCard = ({ notification }) => (
-    <View style={{ padding: 12, backgroundColor: '#e0f2fe', margin: 4, borderRadius: 6 }}>
-      <Text>{notification.title}</Text>
-    </View>
-  );
-  DashboardService = {
-    getKPIData: () => ({ toCollect: 25000, toPay: 12500, stockValue: 185000, weekSales: 45000, totalBalance: 125000 }),
-    getRecentTransactions: () => [
-      { id: '1', reference: 'INV-001', amount: 2500, customer: 'Test Customer', type: 'Sale', status: 'Paid', date: '24-Jan' }
-    ],
-    getReportShortcuts: () => [{ id: 1, title: 'Sales Reports', icon: '📊', color: '#10b981', description: 'View sales' }],
-    getQuickActions: () => [{ id: 1, title: 'New Invoice', icon: '📄', backgroundColor: '#10b981', action: 'CREATE_INVOICE' }],
-    getBusinessProfile: () => ({ businessName: 'Test Store', ownerName: 'Test Owner' }),
-    getDashboardSummary: () => ({ statusMessage: 'All good', netPosition: 12500, cashFlow: 'Healthy' }),
-    getNotifications: () => [{ id: 1, type: 'info', title: 'Test', message: 'Test message', timestamp: '1 hour ago' }],
-    getSalesChartData: () => [{ day: 'Mon', sales: 8500 }, { day: 'Tue', sales: 12300 }],
-    formatCurrency: (amount) => `₹${amount.toLocaleString("en-IN")}`,
-    handleQuickAction: (action) => ({ success: true, message: `Action: ${action}` })
-  };
-}
+  Dimensions,
+  Animated,
+  RefreshControl,
+  TextInput,
+  Alert,
+  StatusBar,
+} from "react-native";
+
+// Import components
+import KPICard from "./components/KPICard";
+import TransactionItem from "./components/TransactionItem";
+import QuickActionButton from "./components/QuickActionButton";
+import NotificationCard from "./components/NotificationCard";
+
+// Import service
+import DashboardService from "./services/DashboardService";
 
 const { width } = Dimensions.get('window');
 
@@ -109,7 +94,7 @@ const DashboardScreen = () => {
   const handleProfilePress = () => {
     Alert.alert(
       "Business Profile",
-      `${businessProfile.businessName}\nOwner: ${businessProfile.ownerName}`,
+      `${businessProfile.businessName}\nOwner: ${businessProfile.ownerName}\nGST: ${businessProfile.gstNumber}\nPhone: ${businessProfile.phone}`,
       [{ text: "OK" }]
     );
   };
@@ -126,6 +111,36 @@ const DashboardScreen = () => {
   const handleReportPress = (report) => {
     Alert.alert("Report", `Opening ${report.title}`, [{ text: "OK" }]);
   };
+
+  const handleNotificationPress = (notification) => {
+    Alert.alert(
+      notification.title,
+      notification.message,
+      [
+        { text: "Dismiss", style: "cancel" },
+        { text: notification.actionLabel || "OK" }
+      ]
+    );
+  };
+
+  const dismissNotification = (notificationId) => {
+    setNotifications(prev => prev.filter(n => n.id !== notificationId));
+  };
+
+  const handleTransactionPress = (transaction) => {
+    Alert.alert(
+      `Transaction Details`,
+      `${transaction.reference}\nCustomer: ${transaction.customer || transaction.supplier}\nAmount: ${DashboardService.formatCurrency(transaction.amount)}\nStatus: ${transaction.status}`,
+      [{ text: "OK" }]
+    );
+  };
+
+  const renderTransactionItem = ({ item }) => (
+    <TransactionItem
+      transaction={item}
+      onPress={() => handleTransactionPress(item)}
+    />
+  );
 
   const renderReportShortcut = ({ item }) => (
     <TouchableOpacity 
@@ -228,9 +243,34 @@ const DashboardScreen = () => {
                       trend={kpiData.toPayTrend}
                     />
                   </View>
+                  <View style={styles.kpiRow}>
+                    <KPICard 
+                      label="Stock Value"
+                      value={kpiData.stockValue}
+                      backgroundColor="#e0f2fe"
+                      textColor="#0284c7"
+                      trend={kpiData.stockTrend}
+                    />
+                    <KPICard 
+                      label="Week Sales"
+                      value={kpiData.weekSales}
+                      backgroundColor="#d1fae5"
+                      textColor="#059669"
+                      trend={kpiData.salesTrend}
+                    />
+                  </View>
+                  <View style={styles.kpiRow}>
+                    <KPICard 
+                      label="Total Balance"
+                      value={kpiData.totalBalance}
+                      backgroundColor="#f3e8ff"
+                      textColor="#7c3aed"
+                      trend={kpiData.balanceTrend}
+                      isLarge={true}
+                    />
+                  </View>
                 </View>
               </View>
-
 
               {/* Quick Actions */}
               <View style={styles.section}>
@@ -425,32 +465,66 @@ const styles = StyleSheet.create({
     fontSize: 18,
     fontWeight: "600",
     color: "#111827",
-
+    marginBottom: 16,
   },
   sectionHeader: {
     flexDirection: "row",
     justifyContent: "space-between",
     alignItems: "center",
-
+    marginBottom: 16,
   },
   viewAllText: {
     fontSize: 14,
     color: "#3b82f6",
     fontWeight: "500",
   },
-
+  notificationsList: {
+    marginTop: 8,
+  },
   kpiContainer: {
     gap: 12,
   },
   kpiRow: {
     flexDirection: "row",
     gap: 12,
-
   },
   actionsContainer: {
     flexDirection: "row",
     flexWrap: "wrap",
     gap: 12,
+  },
+  searchContainer: {
+    flexDirection: "row",
+    alignItems: "center",
+    backgroundColor: "#ffffff",
+    borderRadius: 12,
+    paddingHorizontal: 16,
+    paddingVertical: 4,
+    shadowColor: "#000",
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.1,
+    shadowRadius: 3.84,
+    elevation: 3,
+  },
+  searchInput: {
+    flex: 1,
+    paddingVertical: 12,
+    fontSize: 16,
+    color: "#111827",
+  },
+  clearButton: {
+    width: 24,
+    height: 24,
+    borderRadius: 12,
+    backgroundColor: "#f3f4f6",
+    justifyContent: "center",
+    alignItems: "center",
+    marginLeft: 8,
+  },
+  clearButtonText: {
+    fontSize: 14,
+    color: "#6b7280",
+    fontWeight: "bold",
   },
   transactionsList: {
     backgroundColor: "#ffffff",
