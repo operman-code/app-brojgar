@@ -2,6 +2,8 @@ import React from "react";
 import { createBottomTabNavigator } from "@react-navigation/bottom-tabs";
 import DashboardScreen from "../screens/Dashboard/DashboardScreen";
 import PartiesScreen from "../screens/Parties/PartiesScreen";
+import InventoryScreen from "../screens/Inventory/InventoryScreen";
+import ReportsScreen from "../screens/Reports/ReportsScreen";
 import { View, Text } from "react-native";
 
 const Tab = createBottomTabNavigator();
@@ -104,7 +106,7 @@ const BottomTabNavigator = () => {
       />
       <Tab.Screen 
         name="Inventory" 
-        children={() => <PlaceholderScreen name="Inventory/Items" />}
+        component={InventoryScreen}
         options={{
           tabBarIcon: ({ color, focused }) => (
             <Text style={{ 
@@ -118,7 +120,7 @@ const BottomTabNavigator = () => {
       />
       <Tab.Screen 
         name="Reports" 
-        children={() => <PlaceholderScreen name="Reports" />}
+        component={ReportsScreen}
         options={{
           tabBarIcon: ({ color, focused }) => (
             <Text style={{ 
