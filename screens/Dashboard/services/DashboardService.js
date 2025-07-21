@@ -10,7 +10,63 @@ class DashboardService {
       stockValue: 185000,    // Total inventory value
       weekSales: 45000,      // This week's sales
       totalBalance: 125000,  // Cash + Bank balance
+      
+      // Trend data (percentage change from last period)
+      toCollectTrend: -5.2,    // Decreased by 5.2%
+      toPayTrend: 8.1,         // Increased by 8.1%
+      stockTrend: 2.3,         // Increased by 2.3%
+      salesTrend: 12.5,        // Increased by 12.5%
+      balanceTrend: 6.8,       // Increased by 6.8%
     };
+  }
+
+  static getSalesChartData() {
+    return [
+      { day: "Mon", sales: 8500 },
+      { day: "Tue", sales: 12300 },
+      { day: "Wed", sales: 9800 },
+      { day: "Thu", sales: 15200 },
+      { day: "Fri", sales: 18500 },
+      { day: "Sat", sales: 22100 },
+      { day: "Sun", sales: 14600 },
+    ];
+  }
+
+  static getNotifications() {
+    return [
+      {
+        id: 1,
+        type: "warning",
+        title: "Payment Overdue",
+        message: "Invoice INV-2024-001 from Rajesh Kumar is 5 days overdue. Consider sending a reminder.",
+        timestamp: "2 hours ago",
+        actionLabel: "Send Reminder"
+      },
+      {
+        id: 2,
+        type: "info",
+        title: "Low Stock Alert",
+        message: "5 items are running low in stock. Reorder soon to avoid stockouts.",
+        timestamp: "4 hours ago",
+        actionLabel: "View Items"
+      },
+      {
+        id: 3,
+        type: "success",
+        title: "Goal Achieved",
+        message: "Congratulations! You've achieved 110% of your monthly sales target.",
+        timestamp: "1 day ago",
+        actionLabel: "View Report"
+      },
+      {
+        id: 4,
+        type: "error",
+        title: "GST Filing Due",
+        message: "GST return filing is due in 3 days. Ensure all invoices are updated.",
+        timestamp: "2 days ago",
+        actionLabel: "File GST"
+      }
+    ];
   }
 
   static getRecentTransactions() {
@@ -69,6 +125,24 @@ class DashboardService {
         amount: 15000,
         status: "Overdue",
       },
+      {
+        id: "TXN007",
+        type: "Sale",
+        reference: "INV-2024-004",
+        customer: "Mumbai Traders",
+        date: "18-Jan",
+        amount: 5200,
+        status: "Paid",
+      },
+      {
+        id: "TXN008",
+        type: "Payment",
+        reference: "PAY-2024-009",
+        customer: "Delhi Electronics",
+        date: "17-Jan",
+        amount: 2800,
+        status: "Received",
+      },
     ];
   }
 
@@ -79,7 +153,7 @@ class DashboardService {
         title: "Sales Reports", 
         icon: "📊", 
         color: "#10b981",
-        description: "View sales analytics"
+        description: "View sales analytics and trends"
       },
       { 
         id: 2, 
@@ -102,6 +176,20 @@ class DashboardService {
         color: "#ef4444",
         description: "Customer and supplier reports"
       },
+      { 
+        id: 5, 
+        title: "Profit & Loss", 
+        icon: "💹", 
+        color: "#06b6d4",
+        description: "P&L statements and analysis"
+      },
+      { 
+        id: 6, 
+        title: "Cash Flow", 
+        icon: "💰", 
+        color: "#84cc16",
+        description: "Cash flow statements"
+      },
     ];
   }
 
@@ -116,7 +204,7 @@ class DashboardService {
       },
       {
         id: 2,
-        title: "Received Payment",
+        title: "Receive Payment",
         icon: "💰",
         backgroundColor: "#3b82f6",
         action: "RECEIVE_PAYMENT"
@@ -135,6 +223,20 @@ class DashboardService {
         backgroundColor: "#f59e0b",
         action: "ADD_STOCK"
       },
+      {
+        id: 5,
+        title: "Add Customer",
+        icon: "👤",
+        backgroundColor: "#ef4444",
+        action: "ADD_CUSTOMER"
+      },
+      {
+        id: 6,
+        title: "Expenses",
+        icon: "💳",
+        backgroundColor: "#6366f1",
+        action: "ADD_EXPENSE"
+      },
     ];
   }
 
@@ -147,6 +249,8 @@ class DashboardService {
       location: "New Delhi",
       registeredDate: "2023-01-15",
       gstNumber: "07ABCDE1234F1Z5",
+      phone: "+91 98765 43210",
+      email: "ramkumar@brojgarstore.com",
     };
   }
 
@@ -156,13 +260,17 @@ class DashboardService {
     // In a real app, this would navigate to appropriate screens
     switch (action) {
       case "CREATE_INVOICE":
-        return { success: true, message: "Navigating to Invoice Creation" };
+        return { success: true, message: "Opening Invoice Creation Form..." };
       case "RECEIVE_PAYMENT":
-        return { success: true, message: "Navigating to Payment Receipt" };
+        return { success: true, message: "Opening Payment Receipt Form..." };
       case "QUICK_SALE":
-        return { success: true, message: "Navigating to Quick Sale" };
+        return { success: true, message: "Opening Quick Sale Interface..." };
       case "ADD_STOCK":
-        return { success: true, message: "Navigating to Stock Management" };
+        return { success: true, message: "Opening Stock Management..." };
+      case "ADD_CUSTOMER":
+        return { success: true, message: "Opening Customer Registration..." };
+      case "ADD_EXPENSE":
+        return { success: true, message: "Opening Expense Entry..." };
       default:
         return { success: false, message: "Unknown action" };
     }
@@ -182,6 +290,7 @@ class DashboardService {
         : "Monitor cash flow closely"
     };
   }
+
 }
 
 export default DashboardService;
