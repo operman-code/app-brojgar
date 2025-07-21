@@ -182,7 +182,6 @@ class DashboardService {
         : "Monitor cash flow closely"
     };
   }
-
 }
 
 export default DashboardService;
