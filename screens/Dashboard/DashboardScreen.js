@@ -272,21 +272,6 @@ const DashboardScreen = () => {
                 </View>
               </View>
 
-              {/* Quick Actions */}
-              <View style={styles.section}>
-                <Text style={styles.sectionTitle}>⚡ Quick Actions</Text>
-                <View style={styles.actionsContainer}>
-                  {quickActions.map((action) => (
-                    <QuickActionButton
-                      key={action.id}
-                      icon={action.icon}
-                      title={action.title}
-                      backgroundColor={action.backgroundColor}
-                      onPress={() => handleQuickAction(action.action)}
-                    />
-                  ))}
-                </View>
-              </View>
             </>
           )}
 
@@ -355,6 +340,27 @@ const DashboardScreen = () => {
 
         </Animated.View>
       </ScrollView>
+      
+      {/* Floating Action Buttons */}
+      <View style={styles.floatingButtonsContainer}>
+        <TouchableOpacity
+          style={[styles.floatingButton, styles.secondaryButton]}
+          onPress={() => handleQuickAction('receive_payment')}
+          activeOpacity={0.8}
+        >
+          <Text style={styles.floatingButtonIcon}>💰</Text>
+          <Text style={styles.floatingButtonText}>Receive Payment</Text>
+        </TouchableOpacity>
+        
+        <TouchableOpacity
+          style={[styles.floatingButton, styles.primaryButton]}
+          onPress={() => handleQuickAction('new_invoice')}
+          activeOpacity={0.8}
+        >
+          <Text style={styles.floatingButtonIcon}>📝</Text>
+          <Text style={styles.floatingButtonText}>New Invoice</Text>
+        </TouchableOpacity>
+      </View>
     </SafeAreaView>
   );
 };
@@ -572,6 +578,41 @@ const styles = StyleSheet.create({
     color: "#6b7280",
     textAlign: "center",
     marginTop: 4,
+  },
+  floatingButtonsContainer: {
+    position: "absolute",
+    bottom: 20,
+    right: 20,
+    flexDirection: "column",
+    gap: 12,
+  },
+  floatingButton: {
+    flexDirection: "row",
+    alignItems: "center",
+    paddingHorizontal: 16,
+    paddingVertical: 12,
+    borderRadius: 25,
+    shadowColor: "#000",
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.3,
+    shadowRadius: 4.65,
+    elevation: 8,
+    minWidth: 140,
+  },
+  primaryButton: {
+    backgroundColor: "#3b82f6",
+  },
+  secondaryButton: {
+    backgroundColor: "#10b981",
+  },
+  floatingButtonIcon: {
+    fontSize: 16,
+    marginRight: 8,
+  },
+  floatingButtonText: {
+    color: "#ffffff",
+    fontSize: 14,
+    fontWeight: "600",
   },
 });
 
