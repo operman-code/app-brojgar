@@ -272,7 +272,6 @@ const DashboardScreen = () => {
                 </View>
               </View>
 
-
             </>
           )}
 
