@@ -1,3 +1,7 @@
+class DashboardService {
+  static formatCurrency(amount) {
+    return `₹${amount.toLocaleString("en-IN")}`;
+  }
 
   static getKPIData() {
     return {
