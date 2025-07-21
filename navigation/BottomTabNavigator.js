@@ -4,6 +4,7 @@ import DashboardScreen from "../screens/Dashboard/DashboardScreen";
 import PartiesScreen from "../screens/Parties/PartiesScreen";
 import InventoryScreen from "../screens/Inventory/InventoryScreen";
 import ReportsScreen from "../screens/Reports/ReportsScreen";
+import SettingsScreen from "../screens/Settings/SettingsScreen";
 import { View, Text } from "react-native";
 
 const Tab = createBottomTabNavigator();
@@ -133,8 +134,8 @@ const BottomTabNavigator = () => {
         }}
       />
       <Tab.Screen 
-        name="More" 
-        children={() => <PlaceholderScreen name="More/Settings" />}
+        name="Settings" 
+        component={SettingsScreen}
         options={{
           tabBarIcon: ({ color, focused }) => (
             <Text style={{ 
