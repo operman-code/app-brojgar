@@ -8,112 +8,66 @@ import {
   ScrollView,
   SafeAreaView,
   FlatList,
+  Alert,
 } from "react-native";
+import KPICard from "./components/KPICard";
+import QuickActionButton from "./components/QuickActionButton";
+import TransactionItem from "./components/TransactionItem";
+import DashboardService from "./services/DashboardService";
 
 const DashboardScreen = () => {
-  // Sample data - in real app, this would come from API/database
-  const kpiData = {
-    toCollect: 15000,
-    toPay: 8500,
-    stockValue: 125000,
-    weekSales: 35000,
-    totalBalance: 85000,
+  // Get data from service
+  const kpiData = DashboardService.getKPIData();
+  const recentTransactions = DashboardService.getRecentTransactions();
+  const reportShortcuts = DashboardService.getReportShortcuts();
+  const quickActions = DashboardService.getQuickActions();
+  const businessProfile = DashboardService.getBusinessProfile();
+  const dashboardSummary = DashboardService.getDashboardSummary();
+
+  // Event handlers
+  const handleQuickAction = (action) => {
+    const result = DashboardService.handleQuickAction(action);
+    Alert.alert("Action", result.message);
   };
 
-  const recentTransactions = [
-    {
-      id: "001",
-      type: "Sale",
-      reference: "INV-001",
-      customer: "Rajesh Kumar",
-      date: "20-Jul",
-      amount: 500,
-      status: "Paid",
-    },
-    {
-      id: "002",
-      type: "Purchase",
-      reference: "PUR-003",
-      supplier: "Wholesale Mart",
-      date: "19-Jul",
-      amount: 1200,
-      status: "Pending",
-    },
-    {
-      id: "003",
-      type: "Payment",
-      reference: "PAY-002",
-      customer: "Sunita Devi",
-      date: "18-Jul",
-      amount: 750,
-      status: "Received",
-    },
-    {
-      id: "004",
-      type: "Sale",
-      reference: "INV-002",
-      customer: "Amit Singh",
-      date: "17-Jul",
-      amount: 1500,
-      status: "Pending",
-    },
-  ];
-
-  const reportShortcuts = [
-    { id: 1, title: "Sales Reports", icon: "📊", color: "#10b981" },
-    { id: 2, title: "Inventory Reports", icon: "📦", color: "#f59e0b" },
-    { id: 3, title: "GST Reports", icon: "📋", color: "#8b5cf6" },
-    { id: 4, title: "Party Reports", icon: "👥", color: "#ef4444" },
-  ];
-
-  const formatCurrency = (amount) => {
-    return `₹${amount.toLocaleString("en-IN")}`;
+  const handleTransactionPress = (transaction) => {
+    Alert.alert(
+      "Transaction Details",
+      `${transaction.type}: ${transaction.reference}\nAmount: ${DashboardService.formatCurrency(transaction.amount)}\nStatus: ${transaction.status}`
+    );
   };
 
-  const getStatusColor = (status) => {
-    switch (status) {
-      case "Paid":
-      case "Received":
-        return "#10b981";
-      case "Pending":
-        return "#f59e0b";
-      case "Overdue":
-        return "#ef4444";
-      default:
-        return "#6b7280";
-    }
+  const handleReportPress = (report) => {
+    Alert.alert("Report", `Opening ${report.title}`);
+  };
+
+  const handleViewAllTransactions = () => {
+    Alert.alert("Transactions", "Opening all transactions view");
+  };
+
+  const handleProfilePress = () => {
+    Alert.alert(
+      "Business Profile", 
+      `Business: ${businessProfile.businessName}\nOwner: ${businessProfile.ownerName}\nLocation: ${businessProfile.location}`
+    );
   };
 
   const renderTransactionItem = ({ item }) => (
-    <View style={styles.transactionItem}>
-      <View style={styles.transactionLeft}>
-        <Text style={styles.transactionType}>{item.type}</Text>
-        <Text style={styles.transactionReference}>{item.reference}</Text>
-        <Text style={styles.transactionCustomer}>
-          {item.customer || item.supplier}
-        </Text>
-      </View>
-      <View style={styles.transactionRight}>
-        <Text style={styles.transactionAmount}>
-          {formatCurrency(item.amount)}
-        </Text>
-        <Text style={styles.transactionDate}>{item.date}</Text>
-        <View
-          style={[
-            styles.statusBadge,
-            { backgroundColor: getStatusColor(item.status) },
-          ]}
-        >
-          <Text style={styles.statusText}>{item.status}</Text>
-        </View>
-      </View>
-    </View>
+    <TransactionItem 
+      transaction={item} 
+      onPress={() => handleTransactionPress(item)}
+    />
   );
 
   const renderReportShortcut = ({ item }) => (
-    <TouchableOpacity style={[styles.reportCard, { borderLeftColor: item.color }]}>
+    <TouchableOpacity 
+      style={[styles.reportCard, { borderLeftColor: item.color }]}
+      onPress={() => handleReportPress(item)}
+      activeOpacity={0.7}
+    >
       <Text style={styles.reportIcon}>{item.icon}</Text>
       <Text style={styles.reportTitle}>{item.title}</Text>
+      <Text style={styles.reportDescription}>{item.description}</Text>
     </TouchableOpacity>
   );
 
@@ -123,10 +77,11 @@ const DashboardScreen = () => {
         {/* Business Profile Header */}
         <View style={styles.header}>
           <View style={styles.headerLeft}>
-            <Text style={styles.businessName}>Brojgar Business</Text>
+            <Text style={styles.businessName}>{businessProfile.businessName}</Text>
             <Text style={styles.headerSubtitle}>Dashboard Overview</Text>
+            <Text style={styles.summaryText}>{dashboardSummary.statusMessage}</Text>
           </View>
-          <TouchableOpacity style={styles.profileIcon}>
+          <TouchableOpacity style={styles.profileIcon} onPress={handleProfilePress}>
             <Text style={styles.profileIconText}>👤</Text>
           </TouchableOpacity>
         </View>
@@ -136,40 +91,41 @@ const DashboardScreen = () => {
           <Text style={styles.sectionTitle}>Business Overview</Text>
           <View style={styles.kpiContainer}>
             <View style={styles.kpiRow}>
-              <View style={[styles.kpiCard, { backgroundColor: "#fee2e2" }]}>
-                <Text style={styles.kpiLabel}>To Collect</Text>
-                <Text style={[styles.kpiValue, { color: "#dc2626" }]}>
-                  {formatCurrency(kpiData.toCollect)}
-                </Text>
-              </View>
-              <View style={[styles.kpiCard, { backgroundColor: "#fef3c7" }]}>
-                <Text style={styles.kpiLabel}>To Pay</Text>
-                <Text style={[styles.kpiValue, { color: "#d97706" }]}>
-                  {formatCurrency(kpiData.toPay)}
-                </Text>
-              </View>
+              <KPICard 
+                label="To Collect"
+                value={kpiData.toCollect}
+                backgroundColor="#fee2e2"
+                textColor="#dc2626"
+              />
+              <KPICard 
+                label="To Pay"
+                value={kpiData.toPay}
+                backgroundColor="#fef3c7"
+                textColor="#d97706"
+              />
             </View>
             <View style={styles.kpiRow}>
-              <View style={[styles.kpiCard, { backgroundColor: "#d1fae5" }]}>
-                <Text style={styles.kpiLabel}>Stock Value</Text>
-                <Text style={[styles.kpiValue, { color: "#059669" }]}>
-                  {formatCurrency(kpiData.stockValue)}
-                </Text>
-              </View>
-              <View style={[styles.kpiCard, { backgroundColor: "#dbeafe" }]}>
-                <Text style={styles.kpiLabel}>Week's Sale</Text>
-                <Text style={[styles.kpiValue, { color: "#2563eb" }]}>
-                  {formatCurrency(kpiData.weekSales)}
-                </Text>
-              </View>
+              <KPICard 
+                label="Stock Value"
+                value={kpiData.stockValue}
+                backgroundColor="#d1fae5"
+                textColor="#059669"
+              />
+              <KPICard 
+                label="Week's Sale"
+                value={kpiData.weekSales}
+                backgroundColor="#dbeafe"
+                textColor="#2563eb"
+              />
             </View>
             <View style={styles.kpiFullWidth}>
-              <View style={[styles.kpiCard, { backgroundColor: "#f3f4f6" }]}>
-                <Text style={styles.kpiLabel}>Total Balance</Text>
-                <Text style={[styles.kpiValue, { color: "#374151", fontSize: 24 }]}>
-                  {formatCurrency(kpiData.totalBalance)}
-                </Text>
-              </View>
+              <KPICard 
+                label="Total Balance"
+                value={kpiData.totalBalance}
+                backgroundColor="#f3f4f6"
+                textColor="#374151"
+                isLarge={true}
+              />
             </View>
           </View>
         </View>
@@ -178,22 +134,15 @@ const DashboardScreen = () => {
         <View style={styles.section}>
           <Text style={styles.sectionTitle}>Quick Actions</Text>
           <View style={styles.actionsContainer}>
-            <TouchableOpacity style={[styles.actionButton, { backgroundColor: "#10b981" }]}>
-              <Text style={styles.actionIcon}>📄</Text>
-              <Text style={styles.actionText}>New Invoice</Text>
-            </TouchableOpacity>
-            <TouchableOpacity style={[styles.actionButton, { backgroundColor: "#3b82f6" }]}>
-              <Text style={styles.actionIcon}>💰</Text>
-              <Text style={styles.actionText}>Received Payment</Text>
-            </TouchableOpacity>
-            <TouchableOpacity style={[styles.actionButton, { backgroundColor: "#8b5cf6" }]}>
-              <Text style={styles.actionIcon}>🛒</Text>
-              <Text style={styles.actionText}>Quick Sale</Text>
-            </TouchableOpacity>
-            <TouchableOpacity style={[styles.actionButton, { backgroundColor: "#f59e0b" }]}>
-              <Text style={styles.actionIcon}>📦</Text>
-              <Text style={styles.actionText}>Add Stock</Text>
-            </TouchableOpacity>
+            {quickActions.map((action) => (
+              <QuickActionButton
+                key={action.id}
+                icon={action.icon}
+                title={action.title}
+                backgroundColor={action.backgroundColor}
+                onPress={() => handleQuickAction(action.action)}
+              />
+            ))}
           </View>
         </View>
 
@@ -201,17 +150,19 @@ const DashboardScreen = () => {
         <View style={styles.section}>
           <View style={styles.sectionHeader}>
             <Text style={styles.sectionTitle}>Recent Activity</Text>
-            <TouchableOpacity>
+            <TouchableOpacity onPress={handleViewAllTransactions}>
               <Text style={styles.viewAllText}>View All</Text>
             </TouchableOpacity>
           </View>
-          <FlatList
-            data={recentTransactions}
-            renderItem={renderTransactionItem}
-            keyExtractor={(item) => item.id}
-            style={styles.transactionsList}
-            scrollEnabled={false}
-          />
+          <View style={styles.transactionsList}>
+            <FlatList
+              data={recentTransactions.slice(0, 4)} // Show only first 4 transactions
+              renderItem={renderTransactionItem}
+              keyExtractor={(item) => item.id}
+              scrollEnabled={false}
+              showsVerticalScrollIndicator={false}
+            />
+          </View>
         </View>
 
         {/* Report Shortcuts */}
@@ -225,7 +176,39 @@ const DashboardScreen = () => {
             style={styles.reportsGrid}
             scrollEnabled={false}
             columnWrapperStyle={styles.reportRow}
+            showsVerticalScrollIndicator={false}
           />
+        </View>
+
+        {/* Business Insights */}
+        <View style={styles.section}>
+          <Text style={styles.sectionTitle}>Business Insights</Text>
+          <View style={styles.insightsContainer}>
+            <View style={styles.insightCard}>
+              <Text style={styles.insightLabel}>Net Position</Text>
+              <Text style={[
+                styles.insightValue, 
+                { color: dashboardSummary.netPosition > 0 ? "#059669" : "#dc2626" }
+              ]}>
+                {DashboardService.formatCurrency(Math.abs(dashboardSummary.netPosition))}
+              </Text>
+              <Text style={styles.insightDescription}>
+                {dashboardSummary.netPosition > 0 ? "More to collect" : "More to pay"}
+              </Text>
+            </View>
+            <View style={styles.insightCard}>
+              <Text style={styles.insightLabel}>Cash Flow</Text>
+              <Text style={[
+                styles.insightValue, 
+                { color: kpiData.totalBalance > 50000 ? "#059669" : "#d97706" }
+              ]}>
+                {dashboardSummary.cashFlow.includes("Healthy") ? "🟢" : "🟡"}
+              </Text>
+              <Text style={styles.insightDescription}>
+                {dashboardSummary.cashFlow}
+              </Text>
+            </View>
+          </View>
         </View>
       </ScrollView>
     </SafeAreaView>
@@ -258,6 +241,12 @@ const styles = StyleSheet.create({
     fontSize: 14,
     color: "#6b7280",
     marginTop: 2,
+  },
+  summaryText: {
+    fontSize: 12,
+    color: "#059669",
+    marginTop: 4,
+    fontWeight: "500",
   },
   profileIcon: {
     width: 40,
@@ -300,99 +289,15 @@ const styles = StyleSheet.create({
   kpiFullWidth: {
     width: "100%",
   },
-  kpiCard: {
-    flex: 1,
-    padding: 16,
-    borderRadius: 12,
-    alignItems: "center",
-  },
-  kpiLabel: {
-    fontSize: 12,
-    color: "#6b7280",
-    marginBottom: 8,
-    textAlign: "center",
-  },
-  kpiValue: {
-    fontSize: 18,
-    fontWeight: "bold",
-    textAlign: "center",
-  },
   actionsContainer: {
     flexDirection: "row",
     flexWrap: "wrap",
     gap: 12,
   },
-  actionButton: {
-    flex: 1,
-    minWidth: "47%",
-    padding: 16,
-    borderRadius: 12,
-    alignItems: "center",
-    justifyContent: "center",
-  },
-  actionIcon: {
-    fontSize: 24,
-    marginBottom: 8,
-  },
-  actionText: {
-    color: "#ffffff",
-    fontSize: 14,
-    fontWeight: "600",
-    textAlign: "center",
-  },
   transactionsList: {
     backgroundColor: "#ffffff",
     borderRadius: 12,
-  },
-  transactionItem: {
-    flexDirection: "row",
-    justifyContent: "space-between",
-    alignItems: "center",
-    padding: 16,
-    borderBottomWidth: 1,
-    borderBottomColor: "#f3f4f6",
-  },
-  transactionLeft: {
-    flex: 1,
-  },
-  transactionType: {
-    fontSize: 16,
-    fontWeight: "600",
-    color: "#111827",
-  },
-  transactionReference: {
-    fontSize: 12,
-    color: "#6b7280",
-    marginTop: 2,
-  },
-  transactionCustomer: {
-    fontSize: 14,
-    color: "#374151",
-    marginTop: 4,
-  },
-  transactionRight: {
-    alignItems: "flex-end",
-  },
-  transactionAmount: {
-    fontSize: 16,
-    fontWeight: "600",
-    color: "#111827",
-  },
-  transactionDate: {
-    fontSize: 12,
-    color: "#6b7280",
-    marginTop: 2,
-  },
-  statusBadge: {
-    paddingHorizontal: 8,
-    paddingVertical: 4,
-    borderRadius: 12,
-    marginTop: 4,
-  },
-  statusText: {
-    color: "#ffffff",
-    fontSize: 10,
-    fontWeight: "600",
+    overflow: "hidden",
   },
   reportsGrid: {
     backgroundColor: "transparent",
@@ -418,6 +323,40 @@ const styles = StyleSheet.create({
     fontSize: 14,
     fontWeight: "600",
     color: "#374151",
+    textAlign: "center",
+  },
+  reportDescription: {
+    fontSize: 12,
+    color: "#6b7280",
+    textAlign: "center",
+    marginTop: 4,
+  },
+  insightsContainer: {
+    flexDirection: "row",
+    gap: 12,
+  },
+  insightCard: {
+    flex: 1,
+    backgroundColor: "#ffffff",
+    padding: 16,
+    borderRadius: 12,
+    alignItems: "center",
+  },
+  insightLabel: {
+    fontSize: 12,
+    color: "#6b7280",
+    marginBottom: 8,
+    textAlign: "center",
+  },
+  insightValue: {
+    fontSize: 18,
+    fontWeight: "bold",
+    textAlign: "center",
+    marginBottom: 4,
+  },
+  insightDescription: {
+    fontSize: 11,
+    color: "#6b7280",
     textAlign: "center",
   },
 });
