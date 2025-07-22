@@ -645,20 +645,155 @@ class InventoryService {
     const topItems = this.getTopSellingItems(3);
     const reorderItems = this.getItemsNeedingReorder();
 
+    // Calculate growth trends (mock data)
+    const itemsGrowth = Math.floor(Math.random() * 20) - 10; // -10% to +10%
+    const valueGrowth = Math.floor(Math.random() * 30) - 15; // -15% to +15%
+
     return {
       totalItems: stats.totalItems,
-      totalStockValue: this.formatCurrency(stats.totalStockValue),
-      totalRetailValue: this.formatCurrency(stats.totalRetailValue),
-      potentialProfit: this.formatCurrency(stats.potentialProfit),
+      totalStockValue: stats.totalStockValue,
+      totalRetailValue: stats.totalRetailValue,
+      potentialProfit: stats.potentialProfit,
       lowStockCount: stats.lowStockCount,
       outOfStockCount: stats.outOfStockCount,
       criticalAlerts: alerts.filter(a => a.type === 'critical').length,
       topSellingItems: topItems,
       reorderCount: reorderItems.length,
       categories: Object.keys(stats.categoryStats).length,
+      itemsGrowth,
+      valueGrowth,
     };
   }
+   // Get low stock items for dashboard
+  static async getLowStockItems() {
+    return new Promise((resolve) => {
+      setTimeout(() => {
+        const lowStockItems = this.items.filter(item => 
+          item.stock <= item.minStock && item.stock > 0
+        );
+        resolve(lowStockItems);
+      }, 200);
+    });
+  }
 
+  // Get category breakdown for dashboard
+  static async getCategoryBreakdown() {
+    return new Promise((resolve) => {
+      setTimeout(() => {
+        const categories = {};
+        const categoryColors = {
+          'Electronics': '#3b82f6',
+          'Mobile Accessories': '#10b981',
+          'Computers': '#8b5cf6',
+          'Audio': '#f59e0b',
+          'Gaming': '#ef4444',
+          'Cables': '#6b7280',
+          'Others': '#ec4899'
+        };
+        const categoryIcons = {
+          'Electronics': '⚡',
+          'Mobile Accessories': '📱',
+          'Computers': '💻',
+          'Audio': '🎵',
+          'Gaming': '🎮',
+          'Cables': '🔌',
+          'Others': '📦'
+        };
+
+        this.items.forEach(item => {
+          if (!categories[item.category]) {
+            categories[item.category] = {
+              name: item.category,
+              itemCount: 0,
+              totalValue: 0,
+              color: categoryColors[item.category] || '#6b7280',
+              icon: categoryIcons[item.category] || '📦'
+            };
+          }
+          categories[item.category].itemCount++;
+          categories[item.category].totalValue += item.stock * item.costPrice;
+        });
+
+        resolve(Object.values(categories));
+      }, 250);
+    });
+  }
+
+  // Get recent activity for dashboard
+  static async getRecentActivity() {
+    return new Promise((resolve) => {
+      setTimeout(() => {
+        const activities = [
+          {
+            id: '1',
+            action: 'Stock Added',
+            itemName: 'iPhone 15 Pro',
+            quantity: 50,
+            type: 'in',
+            timestamp: '2 hours ago'
+          },
+          {
+            id: '2',
+            action: 'Stock Removed',
+            itemName: 'Samsung Galaxy S24',
+            quantity: 15,
+            type: 'out',
+            timestamp: '4 hours ago'
+          },
+          {
+            id: '3',
+            action: 'New Item Added',
+            itemName: 'MacBook Air M3',
+            quantity: 25,
+            type: 'in',
+            timestamp: '6 hours ago'
+          },
+          {
+            id: '4',
+            action: 'Stock Sold',
+            itemName: 'AirPods Pro',
+            quantity: 8,
+            type: 'out',
+            timestamp: '8 hours ago'
+          },
+          {
+            id: '5',
+            action: 'Stock Adjusted',
+            itemName: 'iPad Pro',
+            quantity: 5,
+            type: 'in',
+            timestamp: '1 day ago'
+          },
+          {
+            id: '6',
+            action: 'Stock Removed',
+            itemName: 'Apple Watch',
+            quantity: 12,
+            type: 'out',
+            timestamp: '1 day ago'
+          },
+          {
+            id: '7',
+            action: 'Reorder Alert',
+            itemName: 'Lightning Cable',
+            quantity: 10,
+            type: 'in',
+            timestamp: '2 days ago'
+          },
+          {
+            id: '8',
+            action: 'Stock Added',
+            itemName: 'Wireless Charger',
+            quantity: 30,
+            type: 'in',
+            timestamp: '2 days ago'
+          }
+        ];
+
+        resolve(activities);
+      }, 200);
+    });
+  }
   // Calculate profit margin for item
   static calculateProfitMargin(item) {
     if (item.costPrice === 0) return 0;
