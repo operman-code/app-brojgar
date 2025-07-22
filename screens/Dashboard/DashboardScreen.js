@@ -102,9 +102,15 @@ const DashboardScreen = () => {
   };
 
   const handleQuickAction = (action) => {
+    if (action === 'new_invoice') {
+      toggleQuickMenu(); // Close menu first
+      navigation.navigate("Invoice");
+      return;
+    }
+    
     const result = DashboardService.handleQuickAction(action);
     Alert.alert("Action", result.message, [{ text: "OK" }]);
-  toggleQuickMenu(); // Close menu after action
+
   };
 
   const toggleQuickMenu = () => {
@@ -441,7 +447,6 @@ const DashboardScreen = () => {
           onPress={toggleQuickMenu}
           activeOpacity={0.8}
         >
-        <Animated.View
             style={{
               transform: [{
                 rotate: quickMenuAnim.interpolate({
@@ -745,7 +750,7 @@ const styles = StyleSheet.create({
   },
   quickActionContainer: {
     position: "absolute",
-    bottom: 90,
+
     right: 20,
     alignItems: "flex-end",
   },
@@ -778,7 +783,7 @@ const styles = StyleSheet.create({
     alignItems: "flex-end",
     gap: 12,
   },
-  
+
   quickActionOption: {
     flexDirection: "row",
     alignItems: "center",

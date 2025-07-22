@@ -1,4 +1,4 @@
-import React from "react";
+import React, { useState } from "react";
 import { createBottomTabNavigator } from "@react-navigation/bottom-tabs";
 import DashboardScreen from "../screens/Dashboard/DashboardScreen";
 import PartiesScreen from "../screens/Parties/PartiesScreen";
@@ -45,6 +45,37 @@ const PlaceholderScreen = ({ name }) => (
 );
 
 const BottomTabNavigator = () => {
+  const [currentScreen, setCurrentScreen] = useState('main');
+  const [invoiceData, setInvoiceData] = useState(null);
+
+  const navigation = {
+    navigate: (screen, params) => {
+      if (screen === "Invoice") {
+        setCurrentScreen('invoice');
+      } else if (screen === "InvoiceTemplate") {
+        setCurrentScreen('invoiceTemplate');
+        setInvoiceData(params?.invoiceData);
+      } else if (screen === "Dashboard") {
+        setCurrentScreen('main');
+      }
+    },
+    goBack: () => {
+      if (currentScreen === 'invoiceTemplate') {
+        setCurrentScreen('invoice');
+      } else if (currentScreen === 'invoice') {
+        setCurrentScreen('main');
+      }
+    }
+  };
+
+  if (currentScreen === 'invoice') {
+    return <InvoiceScreen navigation={navigation} />;
+  }
+
+  if (currentScreen === 'invoiceTemplate') {
+    return <InvoiceTemplateScreen navigation={navigation} route={{ params: { invoiceData } }} />;
+  }
+
   return (
     <Tab.Navigator
       screenOptions={({ route }) => ({
@@ -96,7 +127,7 @@ const BottomTabNavigator = () => {
     >
       <Tab.Screen 
         name="Dashboard" 
-        component={DashboardScreen}
+        children={() => <DashboardScreen navigation={navigation} />}
         options={{
           tabBarIcon: ({ color, focused }) => (
             <View style={{
@@ -120,7 +151,7 @@ const BottomTabNavigator = () => {
       />
       <Tab.Screen 
         name="Parties" 
-        component={PartiesScreen}
+        children={() => <PartiesScreen navigation={navigation} />}
         options={{
           tabBarIcon: ({ color, focused }) => (
             <View style={{
@@ -144,7 +175,7 @@ const BottomTabNavigator = () => {
       />
       <Tab.Screen 
         name="Inventory" 
-        component={InventoryScreen}
+        children={() => <InventoryScreen navigation={navigation} />}
         options={{
           tabBarIcon: ({ color, focused }) => (
             <View style={{
@@ -168,7 +199,7 @@ const BottomTabNavigator = () => {
       />
       <Tab.Screen 
         name="Reports" 
-        component={ReportsScreen}
+        children={() => <ReportsScreen navigation={navigation} />}
         options={{
           tabBarIcon: ({ color, focused }) => (
             <View style={{
@@ -192,7 +223,7 @@ const BottomTabNavigator = () => {
       />
       <Tab.Screen 
         name="Settings" 
-        component={SettingsScreen}
+        children={() => <SettingsScreen navigation={navigation} />}
         options={{
           tabBarIcon: ({ color, focused }) => (
             <View style={{

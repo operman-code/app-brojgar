@@ -137,7 +137,7 @@ const InventoryScreen = () => {
     setStockQuantity("");
     setStockModalVisible(true);
   };
-  
+
   // Auto-generate barcode function
   const generateBarcode = () => {
     const timestamp = Date.now().toString();
@@ -145,7 +145,7 @@ const InventoryScreen = () => {
     const barcode = `${timestamp.slice(-8)}${random}`;
     setFormData({ ...formData, barcode: barcode });
   };
-  
+
   const handleSave = async () => {
     if (!formData.name.trim()) {
       Alert.alert("Validation Error", "Item name is required");
@@ -896,7 +896,7 @@ const styles = StyleSheet.create({
   itemsList: {
     flex: 1,
     paddingHorizontal: 20,
-    paddingTop: 16,
+    paddingTop: 8,
   },
   itemCard: {
     backgroundColor: "#ffffff",
