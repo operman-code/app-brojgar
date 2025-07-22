@@ -62,7 +62,9 @@ const InvoiceTemplateScreen = ({ navigation, route }) => {
     const discountAmount = invoiceData.discountAmount || 0;
     const total = invoiceData.total || 0;
     
-    const amountInWords = InvoiceService.numberToWords(Math.floor(total));
+    const amountInWords = InvoiceService.numberToWords ? 
+      InvoiceService.numberToWords(Math.floor(total)) : 
+      `${Math.floor(total)} Rupees Only`;
 
     return `
     <!DOCTYPE html>
@@ -437,7 +439,6 @@ const InvoiceTemplateScreen = ({ navigation, route }) => {
             text: "Send via WhatsApp",
             onPress: async () => {
               const message = `Hi! Please find your invoice ${invoice.invoiceNumber} for ₹${invoice.total.toLocaleString('en-IN')}. Thank you for your business! 🙏`;
-              const whatsappUrl = `whatsapp://send?text=${encodeURIComponent(message)}`;
               
               try {
                 await Share.share({
@@ -483,7 +484,7 @@ const InvoiceTemplateScreen = ({ navigation, route }) => {
         
         if (result.success) {
           Alert.alert("Success", "Invoice saved as draft");
-          navigation.navigate('Invoice'); // Go back to create new invoice
+          navigation.goBack();
         } else {
           Alert.alert("Error", result.error);
         }
@@ -493,19 +494,6 @@ const InvoiceTemplateScreen = ({ navigation, route }) => {
     } catch (error) {
       console.error('❌ Error saving invoice:', error);
       Alert.alert("Error", "Failed to save invoice");
-    }
-  };
-
-  const handleMarkAsSent = async () => {
-    try {
-      if (invoice.id) {
-        await InvoiceService.updateInvoiceStatus(invoice.id, 'sent');
-        Alert.alert("Success", "Invoice marked as sent");
-        setInvoice(prev => ({ ...prev, status: 'sent' }));
-      }
-    } catch (error) {
-      console.error('❌ Error updating invoice status:', error);
-      Alert.alert("Error", "Failed to update invoice status");
     }
   };
 
@@ -700,7 +688,10 @@ const InvoiceTemplateScreen = ({ navigation, route }) => {
         <View style={styles.amountWordsSection}>
           <Text style={styles.amountWordsLabel}>Amount in Words:</Text>
           <Text style={styles.amountWordsText}>
-            {InvoiceService.numberToWords(Math.floor(total))}
+            {InvoiceService.numberToWords ? 
+              InvoiceService.numberToWords(Math.floor(total)) : 
+              `${Math.floor(total)} Rupees Only`
+            }
           </Text>
         </View>
 
@@ -753,15 +744,6 @@ const InvoiceTemplateScreen = ({ navigation, route }) => {
             onPress={handleSaveAsDraft}
           >
             <Text style={styles.actionButtonText}>💾 Save</Text>
-          </TouchableOpacity>
-        )}
-        
-        {invoice.id && invoice.status === 'draft' && (
-          <TouchableOpacity
-            style={[styles.actionButton, styles.sentButton]}
-            onPress={handleMarkAsSent}
-          >
-            <Text style={styles.actionButtonText}>✅ Mark Sent</Text>
           </TouchableOpacity>
         )}
       </View>
@@ -1101,9 +1083,6 @@ const styles = StyleSheet.create({
   },
   saveButton: {
     backgroundColor: '#F59E0B',
-  },
-  sentButton: {
-    backgroundColor: '#8B5CF6',
   },
   actionButtonText: {
     color: '#FFFFFF',
