@@ -110,7 +110,7 @@ const DashboardScreen = () => {
     
     const result = DashboardService.handleQuickAction(action);
     Alert.alert("Action", result.message, [{ text: "OK" }]);
-    toggleQuickMenu(); // Close menu after action
+
   };
 
   const toggleQuickMenu = () => {
@@ -309,7 +309,6 @@ const DashboardScreen = () => {
                 </View>
               </View>
 
-
             </>
           )}
 
@@ -448,7 +447,6 @@ const DashboardScreen = () => {
           onPress={toggleQuickMenu}
           activeOpacity={0.8}
         >
-          <Animated.View
             style={{
               transform: [{
                 rotate: quickMenuAnim.interpolate({
@@ -752,7 +750,7 @@ const styles = StyleSheet.create({
   },
   quickActionContainer: {
     position: "absolute",
-    bottom: 90, // Above the bottom navbar
+
     right: 20,
     alignItems: "flex-end",
   },
@@ -785,6 +783,7 @@ const styles = StyleSheet.create({
     alignItems: "flex-end",
     gap: 12,
   },
+
   quickActionOption: {
     flexDirection: "row",
     alignItems: "center",
