@@ -606,17 +606,42 @@ const InvoiceScreen = ({ navigation, route }) => {
         </View>
 
         {/* Action Buttons */}
-        <View style={styles.actionButtons}>
-          <TouchableOpacity
-            style={styles.generateButton}
-            onPress={() => saveInvoice('sent')}
-            disabled={saving || invoiceData.items.length === 0}
-          >
-            <Text style={styles.generateButtonText}>
-              {saving ? 'Generating...' : 'Generate Invoice'}
-            </Text>
-          </TouchableOpacity>
-        </View>
+<View style={styles.actionButtons}>
+  <TouchableOpacity
+    style={styles.previewButton}
+    onPress={() => {
+      if (invoiceData.items.length === 0) {
+        Alert.alert("Error", "Please add at least one item to preview");
+        return;
+      }
+      if (!invoiceData.partyId) {
+        Alert.alert("Error", "Please select a customer to preview");
+        return;
+      }
+      
+      // Navigate to template with live preview
+      navigation.navigate('InvoiceTemplate', { 
+        invoiceData: invoiceData,
+        isPreview: true 
+      });
+    }}
+    disabled={saving || invoiceData.items.length === 0}
+  >
+    <Text style={styles.previewButtonText}>
+      👁️ Preview Invoice
+    </Text>
+  </TouchableOpacity>
+
+  <TouchableOpacity
+    style={styles.generateButton}
+    onPress={() => saveInvoice('sent')}
+    disabled={saving || invoiceData.items.length === 0}
+  >
+    <Text style={styles.generateButtonText}>
+      {saving ? 'Generating...' : '📄 Generate & Save'}
+    </Text>
+  </TouchableOpacity>
+</View>
 
         <View style={{ height: 50 }} />
       </ScrollView>
@@ -1329,6 +1354,18 @@ const styles = StyleSheet.create({
     fontWeight: 'bold',
     color: '#3B82F6',
   },
+  previewButton: {
+  backgroundColor: '#10B981',
+  paddingVertical: 15,
+  borderRadius: 12,
+  alignItems: 'center',
+  marginBottom: 10,
+},
+previewButtonText: {
+  color: '#FFFFFF',
+  fontSize: 16,
+  fontWeight: 'bold',
+},
 });
 
 export default InvoiceScreen;
