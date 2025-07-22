@@ -1,10 +1,8 @@
+// babel.config.js
 module.exports = function(api) {
-   api.cache(true);
-   return {
-     presets: ['babel-preset-expo'],
-     plugins: [
-       'expo-router/babel',
-       'react-native-reanimated/plugin'
-       ]
+  api.cache(true);
+  return {
+    presets: ['babel-preset-expo'],
+    // Remove expo-router/babel line since it's deprecated in SDK 50
   };
 };
