@@ -1020,3 +1020,5 @@ const styles = StyleSheet.create({
     backgroundColor: "#ffffff",
   },
 });
+
+export default InvoiceScreen;
