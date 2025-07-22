@@ -450,6 +450,7 @@ const DashboardScreen = ({ navigation }) => {
           onPress={toggleQuickMenu}
           activeOpacity={0.8}
         >
+          <Animated.View
             style={{
               transform: [{
                 rotate: quickMenuAnim.interpolate({
