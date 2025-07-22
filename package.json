@@ -25,7 +25,8 @@
     "react-native-vector-icons": "^9.2.0",
     "react-native-reanimated": "~3.6.2",
     "ngrok": "^4.3.3",
-    "uuid": "^9.0.0"
+    "uuid": "^9.0.0",
+    "expo-sqlite": "^11.1.1"
   },
   "devDependencies": {
     "@babel/core": "^7.20.0"
