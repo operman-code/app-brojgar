@@ -14,7 +14,7 @@ const AppLoader = () => {
 
   const initializeApp = async () => {
     try {
-      setLoadingMessage('Setting up app...');
+      setLoadingMessage('Setting up Brojgar...');
       
       // Temporarily disable database initialization to fix TurboModule error
       // await DatabaseInitializer.initializeApp();
@@ -41,8 +41,8 @@ const AppLoader = () => {
         {/* App Logo/Brand */}
         <View style={styles.brandContainer}>
           <View style={styles.logoContainer}>
-            <Text style={styles.logoIcon}>📊</Text>
-            <Text style={styles.brandName}>Business Manager</Text>
+            <Text style={styles.logoIcon}>💼</Text>
+            <Text style={styles.brandName}>Brojgar</Text>
             <Text style={styles.brandTagline}>Complete Business Solution</Text>
           </View>
         </View>
@@ -68,7 +68,7 @@ const AppLoader = () => {
 
         {/* Footer */}
         <View style={styles.footer}>
-          <Text style={styles.footerText}>Business Management App</Text>
+          <Text style={styles.footerText}>Brojgar Business App</Text>
           <Text style={styles.versionText}>v1.0.0</Text>
         </View>
       </View>
@@ -100,11 +100,12 @@ const styles = StyleSheet.create({
     marginBottom: 20,
   },
   brandName: {
-    fontSize: 32,
+    fontSize: 38,
     fontWeight: 'bold',
     color: '#ffffff',
     marginBottom: 8,
     textAlign: 'center',
+    letterSpacing: 2,
   },
   brandTagline: {
     fontSize: 16,
