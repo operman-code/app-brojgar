@@ -534,6 +534,38 @@ const ReportsScreen = () => {
         <Text style={styles.headerSubtitle}>Business insights and performance metrics</Text>
       </View>
 
+       {/* Quick Metrics Overview */}
+      <ScrollView 
+        horizontal 
+        showsHorizontalScrollIndicator={false}
+        style={styles.quickMetricsContainer}
+        contentContainerStyle={styles.quickMetricsContent}
+      >
+        <View style={[styles.quickMetricCard, { backgroundColor: "#dbeafe" }]}>
+          <Text style={styles.quickMetricIcon}>📈</Text>
+          <Text style={styles.quickMetricValue}>₹{businessMetrics.totalRevenue?.toLocaleString("en-IN") || "0"}</Text>
+          <Text style={styles.quickMetricLabel}>Total Revenue</Text>
+        </View>
+        
+        <View style={[styles.quickMetricCard, { backgroundColor: "#dcfce7" }]}>
+          <Text style={styles.quickMetricIcon}>💰</Text>
+          <Text style={styles.quickMetricValue}>₹{businessMetrics.totalProfit?.toLocaleString("en-IN") || "0"}</Text>
+          <Text style={styles.quickMetricLabel}>Net Profit</Text>
+        </View>
+        
+        <View style={[styles.quickMetricCard, { backgroundColor: "#fef3c7" }]}>
+          <Text style={styles.quickMetricIcon}>🧾</Text>
+          <Text style={styles.quickMetricValue}>{businessMetrics.totalInvoices || 0}</Text>
+          <Text style={styles.quickMetricLabel}>Total Invoices</Text>
+        </View>
+        
+        <View style={[styles.quickMetricCard, { backgroundColor: "#fce7f3" }]}>
+          <Text style={styles.quickMetricIcon}>👥</Text>
+          <Text style={styles.quickMetricValue}>{partiesData.totalParties || 0}</Text>
+          <Text style={styles.quickMetricLabel}>Active Parties</Text>
+        </View>
+      </ScrollView>
+
       {/* Tab Navigation */}
       <ScrollView 
         horizontal 
@@ -598,6 +630,43 @@ const styles = StyleSheet.create({
   headerSubtitle: {
     fontSize: 14,
     color: "#6b7280",
+    marginTop: 4,
+  },
+  quickMetricsContainer: {
+    marginTop: 16,
+    marginBottom: 8,
+  },
+  quickMetricsContent: {
+    paddingHorizontal: 20,
+    gap: 12,
+  },
+  quickMetricCard: {
+    paddingVertical: 16,
+    paddingHorizontal: 20,
+    borderRadius: 12,
+    minWidth: 130,
+    alignItems: "center",
+    shadowColor: "#000",
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.1,
+    shadowRadius: 3.84,
+    elevation: 3,
+  },
+  quickMetricIcon: {
+    fontSize: 24,
+    marginBottom: 8,
+  },
+  quickMetricValue: {
+    fontSize: 16,
+    fontWeight: "bold",
+    color: "#111827",
+    marginBottom: 4,
+  },
+  quickMetricLabel: {
+    fontSize: 11,
+    color: "#6b7280",
+    fontWeight: "500",
+    textAlign: "center",
     marginTop: 4,
   },
   tabContainer: {
