@@ -561,19 +561,6 @@ const styles = StyleSheet.create({
   profileIconText: {
     fontSize: 20,
   },
-  profileIcon: {
-    width: 44,
-    height: 44,
-    borderRadius: 22,
-    backgroundColor: "#f3f4f6",
-    justifyContent: "center",
-    alignItems: "center",
-    shadowColor: "#000",
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.1,
-    shadowRadius: 3.84,
-    elevation: 3,
-  },
   tabContainer: {
     flexDirection: "row",
     backgroundColor: "#ffffff",
