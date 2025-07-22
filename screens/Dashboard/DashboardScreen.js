@@ -27,7 +27,7 @@ import DashboardService from "./services/DashboardService";
 
 const { width } = Dimensions.get('window');
 
-const DashboardScreen = () => {
+const DashboardScreen = ({ navigation }) => {
   // State management
   const [kpiData, setKpiData] = useState(DashboardService.getKPIData());
   const [recentTransactions, setRecentTransactions] = useState(DashboardService.getRecentTransactions());
@@ -104,7 +104,11 @@ const DashboardScreen = () => {
   const handleQuickAction = (action) => {
     if (action === 'new_invoice') {
       toggleQuickMenu(); // Close menu first
-      navigation.navigate("Invoice");
+      if (navigation && navigation.navigate) {
+        navigation.navigate("Invoice");
+      } else {
+        Alert.alert("Navigation", "Invoice screen will open here");
+      }
       return;
     }
     
@@ -308,7 +312,6 @@ const DashboardScreen = () => {
                   </View>
                 </View>
               </View>
-
             </>
           )}
 
@@ -569,9 +572,6 @@ const styles = StyleSheet.create({
     shadowOpacity: 0.1,
     shadowRadius: 3.84,
     elevation: 3,
-  },
-  profileIconText: {
-    fontSize: 20,
   },
   tabContainer: {
     flexDirection: "row",
