@@ -48,6 +48,7 @@ const InventoryScreen = () => {
     brand: "",
     notes: "",
   });
+  const [dashboardMetrics, setDashboardMetrics] = useState({});
 
   const categories = ["Electronics", "Mobile Accessories", "Computers", "Audio", "Gaming", "Cables", "Others"];
 
@@ -63,6 +64,9 @@ const InventoryScreen = () => {
     try {
       const itemsData = await InventoryService.getAllItems();
       setItems(itemsData);
+      // Load dashboard metrics
+      const metrics = InventoryService.getInventorySummary();
+      setDashboardMetrics(metrics);
     } catch (error) {
       Alert.alert("Error", "Failed to load inventory items");
     }
@@ -353,6 +357,44 @@ const InventoryScreen = () => {
         <Text style={styles.headerTitle}>Inventory</Text>
         <Text style={styles.headerSubtitle}>Manage your stock and products</Text>
       </View>
+
+      {/* Dashboard Metrics */}
+      <ScrollView 
+        horizontal 
+        showsHorizontalScrollIndicator={false}
+        style={styles.metricsContainer}
+        contentContainerStyle={styles.metricsContent}
+      >
+        <View style={[styles.metricCard, { borderLeftColor: "#3b82f6" }]}>
+          <Text style={styles.metricIcon}>📦</Text>
+          <Text style={styles.metricValue}>{dashboardMetrics.totalItems || 0}</Text>
+          <Text style={styles.metricLabel}>Total Items</Text>
+        </View>
+        
+        <View style={[styles.metricCard, { borderLeftColor: "#10b981" }]}>
+          <Text style={styles.metricIcon}>💰</Text>
+          <Text style={styles.metricValue}>₹{dashboardMetrics.totalStockValue?.toLocaleString("en-IN") || "0"}</Text>
+          <Text style={styles.metricLabel}>Stock Value</Text>
+        </View>
+        
+        <View style={[styles.metricCard, { borderLeftColor: "#f59e0b" }]}>
+          <Text style={styles.metricIcon}>⚠️</Text>
+          <Text style={styles.metricValue}>{dashboardMetrics.lowStockCount || 0}</Text>
+          <Text style={styles.metricLabel}>Low Stock</Text>
+        </View>
+        
+        <View style={[styles.metricCard, { borderLeftColor: "#ef4444" }]}>
+          <Text style={styles.metricIcon}>🚨</Text>
+          <Text style={styles.metricValue}>{dashboardMetrics.outOfStockCount || 0}</Text>
+          <Text style={styles.metricLabel}>Out of Stock</Text>
+        </View>
+        
+        <View style={[styles.metricCard, { borderLeftColor: "#8b5cf6" }]}>
+          <Text style={styles.metricIcon}>📊</Text>
+          <Text style={styles.metricValue}>{dashboardMetrics.categories || 0}</Text>
+          <Text style={styles.metricLabel}>Categories</Text>
+        </View>
+      </ScrollView>
 
       {/* Search Bar */}
       <View style={styles.searchContainer}>
@@ -768,6 +810,44 @@ const styles = StyleSheet.create({
     fontSize: 14,
     color: "#6b7280",
     marginTop: 4,
+  },
+  metricsContainer: {
+    marginTop: 16,
+    marginBottom: 8,
+  },
+  metricsContent: {
+    paddingHorizontal: 20,
+    gap: 12,
+  },
+  metricCard: {
+    backgroundColor: "#ffffff",
+    paddingVertical: 16,
+    paddingHorizontal: 20,
+    borderRadius: 12,
+    borderLeftWidth: 4,
+    minWidth: 120,
+    alignItems: "center",
+    shadowColor: "#000",
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.1,
+    shadowRadius: 3.84,
+    elevation: 3,
+  },
+  metricIcon: {
+    fontSize: 20,
+    marginBottom: 8,
+  },
+  metricValue: {
+    fontSize: 18,
+    fontWeight: "bold",
+    color: "#111827",
+    marginBottom: 4,
+  },
+  metricLabel: {
+    fontSize: 12,
+    color: "#6b7280",
+    fontWeight: "500",
+    textAlign: "center",
   },
   searchContainer: {
     flexDirection: "row",
