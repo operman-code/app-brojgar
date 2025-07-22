@@ -1,6 +1,10 @@
 // screens/Inventory/services/InventoryService.js
+import InventoryRepository from '../../../database/repositories/InventoryRepository';
+import DatabaseService from '../../../database/DatabaseService';
+
 class InventoryService {
-  static items = [
+  // Legacy mock data (keeping for fallback)
+  static mockItems = [
     {
       id: "1",
       name: "iPhone 15 Pro",
@@ -231,13 +235,25 @@ class InventoryService {
     },
   ];
 
-  // Get all items
+  // Get all items from database
   static async getAllItems() {
-    return new Promise((resolve) => {
-      setTimeout(() => {
-        resolve([...this.items]);
-      }, 300);
-    });
+    try {
+      const items = await InventoryRepository.getAllItemsWithCategory();
+      return items.map(item => ({
+        ...item,
+        id: item.id.toString(),
+        category: item.category_name || 'Uncategorized',
+        stock: item.current_stock,
+        price: item.selling_price,
+        costPrice: item.cost_price,
+        minStock: item.min_stock,
+        maxStock: item.max_stock
+      }));
+    } catch (error) {
+      console.error('Error fetching items from database:', error);
+      // Fallback to mock data if database fails
+      return [...this.mockItems];
+    }
   }
 
   // Get item by ID
@@ -638,33 +654,46 @@ class InventoryService {
     return `₹${Math.abs(amount).toLocaleString("en-IN")}`;
   }
 
-  // Get inventory summary for dashboard
-  static getInventorySummary() {
-    const stats = this.getInventoryStatistics();
-    const alerts = this.getStockAlerts();
-    const topItems = this.getTopSellingItems(3);
-    const reorderItems = this.getItemsNeedingReorder();
+  // Get inventory summary for dashboard from database
+  static async getInventorySummary() {
+    try {
+      const stats = await InventoryRepository.getInventoryStats();
+      const lowStockItems = await InventoryRepository.getLowStockItems();
+      const outOfStockItems = await InventoryRepository.getOutOfStockItems();
+      const categories = await InventoryRepository.getCategoryStockSummary();
 
-    // Calculate growth trends (mock data)
-    const itemsGrowth = Math.floor(Math.random() * 20) - 10; // -10% to +10%
-    const valueGrowth = Math.floor(Math.random() * 30) - 15; // -15% to +15%
+      // Calculate growth trends (mock data for now)
+      const itemsGrowth = Math.floor(Math.random() * 20) - 10; // -10% to +10%
+      const valueGrowth = Math.floor(Math.random() * 30) - 15; // -15% to +15%
 
     return {
-      totalItems: stats.totalItems,
-      totalStockValue: stats.totalStockValue,
-      totalRetailValue: stats.totalRetailValue,
-      potentialProfit: stats.potentialProfit,
-      lowStockCount: stats.lowStockCount,
-      outOfStockCount: stats.outOfStockCount,
-      criticalAlerts: alerts.filter(a => a.type === 'critical').length,
-      topSellingItems: topItems,
-      reorderCount: reorderItems.length,
-      categories: Object.keys(stats.categoryStats).length,
-      itemsGrowth,
-      valueGrowth,
-    };
+        totalItems: stats.totalItems,
+        totalStockValue: stats.totalStockValue,
+        totalRetailValue: stats.totalRetailValue,
+        potentialProfit: stats.potentialProfit,
+        lowStockCount: stats.lowStockCount,
+        outOfStockCount: stats.outOfStockCount,
+        categories: categories.length,
+        itemsGrowth,
+        valueGrowth,
+      };
+    } catch (error) {
+      console.error('Error fetching inventory summary from database:', error);
+      // Fallback to mock data calculation
+      const stats = this.getInventoryStatistics();
+      return {
+        totalItems: stats.totalItems,
+        totalStockValue: stats.totalStockValue,
+        lowStockCount: stats.lowStockCount,
+        outOfStockCount: stats.outOfStockCount,
+        categories: Object.keys(stats.categoryStats).length,
+        itemsGrowth: 0,
+        valueGrowth: 0,
+      };
+    }
   }
-   // Get low stock items for dashboard
+
+  // Get low stock items for dashboard
   static async getLowStockItems() {
     return new Promise((resolve) => {
       setTimeout(() => {
