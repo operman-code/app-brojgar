@@ -2,7 +2,7 @@
   "name": "brojgar-app",
   "version": "1.0.0",
   "description": "Complete Business Management App with SQLite Database",
-  "main": "expo-router/entry",
+  "main": "index.js",
   "scripts": {
     "start": "expo start",
     "android": "expo start --android",
