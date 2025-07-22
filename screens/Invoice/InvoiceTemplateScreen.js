@@ -1,243 +1,769 @@
 // screens/Invoice/InvoiceTemplateScreen.js
-import React, { useState, useEffect } from "react";
+import React, { useState, useEffect, useRef } from "react";
 import {
   View,
   Text,
-  TouchableOpacity,
   StyleSheet,
   ScrollView,
   SafeAreaView,
   StatusBar,
+  TouchableOpacity,
   Alert,
-  Share,
   Dimensions,
+  Share,
 } from "react-native";
+import * as Print from 'expo-print';
+import * as Sharing from 'expo-sharing';
+import * as FileSystem from 'expo-file-system';
 
-// Import service
+// Import services
 import InvoiceService from "./services/InvoiceService";
 
 const { width } = Dimensions.get('window');
 
 const InvoiceTemplateScreen = ({ navigation, route }) => {
-  const { invoiceData } = route.params;
-  const [businessInfo, setBusinessInfo] = useState({});
+  const [invoice, setInvoice] = useState(null);
+  const [loading, setLoading] = useState(true);
+  const [generating, setGenerating] = useState(false);
+  const scrollViewRef = useRef();
 
   useEffect(() => {
-    setBusinessInfo(InvoiceService.getBusinessInfo());
+    loadInvoice();
   }, []);
 
-  const handlePrint = () => {
-    Alert.alert(
-      "Print Invoice",
-      "Print functionality would be implemented here using a printing library",
-      [{ text: "OK" }]
-    );
+  const loadInvoice = async () => {
+    try {
+      const { invoiceId, invoiceData } = route.params || {};
+      
+      if (invoiceData) {
+        // Live preview mode - use provided data
+        setInvoice(invoiceData);
+      } else if (invoiceId) {
+        // View saved invoice mode
+        const invoiceDetails = await InvoiceService.getInvoiceById(invoiceId);
+        setInvoice(invoiceDetails);
+      } else {
+        Alert.alert("Error", "No invoice data provided");
+        navigation.goBack();
+        return;
+      }
+    } catch (error) {
+      console.error('❌ Error loading invoice:', error);
+      Alert.alert("Error", "Failed to load invoice");
+      navigation.goBack();
+    } finally {
+      setLoading(false);
+    }
   };
 
-  const handleDownload = () => {
-    const result = InvoiceService.generateInvoicePDF(invoiceData);
-    Alert.alert(
-      "Download Invoice",
-      `Invoice saved to: ${result.filePath}`,
-      [{ text: "OK" }]
-    );
+  const generateInvoiceHTML = (invoiceData) => {
+    const subtotal = invoiceData.subtotal || 0;
+    const taxAmount = invoiceData.taxAmount || 0;
+    const discountAmount = invoiceData.discountAmount || 0;
+    const total = invoiceData.total || 0;
+    
+    const amountInWords = InvoiceService.numberToWords(Math.floor(total));
+
+    return `
+    <!DOCTYPE html>
+    <html>
+    <head>
+        <meta charset="utf-8">
+        <meta name="viewport" content="width=device-width, initial-scale=1.0">
+        <title>Invoice ${invoiceData.invoiceNumber}</title>
+        <style>
+            * { margin: 0; padding: 0; box-sizing: border-box; }
+            body { 
+                font-family: 'Arial', sans-serif; 
+                font-size: 14px; 
+                line-height: 1.4; 
+                color: #333;
+                background: #fff;
+            }
+            .invoice-container { 
+                max-width: 800px; 
+                margin: 0 auto; 
+                padding: 20px;
+                border: 1px solid #ddd;
+            }
+            .header { 
+                display: flex; 
+                justify-content: space-between; 
+                align-items: flex-start;
+                margin-bottom: 30px;
+                border-bottom: 3px solid #3B82F6;
+                padding-bottom: 20px;
+            }
+            .company-info h1 { 
+                color: #3B82F6; 
+                font-size: 28px; 
+                margin-bottom: 5px;
+                font-weight: bold;
+            }
+            .company-info p { 
+                color: #666; 
+                margin: 2px 0; 
+                font-size: 13px;
+            }
+            .invoice-title { 
+                text-align: right; 
+            }
+            .invoice-title h2 { 
+                color: #333; 
+                font-size: 32px; 
+                margin-bottom: 10px;
+                font-weight: bold;
+            }
+            .invoice-number { 
+                background: #3B82F6; 
+                color: white; 
+                padding: 8px 16px; 
+                border-radius: 5px;
+                font-weight: bold;
+                font-size: 16px;
+            }
+            .invoice-details { 
+                display: flex; 
+                justify-content: space-between; 
+                margin-bottom: 30px;
+            }
+            .bill-to, .invoice-info { 
+                width: 48%; 
+            }
+            .bill-to h3, .invoice-info h3 { 
+                color: #3B82F6; 
+                margin-bottom: 10px;
+                font-size: 16px;
+                font-weight: bold;
+            }
+            .bill-to p, .invoice-info p { 
+                margin: 3px 0; 
+                color: #555;
+            }
+            .items-table { 
+                width: 100%; 
+                border-collapse: collapse; 
+                margin-bottom: 30px;
+                border: 1px solid #ddd;
+            }
+            .items-table th { 
+                background: #f8f9fa; 
+                padding: 12px 8px; 
+                text-align: left; 
+                border-bottom: 2px solid #ddd;
+                font-weight: bold;
+                color: #333;
+                font-size: 13px;
+            }
+            .items-table td { 
+                padding: 10px 8px; 
+                border-bottom: 1px solid #eee;
+                vertical-align: top;
+            }
+            .items-table tr:nth-child(even) {
+                background-color: #f9f9f9;
+            }
+            .text-right { text-align: right; }
+            .text-center { text-align: center; }
+            .totals-section { 
+                display: flex; 
+                justify-content: flex-end; 
+                margin-bottom: 30px;
+            }
+            .totals-table { 
+                width: 300px; 
+                border-collapse: collapse;
+            }
+            .totals-table td { 
+                padding: 8px 12px; 
+                border-bottom: 1px solid #eee;
+            }
+            .totals-table .label { 
+                font-weight: 500; 
+                color: #666;
+            }
+            .totals-table .amount { 
+                text-align: right; 
+                font-weight: bold;
+                color: #333;
+            }
+            .total-row { 
+                background: #f8f9fa; 
+                border-top: 2px solid #3B82F6;
+                border-bottom: 2px solid #3B82F6;
+            }
+            .total-row .amount { 
+                color: #3B82F6; 
+                font-size: 18px;
+                font-weight: bold;
+            }
+            .amount-words { 
+                background: #f8f9fa; 
+                padding: 15px; 
+                border-radius: 5px; 
+                margin-bottom: 20px;
+                border-left: 4px solid #3B82F6;
+            }
+            .amount-words strong { 
+                color: #3B82F6; 
+            }
+            .footer { 
+                border-top: 2px solid #eee; 
+                padding-top: 20px;
+                margin-top: 30px;
+            }
+            .footer-section { 
+                margin-bottom: 15px; 
+            }
+            .footer-section h4 { 
+                color: #3B82F6; 
+                margin-bottom: 8px;
+                font-size: 14px;
+            }
+            .footer-section p { 
+                color: #666; 
+                font-size: 12px;
+                line-height: 1.5;
+            }
+            .thank-you { 
+                text-align: center; 
+                color: #3B82F6; 
+                font-size: 18px; 
+                font-weight: bold;
+                margin-top: 20px;
+                padding: 15px;
+                background: #f8f9fa;
+                border-radius: 5px;
+            }
+            @media print {
+                .invoice-container { 
+                    border: none; 
+                    padding: 0;
+                    max-width: none;
+                }
+                body { font-size: 12px; }
+            }
+        </style>
+    </head>
+    <body>
+        <div class="invoice-container">
+            <!-- Header -->
+            <div class="header">
+                <div class="company-info">
+                    <h1>Brojgar Business</h1>
+                    <p><strong>Address:</strong> Shop No. 45, Block A, Connaught Place</p>
+                    <p>New Delhi - 110001, India</p>
+                    <p><strong>Phone:</strong> +91 98765 43210</p>
+                    <p><strong>Email:</strong> contact@brojgar.com</p>
+                    <p><strong>GST No:</strong> 07ABCDE1234F1Z5</p>
+                </div>
+                <div class="invoice-title">
+                    <h2>INVOICE</h2>
+                    <div class="invoice-number">${invoiceData.invoiceNumber}</div>
+                </div>
+            </div>
+
+            <!-- Invoice Details -->
+            <div class="invoice-details">
+                <div class="bill-to">
+                    <h3>BILL TO:</h3>
+                    <p><strong>${invoiceData.partyDetails?.name || 'Customer Name'}</strong></p>
+                    ${invoiceData.partyDetails?.address ? `<p>${invoiceData.partyDetails.address}</p>` : ''}
+                    ${invoiceData.partyDetails?.phone ? `<p><strong>Phone:</strong> ${invoiceData.partyDetails.phone}</p>` : ''}
+                    ${invoiceData.partyDetails?.email ? `<p><strong>Email:</strong> ${invoiceData.partyDetails.email}</p>` : ''}
+                    ${invoiceData.partyDetails?.gstNumber ? `<p><strong>GST No:</strong> ${invoiceData.partyDetails.gstNumber}</p>` : ''}
+                </div>
+                <div class="invoice-info">
+                    <h3>INVOICE DETAILS:</h3>
+                    <p><strong>Invoice Date:</strong> ${new Date(invoiceData.date).toLocaleDateString('en-IN')}</p>
+                    <p><strong>Due Date:</strong> ${new Date(invoiceData.dueDate).toLocaleDateString('en-IN')}</p>
+                    <p><strong>Payment Terms:</strong> ${invoiceData.terms || 'Net 30 days'}</p>
+                </div>
+            </div>
+
+            <!-- Items Table -->
+            <table class="items-table">
+                <thead>
+                    <tr>
+                        <th style="width: 8%;">#</th>
+                        <th style="width: 35%;">Item Description</th>
+                        <th style="width: 10%;" class="text-center">Qty</th>
+                        <th style="width: 12%;" class="text-right">Rate</th>
+                        <th style="width: 12%;" class="text-right">Discount</th>
+                        <th style="width: 10%;" class="text-center">Tax%</th>
+                        <th style="width: 13%;" class="text-right">Amount</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    ${(invoiceData.items || []).map((item, index) => `
+                        <tr>
+                            <td class="text-center">${index + 1}</td>
+                            <td>
+                                <strong>${item.name}</strong>
+                                ${item.description ? `<br><small style="color: #666;">${item.description}</small>` : ''}
+                            </td>
+                            <td class="text-center">${item.quantity} ${item.unit || 'pcs'}</td>
+                            <td class="text-right">₹${item.price.toLocaleString('en-IN')}</td>
+                            <td class="text-right">${item.discount ? '₹' + item.discount.toLocaleString('en-IN') : '-'}</td>
+                            <td class="text-center">${item.taxRate || 18}%</td>
+                            <td class="text-right">₹${item.total.toLocaleString('en-IN')}</td>
+                        </tr>
+                    `).join('')}
+                </tbody>
+            </table>
+
+            <!-- Totals -->
+            <div class="totals-section">
+                <table class="totals-table">
+                    <tr>
+                        <td class="label">Subtotal:</td>
+                        <td class="amount">₹${subtotal.toLocaleString('en-IN')}</td>
+                    </tr>
+                    ${discountAmount > 0 ? `
+                    <tr>
+                        <td class="label">Discount:</td>
+                        <td class="amount">-₹${discountAmount.toLocaleString('en-IN')}</td>
+                    </tr>
+                    ` : ''}
+                    <tr>
+                        <td class="label">Tax (${invoiceData.taxRate || 18}%):</td>
+                        <td class="amount">₹${taxAmount.toLocaleString('en-IN')}</td>
+                    </tr>
+                    <tr class="total-row">
+                        <td class="label"><strong>TOTAL:</strong></td>
+                        <td class="amount">₹${total.toLocaleString('en-IN')}</td>
+                    </tr>
+                </table>
+            </div>
+
+            <!-- Amount in Words -->
+            <div class="amount-words">
+                <strong>Amount in Words:</strong> ${amountInWords}
+            </div>
+
+            <!-- Footer -->
+            <div class="footer">
+                ${invoiceData.notes ? `
+                <div class="footer-section">
+                    <h4>Notes:</h4>
+                    <p>${invoiceData.notes}</p>
+                </div>
+                ` : ''}
+                
+                <div class="footer-section">
+                    <h4>Terms & Conditions:</h4>
+                    <p>${invoiceData.terms || 'Payment due within 30 days. Late payments may incur additional charges.'}</p>
+                </div>
+
+                <div class="footer-section">
+                    <h4>Payment Information:</h4>
+                    <p>Please make payment to: Brojgar Business<br>
+                    Bank Details: HDFC Bank, A/C: 12345678901, IFSC: HDFC0001234</p>
+                </div>
+            </div>
+
+            <div class="thank-you">
+                Thank You for Your Business! 🙏
+            </div>
+        </div>
+    </body>
+    </html>
+    `;
+  };
+
+  const generatePDF = async () => {
+    if (!invoice) return;
+
+    setGenerating(true);
+    try {
+      const htmlContent = generateInvoiceHTML(invoice);
+      
+      const { uri } = await Print.printToFileAsync({
+        html: htmlContent,
+        base64: false,
+        margins: {
+          left: 20,
+          top: 20,
+          right: 20,
+          bottom: 20,
+        },
+      });
+
+      const fileName = `Invoice_${invoice.invoiceNumber}_${new Date().toISOString().split('T')[0]}.pdf`;
+      const newUri = `${FileSystem.documentDirectory}${fileName}`;
+      
+      await FileSystem.moveAsync({
+        from: uri,
+        to: newUri,
+      });
+
+      return { uri: newUri, fileName };
+    } catch (error) {
+      console.error('❌ Error generating PDF:', error);
+      throw error;
+    } finally {
+      setGenerating(false);
+    }
   };
 
   const handleShare = async () => {
     try {
-      const shareData = InvoiceService.getShareData(invoiceData);
-      await Share.share({
-        title: shareData.title,
-        message: shareData.message,
-        url: shareData.url,
-      });
+      const result = await generatePDF();
+      
+      Alert.alert(
+        "Share Invoice",
+        "How would you like to share this invoice?",
+        [
+          { text: "Cancel", style: "cancel" },
+          {
+            text: "Share PDF",
+            onPress: async () => {
+              if (await Sharing.isAvailableAsync()) {
+                await Sharing.shareAsync(result.uri, {
+                  mimeType: 'application/pdf',
+                  dialogTitle: `Share ${result.fileName}`,
+                });
+              } else {
+                // Fallback to React Native Share
+                await Share.share({
+                  url: result.uri,
+                  title: `Invoice ${invoice.invoiceNumber}`,
+                  message: `Please find attached invoice ${invoice.invoiceNumber} for ₹${invoice.total.toLocaleString('en-IN')}`,
+                });
+              }
+            }
+          },
+          {
+            text: "Send via WhatsApp",
+            onPress: async () => {
+              const message = `Hi! Please find your invoice ${invoice.invoiceNumber} for ₹${invoice.total.toLocaleString('en-IN')}. Thank you for your business! 🙏`;
+              const whatsappUrl = `whatsapp://send?text=${encodeURIComponent(message)}`;
+              
+              try {
+                await Share.share({
+                  url: result.uri,
+                  title: `Invoice ${invoice.invoiceNumber}`,
+                  message: message,
+                });
+              } catch (error) {
+                Alert.alert("Info", "Please select WhatsApp from the sharing options");
+              }
+            }
+          }
+        ]
+      );
     } catch (error) {
-      Alert.alert("Error", "Failed to share invoice");
+      console.error('❌ Error sharing invoice:', error);
+      Alert.alert("Error", "Failed to generate or share invoice");
     }
   };
 
-  const handleDone = () => {
-    navigation.navigate("Dashboard");
+  const handlePrint = async () => {
+    try {
+      const htmlContent = generateInvoiceHTML(invoice);
+      
+      await Print.printAsync({
+        html: htmlContent,
+        printerUrl: undefined, // Let user select printer
+      });
+    } catch (error) {
+      console.error('❌ Error printing invoice:', error);
+      Alert.alert("Error", "Failed to print invoice");
+    }
   };
 
-  const formatDate = (dateString) => {
-    const date = new Date(dateString);
-    return date.toLocaleDateString("en-IN", {
-      day: "2-digit",
-      month: "2-digit",
-      year: "numeric"
-    });
+  const handleSaveAsDraft = async () => {
+    try {
+      // If this is a live preview, save the invoice
+      if (route.params?.invoiceData && !invoice.id) {
+        const result = await InvoiceService.createInvoice({
+          ...invoice,
+          status: 'draft'
+        });
+        
+        if (result.success) {
+          Alert.alert("Success", "Invoice saved as draft");
+          navigation.navigate('Invoice'); // Go back to create new invoice
+        } else {
+          Alert.alert("Error", result.error);
+        }
+      } else {
+        Alert.alert("Info", "Invoice is already saved");
+      }
+    } catch (error) {
+      console.error('❌ Error saving invoice:', error);
+      Alert.alert("Error", "Failed to save invoice");
+    }
   };
 
-  const amountInWords = InvoiceService.convertAmountToWords(Math.floor(invoiceData.total));
+  const handleMarkAsSent = async () => {
+    try {
+      if (invoice.id) {
+        await InvoiceService.updateInvoiceStatus(invoice.id, 'sent');
+        Alert.alert("Success", "Invoice marked as sent");
+        setInvoice(prev => ({ ...prev, status: 'sent' }));
+      }
+    } catch (error) {
+      console.error('❌ Error updating invoice status:', error);
+      Alert.alert("Error", "Failed to update invoice status");
+    }
+  };
+
+  if (loading) {
+    return (
+      <SafeAreaView style={styles.container}>
+        <StatusBar barStyle="dark-content" />
+        <View style={styles.loadingContainer}>
+          <Text style={styles.loadingText}>Loading Invoice...</Text>
+        </View>
+      </SafeAreaView>
+    );
+  }
+
+  if (!invoice) {
+    return (
+      <SafeAreaView style={styles.container}>
+        <StatusBar barStyle="dark-content" />
+        <View style={styles.errorContainer}>
+          <Text style={styles.errorText}>Invoice not found</Text>
+          <TouchableOpacity
+            style={styles.backButton}
+            onPress={() => navigation.goBack()}
+          >
+            <Text style={styles.backButtonText}>Go Back</Text>
+          </TouchableOpacity>
+        </View>
+      </SafeAreaView>
+    );
+  }
+
+  const subtotal = invoice.subtotal || 0;
+  const taxAmount = invoice.taxAmount || 0;
+  const discountAmount = invoice.discountAmount || 0;
+  const total = invoice.total || 0;
 
   return (
     <SafeAreaView style={styles.container}>
-      <StatusBar barStyle="dark-content" backgroundColor="#ffffff" />
-      
+      <StatusBar barStyle="dark-content" />
+
       {/* Header */}
       <View style={styles.header}>
-        <TouchableOpacity 
-          style={styles.backButton}
+        <TouchableOpacity
+          style={styles.headerButton}
           onPress={() => navigation.goBack()}
         >
-          <Text style={styles.backButtonText}>← Back</Text>
+          <Text style={styles.headerButtonText}>← Back</Text>
         </TouchableOpacity>
         <Text style={styles.headerTitle}>Invoice Preview</Text>
-        <View style={styles.headerRight} />
+        <TouchableOpacity
+          style={styles.headerButton}
+          onPress={() => scrollViewRef.current?.scrollTo({ y: 0, animated: true })}
+        >
+          <Text style={styles.headerButtonText}>↑ Top</Text>
+        </TouchableOpacity>
       </View>
 
-      <ScrollView style={styles.content} showsVerticalScrollIndicator={false}>
-        <View style={styles.invoiceContainer}>
-          {/* Invoice Header */}
-          <View style={styles.invoiceHeader}>
-            <View style={styles.businessSection}>
-              <Text style={styles.businessName}>{businessInfo.businessName}</Text>
-              <Text style={styles.businessAddress}>{businessInfo.address}</Text>
-              <Text style={styles.businessAddress}>{businessInfo.city}</Text>
-              <Text style={styles.businessContact}>Phone: {businessInfo.phone}</Text>
-              <Text style={styles.businessContact}>Email: {businessInfo.email}</Text>
-              {businessInfo.gstNumber && (
-                <Text style={styles.businessGst}>GST: {businessInfo.gstNumber}</Text>
-              )}
+      {/* Invoice Content */}
+      <ScrollView 
+        ref={scrollViewRef}
+        style={styles.invoiceContainer}
+        showsVerticalScrollIndicator={false}
+      >
+        {/* Invoice Header */}
+        <View style={styles.invoiceHeader}>
+          <View style={styles.companyInfo}>
+            <Text style={styles.companyName}>Brojgar Business</Text>
+            <Text style={styles.companyDetail}>Shop No. 45, Block A, Connaught Place</Text>
+            <Text style={styles.companyDetail}>New Delhi - 110001, India</Text>
+            <Text style={styles.companyDetail}>Phone: +91 98765 43210</Text>
+            <Text style={styles.companyDetail}>Email: contact@brojgar.com</Text>
+            <Text style={styles.companyDetail}>GST No: 07ABCDE1234F1Z5</Text>
+          </View>
+          <View style={styles.invoiceTitle}>
+            <Text style={styles.invoiceTitleText}>INVOICE</Text>
+            <View style={styles.invoiceNumberBadge}>
+              <Text style={styles.invoiceNumber}>{invoice.invoiceNumber}</Text>
             </View>
-            
-            <View style={styles.invoiceInfo}>
-              <Text style={styles.invoiceTitle}>INVOICE</Text>
-              <View style={styles.invoiceDetails}>
-                <Text style={styles.invoiceNumber}>#{invoiceData.invoiceNumber}</Text>
-                <Text style={styles.invoiceDate}>Date: {formatDate(invoiceData.date)}</Text>
-                <Text style={styles.invoiceDate}>Due: {formatDate(invoiceData.dueDate)}</Text>
+          </View>
+        </View>
+
+        {/* Invoice Details */}
+        <View style={styles.invoiceDetails}>
+          <View style={styles.billTo}>
+            <Text style={styles.sectionTitle}>BILL TO:</Text>
+            <Text style={styles.customerName}>{invoice.partyDetails?.name || 'Customer Name'}</Text>
+            {invoice.partyDetails?.address && (
+              <Text style={styles.customerDetail}>{invoice.partyDetails.address}</Text>
+            )}
+            {invoice.partyDetails?.phone && (
+              <Text style={styles.customerDetail}>Phone: {invoice.partyDetails.phone}</Text>
+            )}
+            {invoice.partyDetails?.email && (
+              <Text style={styles.customerDetail}>Email: {invoice.partyDetails.email}</Text>
+            )}
+            {invoice.partyDetails?.gstNumber && (
+              <Text style={styles.customerDetail}>GST No: {invoice.partyDetails.gstNumber}</Text>
+            )}
+          </View>
+          <View style={styles.invoiceInfo}>
+            <Text style={styles.sectionTitle}>INVOICE DETAILS:</Text>
+            <Text style={styles.invoiceDetailText}>
+              Invoice Date: {new Date(invoice.date).toLocaleDateString('en-IN')}
+            </Text>
+            <Text style={styles.invoiceDetailText}>
+              Due Date: {new Date(invoice.dueDate).toLocaleDateString('en-IN')}
+            </Text>
+            <Text style={styles.invoiceDetailText}>
+              Payment Terms: {invoice.terms || 'Net 30 days'}
+            </Text>
+            {invoice.status && (
+              <View style={[styles.statusBadge, { 
+                backgroundColor: invoice.status === 'paid' ? '#10B981' : 
+                                invoice.status === 'sent' ? '#3B82F6' : 
+                                invoice.status === 'overdue' ? '#EF4444' : '#F59E0B' 
+              }]}>
+                <Text style={styles.statusText}>
+                  {invoice.status.charAt(0).toUpperCase() + invoice.status.slice(1)}
+                </Text>
               </View>
-            </View>
+            )}
           </View>
+        </View>
 
-          {/* Bill To Section */}
-          <View style={styles.billToSection}>
-            <Text style={styles.billToTitle}>Bill To:</Text>
-            <View style={styles.customerInfo}>
-              <Text style={styles.customerName}>{invoiceData.partyDetails.name}</Text>
-              {invoiceData.partyDetails.address && (
-                <Text style={styles.customerAddress}>{invoiceData.partyDetails.address}</Text>
-              )}
-              <Text style={styles.customerContact}>Phone: {invoiceData.partyDetails.phone}</Text>
-              {invoiceData.partyDetails.email && (
-                <Text style={styles.customerContact}>Email: {invoiceData.partyDetails.email}</Text>
-              )}
-            </View>
-          </View>
-
-          {/* Items Table */}
-          <View style={styles.itemsSection}>
+        {/* Items Table */}
+        <View style={styles.itemsSection}>
+          <Text style={styles.sectionTitle}>ITEMS:</Text>
+          <View style={styles.itemsTable}>
             {/* Table Header */}
             <View style={styles.tableHeader}>
-              <Text style={[styles.tableHeaderText, styles.itemColumn]}>Item</Text>
-              <Text style={[styles.tableHeaderText, styles.qtyColumn]}>Qty</Text>
-              <Text style={[styles.tableHeaderText, styles.priceColumn]}>Price</Text>
-              <Text style={[styles.tableHeaderText, styles.discountColumn]}>Disc.</Text>
-              <Text style={[styles.tableHeaderText, styles.totalColumn]}>Amount</Text>
+              <Text style={[styles.tableHeaderText, { flex: 0.8 }]}>#</Text>
+              <Text style={[styles.tableHeaderText, { flex: 3 }]}>Description</Text>
+              <Text style={[styles.tableHeaderText, { flex: 1 }]}>Qty</Text>
+              <Text style={[styles.tableHeaderText, { flex: 1.2 }]}>Rate</Text>
+              <Text style={[styles.tableHeaderText, { flex: 1.2 }]}>Amount</Text>
             </View>
-
+            
             {/* Table Rows */}
-            {invoiceData.items.map((item, index) => (
+            {(invoice.items || []).map((item, index) => (
               <View key={index} style={styles.tableRow}>
-                <View style={styles.itemColumn}>
+                <Text style={[styles.tableCellText, { flex: 0.8 }]}>{index + 1}</Text>
+                <View style={{ flex: 3 }}>
                   <Text style={styles.itemName}>{item.name}</Text>
                   {item.description && (
                     <Text style={styles.itemDescription}>{item.description}</Text>
                   )}
                 </View>
-                <Text style={[styles.tableCell, styles.qtyColumn]}>
-                  {item.quantity} {item.unit}
+                <Text style={[styles.tableCellText, { flex: 1 }]}>
+                  {item.quantity} {item.unit || 'pcs'}
                 </Text>
-                <Text style={[styles.tableCell, styles.priceColumn]}>
-                  ₹{item.price.toLocaleString("en-IN")}
+                <Text style={[styles.tableCellText, { flex: 1.2 }]}>
+                  ₹{item.price.toLocaleString('en-IN')}
                 </Text>
-                <Text style={[styles.tableCell, styles.discountColumn]}>
-                  ₹{item.discount.toLocaleString("en-IN")}
-                </Text>
-                <Text style={[styles.tableCell, styles.totalColumn]}>
-                  ₹{((item.quantity * item.price) - item.discount).toLocaleString("en-IN")}
+                <Text style={[styles.tableCellText, { flex: 1.2, fontWeight: 'bold' }]}>
+                  ₹{item.total.toLocaleString('en-IN')}
                 </Text>
               </View>
             ))}
           </View>
+        </View>
 
-          {/* Totals Section */}
-          <View style={styles.totalsSection}>
-            <View style={styles.totalsContainer}>
-              <View style={styles.totalRow}>
-                <Text style={styles.totalLabel}>Subtotal:</Text>
-                <Text style={styles.totalValue}>₹{invoiceData.subtotal.toLocaleString("en-IN")}</Text>
-              </View>
-              
-              <View style={styles.totalRow}>
-                <Text style={styles.totalLabel}>Tax ({invoiceData.taxRate}%):</Text>
-                <Text style={styles.totalValue}>₹{invoiceData.taxAmount.toLocaleString("en-IN")}</Text>
-              </View>
-              
-              <View style={styles.grandTotalRow}>
-                <Text style={styles.grandTotalLabel}>Total Amount:</Text>
-                <Text style={styles.grandTotalValue}>₹{invoiceData.total.toLocaleString("en-IN")}</Text>
-              </View>
+        {/* Totals Section */}
+        <View style={styles.totalsSection}>
+          <View style={styles.totalsTable}>
+            <View style={styles.totalRow}>
+              <Text style={styles.totalLabel}>Subtotal:</Text>
+              <Text style={styles.totalValue}>₹{subtotal.toLocaleString('en-IN')}</Text>
             </View>
             
-            <View style={styles.amountInWords}>
-              <Text style={styles.amountInWordsLabel}>Amount in Words:</Text>
-              <Text style={styles.amountInWordsText}>{amountInWords}</Text>
+            {discountAmount > 0 && (
+              <View style={styles.totalRow}>
+                <Text style={styles.totalLabel}>Discount:</Text>
+                <Text style={[styles.totalValue, { color: '#EF4444' }]}>
+                  -₹{discountAmount.toLocaleString('en-IN')}
+                </Text>
+              </View>
+            )}
+            
+            <View style={styles.totalRow}>
+              <Text style={styles.totalLabel}>Tax ({invoice.taxRate || 18}%):</Text>
+              <Text style={styles.totalValue}>₹{taxAmount.toLocaleString('en-IN')}</Text>
             </View>
-          </View>
-
-          {/* Notes and Terms */}
-          {(invoiceData.notes || invoiceData.termsConditions) && (
-            <View style={styles.notesSection}>
-              {invoiceData.notes && (
-                <View style={styles.notesContainer}>
-                  <Text style={styles.notesTitle}>Notes:</Text>
-                  <Text style={styles.notesText}>{invoiceData.notes}</Text>
-                </View>
-              )}
-              
-              {invoiceData.termsConditions && (
-                <View style={styles.termsContainer}>
-                  <Text style={styles.termsTitle}>Terms & Conditions:</Text>
-                  <Text style={styles.termsText}>{invoiceData.termsConditions}</Text>
-                </View>
-              )}
+            
+            <View style={[styles.totalRow, styles.grandTotalRow]}>
+              <Text style={styles.grandTotalLabel}>TOTAL:</Text>
+              <Text style={styles.grandTotalValue}>₹{total.toLocaleString('en-IN')}</Text>
             </View>
-          )}
-
-          {/* Footer */}
-          <View style={styles.invoiceFooter}>
-            <Text style={styles.footerText}>Thank you for your business!</Text>
-            <Text style={styles.footerContact}>
-              For any queries, contact us at {businessInfo.phone} or {businessInfo.email}
-            </Text>
           </View>
         </View>
+
+        {/* Amount in Words */}
+        <View style={styles.amountWordsSection}>
+          <Text style={styles.amountWordsLabel}>Amount in Words:</Text>
+          <Text style={styles.amountWordsText}>
+            {InvoiceService.numberToWords(Math.floor(total))}
+          </Text>
+        </View>
+
+        {/* Footer */}
+        <View style={styles.footerSection}>
+          {invoice.notes && (
+            <View style={styles.notesSection}>
+              <Text style={styles.notesSectionTitle}>Notes:</Text>
+              <Text style={styles.notesText}>{invoice.notes}</Text>
+            </View>
+          )}
+          
+          <View style={styles.termsSection}>
+            <Text style={styles.termsSectionTitle}>Terms & Conditions:</Text>
+            <Text style={styles.termsText}>
+              {invoice.terms || 'Payment due within 30 days. Late payments may incur additional charges.'}
+            </Text>
+          </View>
+
+          <View style={styles.thankYouSection}>
+            <Text style={styles.thankYouText}>Thank You for Your Business! 🙏</Text>
+          </View>
+        </View>
+
+        <View style={{ height: 100 }} />
       </ScrollView>
 
-      {/* Action Bar */}
-      <View style={styles.actionBar}>
-        <TouchableOpacity style={styles.actionButton} onPress={handlePrint}>
-          <Text style={styles.actionIcon}>🖨️</Text>
-          <Text style={styles.actionText}>Print</Text>
+      {/* Action Buttons */}
+      <View style={styles.actionButtons}>
+        <TouchableOpacity
+          style={[styles.actionButton, styles.shareButton]}
+          onPress={handleShare}
+          disabled={generating}
+        >
+          <Text style={styles.actionButtonText}>
+            {generating ? "Generating..." : "📤 Share"}
+          </Text>
         </TouchableOpacity>
         
-        <TouchableOpacity style={styles.actionButton} onPress={handleDownload}>
-          <Text style={styles.actionIcon}>📥</Text>
-          <Text style={styles.actionText}>Download</Text>
+        <TouchableOpacity
+          style={[styles.actionButton, styles.printButton]}
+          onPress={handlePrint}
+        >
+          <Text style={styles.actionButtonText}>🖨️ Print</Text>
         </TouchableOpacity>
         
-        <TouchableOpacity style={styles.actionButton} onPress={handleShare}>
-          <Text style={styles.actionIcon}>📤</Text>
-          <Text style={styles.actionText}>Share</Text>
-        </TouchableOpacity>
+        {!invoice.id && (
+          <TouchableOpacity
+            style={[styles.actionButton, styles.saveButton]}
+            onPress={handleSaveAsDraft}
+          >
+            <Text style={styles.actionButtonText}>💾 Save</Text>
+          </TouchableOpacity>
+        )}
         
-        <TouchableOpacity style={[styles.actionButton, styles.doneButton]} onPress={handleDone}>
-          <Text style={styles.doneIcon}>✓</Text>
-          <Text style={styles.doneText}>Done</Text>
-        </TouchableOpacity>
+        {invoice.id && invoice.status === 'draft' && (
+          <TouchableOpacity
+            style={[styles.actionButton, styles.sentButton]}
+            onPress={handleMarkAsSent}
+          >
+            <Text style={styles.actionButtonText}>✅ Mark Sent</Text>
+          </TouchableOpacity>
+        )}
       </View>
     </SafeAreaView>
   );
@@ -246,348 +772,343 @@ const InvoiceTemplateScreen = ({ navigation, route }) => {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: "#f8fafc",
+    backgroundColor: '#F8FAFC',
   },
-  header: {
-    flexDirection: "row",
-    justifyContent: "space-between",
-    alignItems: "center",
-    paddingHorizontal: 20,
-    paddingVertical: 16,
-    backgroundColor: "#ffffff",
-    borderBottomWidth: 1,
-    borderBottomColor: "#e5e7eb",
+  loadingContainer: {
+    flex: 1,
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  loadingText: {
+    fontSize: 18,
+    color: '#64748B',
+  },
+  errorContainer: {
+    flex: 1,
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  errorText: {
+    fontSize: 18,
+    color: '#EF4444',
+    marginBottom: 20,
   },
   backButton: {
-    padding: 4,
+    backgroundColor: '#3B82F6',
+    paddingHorizontal: 20,
+    paddingVertical: 12,
+    borderRadius: 8,
   },
   backButtonText: {
+    color: '#FFFFFF',
+    fontWeight: '600',
+  },
+  header: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    paddingHorizontal: 20,
+    paddingVertical: 15,
+    backgroundColor: '#FFFFFF',
+    borderBottomWidth: 1,
+    borderBottomColor: '#E2E8F0',
+  },
+  headerButton: {
+    paddingVertical: 8,
+    paddingHorizontal: 12,
+  },
+  headerButtonText: {
     fontSize: 16,
-    color: "#3b82f6",
-    fontWeight: "500",
+    color: '#3B82F6',
+    fontWeight: '500',
   },
   headerTitle: {
     fontSize: 18,
-    fontWeight: "600",
-    color: "#111827",
-  },
-  headerRight: {
-    width: 60,
-  },
-  content: {
-    flex: 1,
-    padding: 20,
+    fontWeight: 'bold',
+    color: '#1E293B',
   },
   invoiceContainer: {
-    backgroundColor: "#ffffff",
+    flex: 1,
+    backgroundColor: '#FFFFFF',
+    margin: 15,
     borderRadius: 12,
-    padding: 24,
-    shadowColor: "#000",
-    shadowOffset: { width: 0, height: 4 },
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
     shadowOpacity: 0.1,
     shadowRadius: 8,
-    elevation: 8,
-    marginBottom: 20,
+    elevation: 4,
   },
   invoiceHeader: {
-    flexDirection: "row",
-    justifyContent: "space-between",
-    alignItems: "flex-start",
-    marginBottom: 32,
-    paddingBottom: 20,
-    borderBottomWidth: 2,
-    borderBottomColor: "#e5e7eb",
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'flex-start',
+    padding: 20,
+    borderBottomWidth: 3,
+    borderBottomColor: '#3B82F6',
   },
-  businessSection: {
+  companyInfo: {
     flex: 1,
   },
-  businessName: {
-    fontSize: 22,
-    fontWeight: "bold",
-    color: "#111827",
+  companyName: {
+    fontSize: 24,
+    fontWeight: 'bold',
+    color: '#3B82F6',
     marginBottom: 8,
   },
-  businessAddress: {
-    fontSize: 14,
-    color: "#6b7280",
-    lineHeight: 20,
-  },
-  businessContact: {
-    fontSize: 14,
-    color: "#6b7280",
-    lineHeight: 20,
-  },
-  businessGst: {
-    fontSize: 14,
-    color: "#6b7280",
-    fontWeight: "500",
-    marginTop: 4,
-  },
-  invoiceInfo: {
-    alignItems: "flex-end",
-  },
-  invoiceTitle: {
-    fontSize: 28,
-    fontWeight: "bold",
-    color: "#1f2937",
-    marginBottom: 12,
-  },
-  invoiceDetails: {
-    alignItems: "flex-end",
-  },
-  invoiceNumber: {
-    fontSize: 18,
-    fontWeight: "600",
-    color: "#3b82f6",
-    marginBottom: 4,
-  },
-  invoiceDate: {
-    fontSize: 14,
-    color: "#6b7280",
+  companyDetail: {
+    fontSize: 12,
+    color: '#64748B',
     marginBottom: 2,
   },
-  billToSection: {
-    marginBottom: 32,
+  invoiceTitle: {
+    alignItems: 'flex-end',
   },
-  billToTitle: {
+  invoiceTitleText: {
+    fontSize: 28,
+    fontWeight: 'bold',
+    color: '#1E293B',
+    marginBottom: 10,
+  },
+  invoiceNumberBadge: {
+    backgroundColor: '#3B82F6',
+    paddingHorizontal: 16,
+    paddingVertical: 8,
+    borderRadius: 6,
+  },
+  invoiceNumber: {
+    color: '#FFFFFF',
+    fontWeight: 'bold',
     fontSize: 16,
-    fontWeight: "600",
-    color: "#374151",
+  },
+  invoiceDetails: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    padding: 20,
+  },
+  billTo: {
+    flex: 1,
+    marginRight: 20,
+  },
+  invoiceInfo: {
+    flex: 1,
+  },
+  sectionTitle: {
+    fontSize: 14,
+    fontWeight: 'bold',
+    color: '#3B82F6',
     marginBottom: 12,
   },
-  customerInfo: {
-    backgroundColor: "#f9fafb",
-    padding: 16,
-    borderRadius: 8,
-    borderLeftWidth: 4,
-    borderLeftColor: "#3b82f6",
-  },
   customerName: {
-    fontSize: 18,
-    fontWeight: "600",
-    color: "#111827",
-    marginBottom: 8,
-  },
-  customerAddress: {
-    fontSize: 14,
-    color: "#6b7280",
-    lineHeight: 20,
+    fontSize: 16,
+    fontWeight: 'bold',
+    color: '#1E293B',
     marginBottom: 4,
   },
-  customerContact: {
-    fontSize: 14,
-    color: "#6b7280",
-    lineHeight: 20,
+  customerDetail: {
+    fontSize: 13,
+    color: '#64748B',
+    marginBottom: 2,
+  },
+  invoiceDetailText: {
+    fontSize: 13,
+    color: '#64748B',
+    marginBottom: 4,
+  },
+  statusBadge: {
+    paddingHorizontal: 12,
+    paddingVertical: 4,
+    borderRadius: 12,
+    marginTop: 8,
+    alignSelf: 'flex-start',
+  },
+  statusText: {
+    color: '#FFFFFF',
+    fontSize: 12,
+    fontWeight: 'bold',
   },
   itemsSection: {
-    marginBottom: 32,
+    paddingHorizontal: 20,
+    paddingBottom: 20,
+  },
+  itemsTable: {
+    borderWidth: 1,
+    borderColor: '#E2E8F0',
+    borderRadius: 8,
+    overflow: 'hidden',
   },
   tableHeader: {
-    flexDirection: "row",
-    backgroundColor: "#f3f4f6",
+    flexDirection: 'row',
+    backgroundColor: '#F8FAFC',
     paddingVertical: 12,
-    paddingHorizontal: 8,
-    borderRadius: 8,
-    marginBottom: 8,
+    paddingHorizontal: 12,
+    borderBottomWidth: 1,
+    borderBottomColor: '#E2E8F0',
   },
   tableHeaderText: {
-    fontSize: 14,
-    fontWeight: "600",
-    color: "#374151",
-    textAlign: "center",
+    fontSize: 12,
+    fontWeight: 'bold',
+    color: '#374151',
   },
   tableRow: {
-    flexDirection: "row",
-    alignItems: "center",
+    flexDirection: 'row',
     paddingVertical: 12,
-    paddingHorizontal: 8,
+    paddingHorizontal: 12,
     borderBottomWidth: 1,
-    borderBottomColor: "#f3f4f6",
+    borderBottomColor: '#F1F5F9',
+    alignItems: 'center',
   },
-  itemColumn: {
-    flex: 3,
-  },
-  qtyColumn: {
-    flex: 1,
-    textAlign: "center",
-  },
-  priceColumn: {
-    flex: 1.5,
-    textAlign: "right",
-  },
-  discountColumn: {
-    flex: 1.2,
-    textAlign: "right",
-  },
-  totalColumn: {
-    flex: 1.5,
-    textAlign: "right",
+  tableCellText: {
+    fontSize: 13,
+    color: '#64748B',
   },
   itemName: {
     fontSize: 14,
-    fontWeight: "500",
-    color: "#111827",
+    fontWeight: '600',
+    color: '#1E293B',
   },
   itemDescription: {
     fontSize: 12,
-    color: "#6b7280",
+    color: '#64748B',
     marginTop: 2,
   },
-  tableCell: {
-    fontSize: 14,
-    color: "#374151",
-  },
   totalsSection: {
-    marginBottom: 32,
+    alignItems: 'flex-end',
+    paddingHorizontal: 20,
+    paddingBottom: 20,
   },
-  totalsContainer: {
-    alignSelf: "flex-end",
-    minWidth: 250,
+  totalsTable: {
+    width: 250,
   },
   totalRow: {
-    flexDirection: "row",
-    justifyContent: "space-between",
-    alignItems: "center",
+    flexDirection: 'row',
+    justifyContent: 'space-between',
     paddingVertical: 8,
+    borderBottomWidth: 1,
+    borderBottomColor: '#F1F5F9',
   },
   totalLabel: {
     fontSize: 14,
-    color: "#6b7280",
+    color: '#64748B',
   },
   totalValue: {
     fontSize: 14,
-    fontWeight: "500",
-    color: "#111827",
+    fontWeight: '600',
+    color: '#1E293B',
   },
   grandTotalRow: {
-    flexDirection: "row",
-    justifyContent: "space-between",
-    alignItems: "center",
-    paddingVertical: 12,
-    paddingTop: 16,
+    backgroundColor: '#F8FAFC',
+    paddingHorizontal: 12,
     borderTopWidth: 2,
-    borderTopColor: "#e5e7eb",
-    marginTop: 8,
+    borderTopColor: '#3B82F6',
+    borderBottomWidth: 2,
+    borderBottomColor: '#3B82F6',
   },
   grandTotalLabel: {
     fontSize: 16,
-    fontWeight: "600",
-    color: "#111827",
+    fontWeight: 'bold',
+    color: '#1E293B',
   },
   grandTotalValue: {
-    fontSize: 18,
-    fontWeight: "bold",
-    color: "#059669",
+    fontSize: 16,
+    fontWeight: 'bold',
+    color: '#3B82F6',
   },
-  amountInWords: {
-    marginTop: 20,
-    padding: 16,
-    backgroundColor: "#f9fafb",
+  amountWordsSection: {
+    backgroundColor: '#F8FAFC',
+    margin: 20,
+    padding: 15,
     borderRadius: 8,
-    borderWidth: 1,
-    borderColor: "#e5e7eb",
+    borderLeftWidth: 4,
+    borderLeftColor: '#3B82F6',
   },
-  amountInWordsLabel: {
+  amountWordsLabel: {
     fontSize: 14,
-    fontWeight: "600",
-    color: "#374151",
-    marginBottom: 4,
+    fontWeight: 'bold',
+    color: '#3B82F6',
+    marginBottom: 8,
   },
-  amountInWordsText: {
+  amountWordsText: {
     fontSize: 14,
-    color: "#6b7280",
-    fontStyle: "italic",
+    color: '#1E293B',
+    lineHeight: 20,
+  },
+  footerSection: {
+    paddingHorizontal: 20,
+    borderTopWidth: 1,
+    borderTopColor: '#E2E8F0',
+    paddingTop: 20,
   },
   notesSection: {
-    marginBottom: 32,
+    marginBottom: 20,
   },
-  notesContainer: {
-    marginBottom: 16,
-  },
-  notesTitle: {
+  notesSectionTitle: {
     fontSize: 14,
-    fontWeight: "600",
-    color: "#374151",
+    fontWeight: 'bold',
+    color: '#3B82F6',
     marginBottom: 8,
   },
   notesText: {
-    fontSize: 14,
-    color: "#6b7280",
-    lineHeight: 20,
+    fontSize: 13,
+    color: '#64748B',
+    lineHeight: 18,
   },
-  termsContainer: {
-    marginBottom: 16,
+  termsSection: {
+    marginBottom: 20,
   },
-  termsTitle: {
+  termsSectionTitle: {
     fontSize: 14,
-    fontWeight: "600",
-    color: "#374151",
+    fontWeight: 'bold',
+    color: '#3B82F6',
     marginBottom: 8,
   },
   termsText: {
-    fontSize: 14,
-    color: "#6b7280",
-    lineHeight: 20,
+    fontSize: 13,
+    color: '#64748B',
+    lineHeight: 18,
   },
-  invoiceFooter: {
+  thankYouSection: {
+    alignItems: 'center',
+    backgroundColor: '#F8FAFC',
+    padding: 20,
+    borderRadius: 8,
+    marginVertical: 10,
+  },
+  thankYouText: {
+    fontSize: 18,
+    fontWeight: 'bold',
+    color: '#3B82F6',
+  },
+  actionButtons: {
+    flexDirection: 'row',
+    paddingHorizontal: 15,
+    paddingVertical: 10,
+    backgroundColor: '#FFFFFF',
     borderTopWidth: 1,
-    borderTopColor: "#e5e7eb",
-    paddingTop: 20,
-    alignItems: "center",
-  },
-  footerText: {
-    fontSize: 16,
-    fontWeight: "600",
-    color: "#059669",
-    marginBottom: 8,
-  },
-  footerContact: {
-    fontSize: 12,
-    color: "#6b7280",
-    textAlign: "center",
-  },
-  actionBar: {
-    flexDirection: "row",
-    backgroundColor: "#ffffff",
-    paddingHorizontal: 20,
-    paddingVertical: 16,
-    borderTopWidth: 1,
-    borderTopColor: "#e5e7eb",
-    shadowColor: "#000",
-    shadowOffset: { width: 0, height: -2 },
-    shadowOpacity: 0.1,
-    shadowRadius: 4,
-    elevation: 8,
+    borderTopColor: '#E2E8F0',
   },
   actionButton: {
     flex: 1,
-    alignItems: "center",
     paddingVertical: 12,
-    marginHorizontal: 4,
+    marginHorizontal: 5,
     borderRadius: 8,
-    backgroundColor: "#f9fafb",
+    alignItems: 'center',
   },
-  doneButton: {
-    backgroundColor: "#059669",
+  shareButton: {
+    backgroundColor: '#3B82F6',
   },
-  actionIcon: {
-    fontSize: 20,
-    marginBottom: 4,
+  printButton: {
+    backgroundColor: '#10B981',
   },
-  actionText: {
-    fontSize: 12,
-    fontWeight: "500",
-    color: "#374151",
+  saveButton: {
+    backgroundColor: '#F59E0B',
   },
-  doneIcon: {
-    fontSize: 20,
-    marginBottom: 4,
-    color: "#ffffff",
+  sentButton: {
+    backgroundColor: '#8B5CF6',
   },
-  doneText: {
-    fontSize: 12,
-    fontWeight: "600",
-    color: "#ffffff",
+  actionButtonText: {
+    color: '#FFFFFF',
+    fontWeight: '600',
+    fontSize: 14,
   },
 });
 
