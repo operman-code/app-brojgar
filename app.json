@@ -1,10 +1,11 @@
 {
   "expo": {
-    "name": "brojgar",
-    "slug": "brojgar",
+    "name": "Brojgar",
+    "slug": "brojgar-app",
     "version": "1.0.0",
     "orientation": "portrait",
     "icon": "./assets/icon.png",
+    "userInterfaceStyle": "light",
     "splash": {
       "image": "./assets/splash.png",
       "resizeMode": "contain",
@@ -15,14 +16,14 @@
     ],
     "ios": {
       "supportsTablet": true,
-      "bundleIdentifier": "com.businessmanager.app"
+      "bundleIdentifier": "com.operman.brojgar"
     },
     "android": {
       "adaptiveIcon": {
         "foregroundImage": "./assets/adaptive-icon.png",
         "backgroundColor": "#1e40af"
       },
-      "package": "com.businessmanager.app"
+      "package": "com.operman.brojgar"
     },
     "web": {
       "favicon": "./assets/favicon.png",
@@ -32,10 +33,9 @@
     "plugins": [
       "expo-router"
     ],
-    "scheme": "business-manager",
+    "scheme": "brojgar",
     "experiments": {
       "typedRoutes": false
-    },
-     "sdkVersion": "53.0.0"
+    }
   }
 }
