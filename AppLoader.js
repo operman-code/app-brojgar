@@ -1,7 +1,7 @@
 // AppLoader.js
 import React, { useState, useEffect } from 'react';
-import { View, Text, StyleSheet, ActivityIndicator, StatusBar } from 'react-native';
-// import DatabaseInitializer from './database/DatabaseInitializer'; // Temporarily commented out
+import { View, Text, StyleSheet, ActivityIndicator, StatusBar, SafeAreaView } from 'react-native';
+import DatabaseInitializer from './database/DatabaseInitializer';
 import App from './App';
 
 const AppLoader = () => {
@@ -16,13 +16,13 @@ const AppLoader = () => {
     try {
       setLoadingMessage('Setting up Brojgar...');
       
-      // Temporarily disable database initialization to fix TurboModule error
-      // await DatabaseInitializer.initializeApp();
+      // Initialize database
+      await DatabaseInitializer.initializeApp();
       
-      // Simple delay instead
-      await new Promise(resolve => setTimeout(resolve, 1500));
+      setLoadingMessage('Database ready!');
+      await new Promise(resolve => setTimeout(resolve, 500));
       
-      setLoadingMessage('Ready!');
+      setLoadingMessage('Loading app...');
       await new Promise(resolve => setTimeout(resolve, 500));
       
       setIsLoading(false);
@@ -35,43 +35,33 @@ const AppLoader = () => {
 
   if (isLoading) {
     return (
-      <View style={styles.container}>
+      <SafeAreaView style={styles.container}>
         <StatusBar barStyle="light-content" backgroundColor="#1e40af" />
         
-        {/* App Logo/Brand */}
         <View style={styles.brandContainer}>
-          <View style={styles.logoContainer}>
-            <Text style={styles.logoIcon}>💼</Text>
-            <Text style={styles.brandName}>Brojgar</Text>
-            <Text style={styles.brandTagline}>Complete Business Solution</Text>
+          <Text style={styles.logoIcon}>📊</Text>
+          <Text style={styles.brandName}>Brojgar</Text>
+          <Text style={styles.brandTagline}>Complete Business Solution</Text>
+        </View>
+
+        <View style={styles.loadingSection}>
+          <ActivityIndicator size="large" color="#ffffff" />
+          <Text style={styles.loadingText}>{loadingMessage}</Text>
+          
+          <View style={styles.featuresContainer}>
+            <Text style={styles.featuresTitle}>Getting Ready:</Text>
+            <Text style={styles.featureItem}>🗄️ Setting up database</Text>
+            <Text style={styles.featureItem}>📦 Inventory System</Text>
+            <Text style={styles.featureItem}>👥 Customer Management</Text>
+            <Text style={styles.featureItem}>🧾 Invoice Templates</Text>
+            <Text style={styles.featureItem}>📊 Analytics Dashboard</Text>
           </View>
         </View>
 
-        {/* Loading Section */}
-        <View style={styles.loadingContainer}>
-          <View style={styles.progressContainer}>
-            <ActivityIndicator size="large" color="#ffffff" />
-            <Text style={styles.loadingText}>{loadingMessage}</Text>
-            
-            {/* Feature Preview */}
-            <View style={styles.featuresContainer}>
-              <Text style={styles.featuresTitle}>Getting Ready:</Text>
-              <View style={styles.featuresList}>
-                <Text style={styles.featureItem}>📦 Setting up inventory system</Text>
-                <Text style={styles.featureItem}>👥 Configuring customer management</Text>
-                <Text style={styles.featureItem}>🧾 Preparing invoice templates</Text>
-                <Text style={styles.featureItem}>📊 Loading analytics dashboard</Text>
-              </View>
-            </View>
-          </View>
-        </View>
-
-        {/* Footer */}
         <View style={styles.footer}>
-          <Text style={styles.footerText}>Brojgar Business App</Text>
-          <Text style={styles.versionText}>v1.0.0</Text>
+          <Text style={styles.footerText}>Brojgar Business Management v1.0.0</Text>
         </View>
-      </View>
+      </SafeAreaView>
     );
   }
 
@@ -83,83 +73,61 @@ const styles = StyleSheet.create({
     flex: 1,
     backgroundColor: '#1e40af',
     justifyContent: 'space-between',
-    alignItems: 'center',
-    paddingVertical: 50,
+    paddingHorizontal: 20,
+    paddingVertical: 40,
   },
   brandContainer: {
+    alignItems: 'center',
     flex: 1,
     justifyContent: 'center',
-    alignItems: 'center',
-  },
-  logoContainer: {
-    alignItems: 'center',
-    marginBottom: 20,
   },
   logoIcon: {
     fontSize: 80,
     marginBottom: 20,
   },
   brandName: {
-    fontSize: 38,
+    fontSize: 36,
     fontWeight: 'bold',
     color: '#ffffff',
     marginBottom: 8,
-    textAlign: 'center',
-    letterSpacing: 2,
   },
   brandTagline: {
     fontSize: 16,
-    color: '#bfdbfe',
+    color: '#e0e7ff',
     textAlign: 'center',
-    fontWeight: '300',
   },
-  loadingContainer: {
+  loadingSection: {
+    alignItems: 'center',
     flex: 1,
     justifyContent: 'center',
-    alignItems: 'center',
-    paddingHorizontal: 40,
-  },
-  progressContainer: {
-    alignItems: 'center',
   },
   loadingText: {
     fontSize: 18,
     color: '#ffffff',
     marginTop: 20,
-    textAlign: 'center',
-    fontWeight: '500',
+    marginBottom: 30,
   },
   featuresContainer: {
-    marginTop: 40,
     alignItems: 'center',
   },
   featuresTitle: {
     fontSize: 16,
-    color: '#bfdbfe',
-    marginBottom: 16,
+    color: '#e0e7ff',
+    marginBottom: 15,
     fontWeight: '600',
-  },
-  featuresList: {
-    alignItems: 'flex-start',
   },
   featureItem: {
     fontSize: 14,
-    color: '#93c5fd',
+    color: '#cbd5e1',
     marginBottom: 8,
-    textAlign: 'left',
+    textAlign: 'center',
   },
   footer: {
     alignItems: 'center',
-    marginTop: 20,
   },
   footerText: {
     fontSize: 12,
-    color: '#93c5fd',
-    marginBottom: 4,
-  },
-  versionText: {
-    fontSize: 10,
-    color: '#6b7280',
+    color: '#94a3b8',
   },
 });
 
