@@ -29,18 +29,17 @@ const { width } = Dimensions.get('window');
 
 const DashboardScreen = ({ navigation }) => {
   // State management
-  const [kpiData, setKpiData] = useState(DashboardService.getKPIData());
-  const [recentTransactions, setRecentTransactions] = useState(DashboardService.getRecentTransactions());
-  const [reportShortcuts] = useState(DashboardService.getReportShortcuts());
-  const [quickActions] = useState(DashboardService.getQuickActions());
-  const [businessProfile] = useState(DashboardService.getBusinessProfile());
-  const [dashboardSummary, setDashboardSummary] = useState(DashboardService.getDashboardSummary());
-  const [notifications, setNotifications] = useState(DashboardService.getNotifications());
-  const [salesChartData] = useState(DashboardService.getSalesChartData());
+  const [kpiData, setKpiData] = useState({});
+  const [recentTransactions, setRecentTransactions] = useState([]);
+  const [notifications, setNotifications] = useState([]);
+  const [salesChartData, setSalesChartData] = useState([]);
+  const [businessMetrics, setBusinessMetrics] = useState({});
+  const [monthlyGrowth, setMonthlyGrowth] = useState([]);
   
   const [refreshing, setRefreshing] = useState(false);
+  const [loading, setLoading] = useState(true);
   const [searchQuery, setSearchQuery] = useState("");
-  const [filteredTransactions, setFilteredTransactions] = useState(recentTransactions);
+  const [filteredTransactions, setFilteredTransactions] = useState([]);
   const [activeTab, setActiveTab] = useState("overview");
   const [isQuickSiteOpen, setIsQuickSiteOpen] = useState(false);
   
@@ -50,20 +49,26 @@ const DashboardScreen = ({ navigation }) => {
   const quickMenuAnim = useRef(new Animated.Value(0)).current;
 
   useEffect(() => {
-    // Animate dashboard on load
-    Animated.parallel([
-      Animated.timing(fadeAnim, {
-        toValue: 1,
-        duration: 800,
-        useNativeDriver: true,
-      }),
-      Animated.timing(slideAnim, {
-        toValue: 0,
-        duration: 600,
-        useNativeDriver: true,
-      }),
-    ]).start();
+    loadDashboardData();
   }, []);
+
+  useEffect(() => {
+    // Animate dashboard on load
+    if (!loading) {
+      Animated.parallel([
+        Animated.timing(fadeAnim, {
+          toValue: 1,
+          duration: 800,
+          useNativeDriver: true,
+        }),
+        Animated.timing(slideAnim, {
+          toValue: 0,
+          duration: 600,
+          useNativeDriver: true,
+        }),
+      ]).start();
+    }
+  }, [loading]);
 
   useEffect(() => {
     // Filter transactions based on search query
@@ -71,422 +76,419 @@ const DashboardScreen = ({ navigation }) => {
       setFilteredTransactions(recentTransactions);
     } else {
       const filtered = recentTransactions.filter(transaction =>
-        transaction.customer?.toLowerCase().includes(searchQuery.toLowerCase()) ||
-        transaction.supplier?.toLowerCase().includes(searchQuery.toLowerCase()) ||
-        transaction.reference.toLowerCase().includes(searchQuery.toLowerCase()) ||
-        transaction.type.toLowerCase().includes(searchQuery.toLowerCase())
+        transaction.partyName?.toLowerCase().includes(searchQuery.toLowerCase()) ||
+        transaction.reference?.toLowerCase().includes(searchQuery.toLowerCase()) ||
+        transaction.type?.toLowerCase().includes(searchQuery.toLowerCase())
       );
       setFilteredTransactions(filtered);
     }
   }, [searchQuery, recentTransactions]);
 
+  // Load all dashboard data from database
+  const loadDashboardData = async () => {
+    setLoading(true);
+    try {
+      const [
+        kpiDataResult,
+        transactionsResult,
+        notificationsResult,
+        chartDataResult,
+        metricsResult,
+        growthResult
+      ] = await Promise.all([
+        DashboardService.getKPIData(),
+        DashboardService.getRecentTransactions(),
+        DashboardService.getNotifications(),
+        DashboardService.getSalesChartData(),
+        DashboardService.calculateBusinessMetrics(),
+        DashboardService.getMonthlyGrowthData()
+      ]);
+
+      setKpiData(kpiDataResult);
+      setRecentTransactions(transactionsResult);
+      setNotifications(notificationsResult);
+      setSalesChartData(chartDataResult);
+      setBusinessMetrics(metricsResult);
+      setMonthlyGrowth(growthResult);
+    } catch (error) {
+      console.error('❌ Error loading dashboard data:', error);
+      Alert.alert('Error', 'Failed to load dashboard data');
+    } finally {
+      setLoading(false);
+    }
+  };
+
   // Event handlers
   const handleRefresh = async () => {
     setRefreshing(true);
-    // Simulate API call
-    setTimeout(() => {
-      setKpiData(DashboardService.getKPIData());
-      setRecentTransactions(DashboardService.getRecentTransactions());
-      setDashboardSummary(DashboardService.getDashboardSummary());
-      setNotifications(DashboardService.getNotifications());
-      setRefreshing(false);
-    }, 1500);
-  };
-
-  const handleProfilePress = () => {
-    Alert.alert(
-      "Business Profile",
-      `${businessProfile.businessName}\nOwner: ${businessProfile.ownerName}\nGST: ${businessProfile.gstNumber}\nPhone: ${businessProfile.phone}`,
-      [{ text: "OK" }]
-    );
+    await loadDashboardData();
+    setRefreshing(false);
   };
 
   const handleQuickAction = (action) => {
-    if (action === 'new_invoice') {
-      toggleQuickMenu(); // Close menu first
-      if (navigation && navigation.navigate) {
-        navigation.navigate("Invoice");
-      } else {
-        Alert.alert("Navigation", "Invoice screen will open here");
-      }
-      return;
-    }
+    setIsQuickSiteOpen(false);
     
-    const result = DashboardService.handleQuickAction(action);
-    Alert.alert("Action", result.message, [{ text: "OK" }]);
-
+    switch (action) {
+      case 'new-invoice':
+        navigation.navigate('Invoice');
+        break;
+      case 'receive-payment':
+        navigation.navigate('Payment');
+        break;
+      case 'add-customer':
+        navigation.navigate('Parties', { action: 'add', type: 'customer' });
+        break;
+      case 'add-item':
+        navigation.navigate('Inventory', { action: 'add' });
+        break;
+      case 'view-reports':
+        navigation.navigate('Reports');
+        break;
+      default:
+        console.log('Unknown quick action:', action);
+    }
   };
 
   const toggleQuickSite = () => {
     const toValue = isQuickSiteOpen ? 0 : 1;
-    setIsQuickSiteOpen(!isQuickSiteOpen);
-    
     Animated.spring(quickMenuAnim, {
       toValue,
       useNativeDriver: true,
       tension: 100,
       friction: 8,
     }).start();
+    setIsQuickSiteOpen(!isQuickSiteOpen);
   };
 
-  const handleBillInvoice = () => {
-    navigation?.navigate('Invoice');
-  };
-
-  const handleReceivedPayment = () => {
-    Alert.alert("Received Payment", "Navigate to payment receiving screen");
-  };
-
-  const handleViewAllTransactions = () => {
-    Alert.alert("Navigation", "Navigating to All Transactions", [{ text: "OK" }]);
-  };
-
-  const handleReportPress = (report) => {
-    Alert.alert("Report", `Opening ${report.title}`, [{ text: "OK" }]);
-  };
-
-  const handleNotificationPress = (notification) => {
-    Alert.alert(
-      notification.title,
-      notification.message,
-      [
-        { text: "Dismiss", style: "cancel" },
-        { text: notification.actionLabel || "OK" }
-      ]
-    );
-  };
-
-  const dismissNotification = (notificationId) => {
-    setNotifications(prev => prev.filter(n => n.id !== notificationId));
-  };
-
-  const handleTransactionPress = (transaction) => {
-    Alert.alert(
-      `Transaction Details`,
-      `${transaction.reference}\nCustomer: ${transaction.customer || transaction.supplier}\nAmount: ${DashboardService.formatCurrency(transaction.amount)}\nStatus: ${transaction.status}`,
-      [{ text: "OK" }]
-    );
-  };
-
-  const renderTransactionItem = ({ item }) => (
-    <TransactionItem
-      transaction={item}
-      onPress={() => handleTransactionPress(item)}
+  // Render methods
+  const renderKPICard = ({ item }) => (
+    <KPICard
+      title={item.title}
+      value={item.value}
+      trend={item.trend}
+      icon={item.icon}
+      color={item.color}
     />
   );
 
-  const renderReportShortcut = ({ item }) => (
-    <TouchableOpacity 
-      style={[styles.reportCard, { borderLeftColor: item.color }]}
-      onPress={() => handleReportPress(item)}
-      activeOpacity={0.7}
-    >
-      <Text style={styles.reportIcon}>{item.icon}</Text>
-      <Text style={styles.reportTitle}>{item.title}</Text>
-      <Text style={styles.reportDescription}>{item.description}</Text>
-    </TouchableOpacity>
+  const renderTransaction = ({ item }) => (
+    <TransactionItem
+      transaction={item}
+      onPress={() => {
+        if (item.type === 'invoice') {
+          navigation.navigate('InvoiceTemplate', { invoiceId: item.id });
+        }
+      }}
+    />
   );
 
   const renderNotification = ({ item }) => (
     <NotificationCard
       notification={item}
-      onPress={() => handleNotificationPress(item)}
-      onDismiss={() => dismissNotification(item.id)}
+      onPress={() => {
+        // Handle notification press based on type
+        if (item.type === 'warning' && item.id.includes('overdue')) {
+          navigation.navigate('Parties');
+        } else if (item.type === 'info' && item.id.includes('lowstock')) {
+          navigation.navigate('Inventory');
+        }
+      }}
     />
   );
 
-  const renderTabButton = (tabId, title, icon) => (
-    <TouchableOpacity
-      style={[styles.tabButton, activeTab === tabId && styles.activeTabButton]}
-      onPress={() => setActiveTab(tabId)}
-      activeOpacity={0.7}
-    >
-      <View style={[styles.tabIconContainer, activeTab === tabId && styles.activeTabIconContainer]}>
-        <Text style={[styles.tabIcon, activeTab === tabId && styles.activeTabIcon]}>{icon}</Text>
+  const renderSalesChart = () => (
+    <View style={styles.chartContainer}>
+      <Text style={styles.chartTitle}>Weekly Sales</Text>
+      <View style={styles.chartArea}>
+        {salesChartData.map((data, index) => (
+          <View key={index} style={styles.chartBar}>
+            <View style={styles.barContainer}>
+              <View 
+                style={[
+                  styles.salesBar, 
+                  { height: Math.max((data.sales / 35000) * 80, 5) }
+                ]} 
+              />
+              <View 
+                style={[
+                  styles.targetBar, 
+                  { height: (data.target / 35000) * 80 }
+                ]} 
+              />
+            </View>
+            <Text style={styles.chartLabel}>{data.day}</Text>
+            <Text style={styles.chartValue}>₹{(data.sales / 1000).toFixed(0)}K</Text>
+          </View>
+        ))}
       </View>
-      <Text style={[styles.tabTitle, activeTab === tabId && styles.activeTabTitle]}>{title}</Text>
-      {activeTab === tabId && <View style={styles.tabIndicator} />}
-    </TouchableOpacity>
+      <View style={styles.chartLegend}>
+        <View style={styles.legendItem}>
+          <View style={[styles.legendColor, { backgroundColor: '#3B82F6' }]} />
+          <Text style={styles.legendText}>Sales</Text>
+        </View>
+        <View style={styles.legendItem}>
+          <View style={[styles.legendColor, { backgroundColor: '#E5E7EB' }]} />
+          <Text style={styles.legendText}>Target</Text>
+        </View>
+      </View>
+    </View>
   );
+
+  const renderQuickActions = () => (
+    <View style={styles.quickActionsContainer}>
+      <Text style={styles.sectionTitle}>Quick Actions</Text>
+      <View style={styles.quickActionsGrid}>
+        <QuickActionButton
+          title="New Invoice"
+          icon="📄"
+          color="#3B82F6"
+          onPress={() => handleQuickAction('new-invoice')}
+        />
+        <QuickActionButton
+          title="Receive Payment"
+          icon="💰"
+          color="#10B981"
+          onPress={() => handleQuickAction('receive-payment')}
+        />
+        <QuickActionButton
+          title="Add Customer"
+          icon="👥"
+          color="#8B5CF6"
+          onPress={() => handleQuickAction('add-customer')}
+        />
+        <QuickActionButton
+          title="Add Item"
+          icon="📦"
+          color="#F59E0B"
+          onPress={() => handleQuickAction('add-item')}
+        />
+      </View>
+    </View>
+  );
+
+  const kpiCards = [
+    {
+      title: "To Collect",
+      value: `₹${(kpiData.toCollect || 0).toLocaleString('en-IN')}`,
+      trend: kpiData.toCollectTrend || 0,
+      icon: "💰",
+      color: "#3B82F6"
+    },
+    {
+      title: "To Pay",
+      value: `₹${(kpiData.toPay || 0).toLocaleString('en-IN')}`,
+      trend: kpiData.toPayTrend || 0,
+      icon: "💳",
+      color: "#EF4444"
+    },
+    {
+      title: "Stock Value",
+      value: `₹${(kpiData.stockValue || 0).toLocaleString('en-IN')}`,
+      trend: kpiData.stockTrend || 0,
+      icon: "📦",
+      color: "#10B981"
+    },
+    {
+      title: "Week Sales",
+      value: `₹${(kpiData.weekSales || 0).toLocaleString('en-IN')}`,
+      trend: kpiData.salesTrend || 0,
+      icon: "📈",
+      color: "#8B5CF6"
+    }
+  ];
+
+  if (loading) {
+    return (
+      <SafeAreaView style={styles.container}>
+        <StatusBar barStyle="dark-content" />
+        <View style={styles.loadingContainer}>
+          <Text style={styles.loadingText}>Loading Dashboard...</Text>
+        </View>
+      </SafeAreaView>
+    );
+  }
 
   return (
     <SafeAreaView style={styles.container}>
-      <StatusBar barStyle="light-content" backgroundColor="#1e40af" />
+      <StatusBar barStyle="dark-content" />
       
-      {/* Enhanced Header */}
-      <Animated.View style={[styles.header, { opacity: fadeAnim }]}>
-        <View style={styles.headerContent}>
-          <View style={styles.headerLeft}>
-            <Text style={styles.businessName}>{businessProfile.businessName}</Text>
-            <Text style={styles.headerSubtitle}>Welcome back, {businessProfile.ownerName}</Text>
-            <View style={styles.statusContainer}>
-              <View style={[styles.statusDot, { backgroundColor: "#10b981" }]} />
-              <Text style={styles.summaryText}>{dashboardSummary.statusMessage}</Text>
+      <Animated.View 
+        style={[
+          styles.content,
+          {
+            opacity: fadeAnim,
+            transform: [{ translateY: slideAnim }]
+          }
+        ]}
+      >
+        <ScrollView
+          refreshControl={
+            <RefreshControl refreshing={refreshing} onRefresh={handleRefresh} />
+          }
+          showsVerticalScrollIndicator={false}
+        >
+          {/* Header */}
+          <View style={styles.header}>
+            <View>
+              <Text style={styles.welcomeText}>Welcome back!</Text>
+              <Text style={styles.businessName}>Brojgar Business</Text>
+            </View>
+            <TouchableOpacity style={styles.profileButton}>
+              <Text style={styles.profileIcon}>👤</Text>
+            </TouchableOpacity>
+          </View>
+
+          {/* Search Bar */}
+          <View style={styles.searchContainer}>
+            <TextInput
+              style={styles.searchInput}
+              placeholder="Search transactions..."
+              value={searchQuery}
+              onChangeText={setSearchQuery}
+            />
+            <Text style={styles.searchIcon}>🔍</Text>
+          </View>
+
+          {/* KPI Cards */}
+          <FlatList
+            data={kpiCards}
+            renderItem={renderKPICard}
+            keyExtractor={(item) => item.title}
+            horizontal
+            showsHorizontalScrollIndicator={false}
+            contentContainerStyle={styles.kpiContainer}
+          />
+
+          {/* Sales Chart */}
+          {renderSalesChart()}
+
+          {/* Business Metrics Summary */}
+          <View style={styles.metricsContainer}>
+            <Text style={styles.sectionTitle}>Business Overview</Text>
+            <View style={styles.metricsGrid}>
+              <View style={styles.metricCard}>
+                <Text style={styles.metricValue}>
+                  ₹{(businessMetrics.totalSales || 0).toLocaleString('en-IN')}
+                </Text>
+                <Text style={styles.metricLabel}>Monthly Sales</Text>
+              </View>
+              <View style={styles.metricCard}>
+                <Text style={styles.metricValue}>
+                  {businessMetrics.totalCustomers || 0}
+                </Text>
+                <Text style={styles.metricLabel}>Customers</Text>
+              </View>
+              <View style={styles.metricCard}>
+                <Text style={styles.metricValue}>
+                  {businessMetrics.totalItems || 0}
+                </Text>
+                <Text style={styles.metricLabel}>Products</Text>
+              </View>
+              <View style={styles.metricCard}>
+                <Text style={styles.metricValue}>
+                  ₹{(businessMetrics.netRevenue || 0).toLocaleString('en-IN')}
+                </Text>
+                <Text style={styles.metricLabel}>Net Profit</Text>
+              </View>
             </View>
           </View>
-          <View style={styles.headerRight}>
-            <TouchableOpacity style={styles.notificationButton} onPress={() => Alert.alert("Notifications", "Feature coming soon!")}>
-              <Text style={styles.notificationIcon}>🔔</Text>
-              {notifications.length > 0 && (
-                <View style={styles.notificationBadge}>
-                  <Text style={styles.badgeText}>{notifications.length}</Text>
-                </View>
-              )}
-            </TouchableOpacity>
-            <TouchableOpacity style={styles.profileIconContainer} onPress={handleProfilePress}>
-              <Text style={styles.profileIconText}>👤</Text>
-            </TouchableOpacity>
-          </View>
-        </View>
-      </Animated.View>
 
-      {/* Tab Navigation */}
-      <View style={styles.tabContainer}>
-        {renderTabButton("overview", "Overview", "📊")}
-        {renderTabButton("transactions", "Activity", "💳")}
-        {renderTabButton("reports", "Reports", "📈")}
-      </View>
+          {/* Quick Actions */}
+          {renderQuickActions()}
 
-      <ScrollView 
-        showsVerticalScrollIndicator={false}
-        refreshControl={
-          <RefreshControl refreshing={refreshing} onRefresh={handleRefresh} />
-        }
-      >
-        <Animated.View style={[{ opacity: fadeAnim, transform: [{ translateY: slideAnim }] }]}>
-          
           {/* Notifications */}
           {notifications.length > 0 && (
-            <View style={styles.section}>
-              <Text style={styles.sectionTitle}>🔔 Important Alerts</Text>
+            <View style={styles.notificationsContainer}>
+              <Text style={styles.sectionTitle}>Important Alerts</Text>
               <FlatList
-                data={notifications}
+                data={notifications.slice(0, 3)} // Show only first 3
                 renderItem={renderNotification}
-                keyExtractor={(item) => item.id.toString()}
-                horizontal
-                showsHorizontalScrollIndicator={false}
-                style={styles.notificationsList}
-              />
-            </View>
-          )}
-
-          {activeTab === "overview" && (
-            <>
-              {/* KPI Summary Cards */}
-              <View style={styles.section}>
-                <Text style={styles.sectionTitle}>📈 Business Overview</Text>
-                <View style={styles.kpiContainer}>
-                  <View style={styles.kpiRow}>
-                    <KPICard 
-                      label="To Collect"
-                      value={kpiData.toCollect}
-                      backgroundColor="#fee2e2"
-                      textColor="#dc2626"
-                      trend={kpiData.toCollectTrend}
-                    />
-                    <KPICard 
-                      label="To Pay"
-                      value={kpiData.toPay}
-                      backgroundColor="#fef3c7"
-                      textColor="#d97706"
-                      trend={kpiData.toPayTrend}
-                    />
-                  </View>
-                  <View style={styles.kpiRow}>
-                    <KPICard 
-                      label="Stock Value"
-                      value={kpiData.stockValue}
-                      backgroundColor="#e0f2fe"
-                      textColor="#0284c7"
-                      trend={kpiData.stockTrend}
-                    />
-                    <KPICard 
-                      label="Week Sales"
-                      value={kpiData.weekSales}
-                      backgroundColor="#d1fae5"
-                      textColor="#059669"
-                      trend={kpiData.salesTrend}
-                    />
-                  </View>
-                  <View style={styles.kpiRow}>
-                    <KPICard 
-                      label="Total Balance"
-                      value={kpiData.totalBalance}
-                      backgroundColor="#f3e8ff"
-                      textColor="#7c3aed"
-                      trend={kpiData.balanceTrend}
-                      isLarge={true}
-                    />
-                  </View>
-                </View>
-              </View>
-            </>
-          )}
-
-          {activeTab === "transactions" && (
-            <>
-              {/* Search Bar */}
-              <View style={styles.section}>
-                <Text style={styles.sectionTitle}>🔍 Search Transactions</Text>
-                <View style={styles.searchContainer}>
-                  <TextInput
-                    style={styles.searchInput}
-                    placeholder="Search by customer, reference, or type..."
-                    value={searchQuery}
-                    onChangeText={setSearchQuery}
-                    placeholderTextColor="#9ca3af"
-                  />
-                  {searchQuery.length > 0 && (
-                    <TouchableOpacity 
-                      style={styles.clearButton}
-                      onPress={() => setSearchQuery("")}
-                    >
-                      <Text style={styles.clearButtonText}>✕</Text>
-                    </TouchableOpacity>
-                  )}
-                </View>
-              </View>
-
-              {/* Recent Transactions */}
-              <View style={styles.section}>
-                <View style={styles.sectionHeader}>
-                  <Text style={styles.sectionTitle}>
-                    💳 Recent Activity ({filteredTransactions.length})
-                  </Text>
-                  <TouchableOpacity onPress={handleViewAllTransactions}>
-                    <Text style={styles.viewAllText}>View All</Text>
-                  </TouchableOpacity>
-                </View>
-                <View style={styles.transactionsList}>
-                  <FlatList
-                    data={filteredTransactions.slice(0, 8)}
-                    renderItem={renderTransactionItem}
-                    keyExtractor={(item) => item.id}
-                    scrollEnabled={false}
-                    showsVerticalScrollIndicator={false}
-                  />
-                </View>
-              </View>
-            </>
-          )}
-
-          {activeTab === "reports" && (
-            <View style={styles.section}>
-              <Text style={styles.sectionTitle}>📋 Quick Reports</Text>
-              <FlatList
-                data={reportShortcuts}
-                renderItem={renderReportShortcut}
-                keyExtractor={(item) => item.id.toString()}
-                numColumns={2}
-                style={styles.reportsGrid}
+                keyExtractor={(item) => item.id}
                 scrollEnabled={false}
-                columnWrapperStyle={styles.reportRow}
-                showsVerticalScrollIndicator={false}
               />
             </View>
           )}
 
-        </Animated.View>
-      </ScrollView>
-      
-      {/* QuickSite Options - Animated overlay */}
-      {isQuickSiteOpen && (
-        <Animated.View 
-          style={[
-            styles.quickSiteOverlay,
-            {
-              opacity: quickMenuAnim,
-              transform: [{
-                scale: quickMenuAnim.interpolate({
-                  inputRange: [0, 1],
-                  outputRange: [0.3, 1],
-                })
-              }]
-            }
-          ]}
-        >
-          <TouchableOpacity
-            style={styles.overlayBackground}
-            onPress={toggleQuickSite}
-            activeOpacity={1}
-          />
-          <View style={styles.quickSiteContainer}>
-            <TouchableOpacity
-              style={[styles.quickSiteOption, { backgroundColor: '#10b981' }]}
-              onPress={() => handleQuickAction('new_invoice')}
-            >
-              <Text style={styles.quickSiteIcon}>📝</Text>
-              <Text style={styles.quickSiteLabel}>New Invoice</Text>
-            </TouchableOpacity>
-            
-            <TouchableOpacity
-              style={[styles.quickSiteOption, { backgroundColor: '#3b82f6' }]}
-              onPress={() => handleQuickAction('receive_payment')}
-            >
-              <Text style={styles.quickSiteIcon}>💰</Text>
-              <Text style={styles.quickSiteLabel}>Receive Payment</Text>
-            </TouchableOpacity>
-            
-            <TouchableOpacity
-              style={[styles.quickSiteOption, { backgroundColor: '#f59e0b' }]}
-              onPress={() => handleQuickAction('add_expense')}
-            >
-              <Text style={styles.quickSiteIcon}>💳</Text>
-              <Text style={styles.quickSiteLabel}>Add Expense</Text>
-            </TouchableOpacity>
-            
-            <TouchableOpacity
-              style={[styles.quickSiteOption, { backgroundColor: '#8b5cf6' }]}
-              onPress={() => handleQuickAction('add_customer')}
-            >
-              <Text style={styles.quickSiteIcon}>👥</Text>
-              <Text style={styles.quickSiteLabel}>Add Customer</Text>
-            </TouchableOpacity>
-            
-            <TouchableOpacity
-              style={[styles.quickSiteOption, { backgroundColor: '#ef4444' }]}
-              onPress={() => handleQuickAction('inventory_alert')}
-            >
-              <Text style={styles.quickSiteIcon}>📦</Text>
-              <Text style={styles.quickSiteLabel}>Stock Alert</Text>
-            </TouchableOpacity>
+          {/* Recent Transactions */}
+          <View style={styles.transactionsContainer}>
+            <View style={styles.sectionHeader}>
+              <Text style={styles.sectionTitle}>Recent Transactions</Text>
+              <TouchableOpacity onPress={() => navigation.navigate('Reports')}>
+                <Text style={styles.viewAllText}>View All</Text>
+              </TouchableOpacity>
+            </View>
+            <FlatList
+              data={filteredTransactions.slice(0, 5)} // Show only first 5
+              renderItem={renderTransaction}
+              keyExtractor={(item) => item.id}
+              scrollEnabled={false}
+            />
           </View>
-        </Animated.View>
-      )}
 
-      {/* Bottom Bar */}
-      <View style={styles.bottomBar}>
-        <TouchableOpacity
-          style={styles.leftButton}
-          onPress={handleReceivedPayment}
-          activeOpacity={0.8}
-        >
-          <Text style={styles.leftButtonText}>Received Payment</Text>
-        </TouchableOpacity>
-        <TouchableOpacity
-          style={styles.centerButton}
-          onPress={toggleQuickSite}
-          activeOpacity={0.8}
-        >
+          <View style={{ height: 100 }} />
+        </ScrollView>
+      </Animated.View>
+
+      {/* Floating QuickSite Button */}
+      <View style={styles.quickSiteContainer}>
+        {isQuickSiteOpen && (
           <Animated.View
-            style={{
-              transform: [{
-                rotate: quickMenuAnim.interpolate({
-                  inputRange: [0, 1],
-                  outputRange: ['0deg', '45deg'],
-                })
-              }]
-            }}
+            style={[
+              styles.quickSiteMenu,
+              {
+                opacity: quickMenuAnim,
+                transform: [
+                  {
+                    scale: quickMenuAnim.interpolate({
+                      inputRange: [0, 1],
+                      outputRange: [0.3, 1],
+                    }),
+                  },
+                ],
+              },
+            ]}
           >
-            <Text style={styles.plus}>+</Text>
-          </Animated.View>
-        </TouchableOpacity>
             <TouchableOpacity
-          style={styles.rightButton}
-          onPress={handleBillInvoice}
-          activeOpacity={0.8}
+              style={[styles.quickSiteOption, { backgroundColor: '#3B82F6' }]}
+              onPress={() => handleQuickAction('new-invoice')}
+            >
+              <Text style={styles.quickSiteOptionText}>📄</Text>
+            </TouchableOpacity>
+            <TouchableOpacity
+              style={[styles.quickSiteOption, { backgroundColor: '#10B981' }]}
+              onPress={() => handleQuickAction('receive-payment')}
+            >
+              <Text style={styles.quickSiteOptionText}>💰</Text>
+            </TouchableOpacity>
+            <TouchableOpacity
+              style={[styles.quickSiteOption, { backgroundColor: '#8B5CF6' }]}
+              onPress={() => handleQuickAction('add-customer')}
+            >
+              <Text style={styles.quickSiteOptionText}>👥</Text>
+            </TouchableOpacity>
+            <TouchableOpacity
+              style={[styles.quickSiteOption, { backgroundColor: '#F59E0B' }]}
+              onPress={() => handleQuickAction('add-item')}
+            >
+              <Text style={styles.quickSiteOptionText}>📦</Text>
+            </TouchableOpacity>
+            <TouchableOpacity
+              style={[styles.quickSiteOption, { backgroundColor: '#EF4444' }]}
+              onPress={() => handleQuickAction('view-reports')}
+            >
+              <Text style={styles.quickSiteOptionText}>📊</Text>
+            </TouchableOpacity>
+          </Animated.View>
+        )}
+        
+        <TouchableOpacity
+          style={[
+            styles.quickSiteButton,
+            { transform: [{ rotate: isQuickSiteOpen ? '45deg' : '0deg' }] }
+          ]}
+          onPress={toggleQuickSite}
         >
-          <Text style={styles.rightButtonText}>Bill / Invoice</Text>
+          <Text style={styles.quickSiteButtonText}>+</Text>
         </TouchableOpacity>
       </View>
     </SafeAreaView>
@@ -496,399 +498,262 @@ const DashboardScreen = ({ navigation }) => {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: "#f8fafc",
+    backgroundColor: '#F8FAFC',
+  },
+  loadingContainer: {
+    flex: 1,
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  loadingText: {
+    fontSize: 18,
+    color: '#64748B',
+  },
+  content: {
+    flex: 1,
   },
   header: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
     paddingHorizontal: 20,
-    paddingTop: 20,
-    paddingBottom: 25,
-    backgroundColor: "#1e40af",
-    borderBottomLeftRadius: 25,
-    borderBottomRightRadius: 25,
-    shadowColor: "#1e40af",
-    shadowOffset: { width: 0, height: 8 },
-    shadowOpacity: 0.3,
-    shadowRadius: 10,
-    elevation: 15,
+    paddingVertical: 20,
   },
-  headerContent: {
-    flexDirection: "row",
-    justifyContent: "space-between",
-    alignItems: "flex-start",
-  },
-  headerLeft: {
-    flex: 1,
+  welcomeText: {
+    fontSize: 16,
+    color: '#64748B',
   },
   businessName: {
     fontSize: 24,
-    fontWeight: "bold",
-    color: "#ffffff",
+    fontWeight: 'bold',
+    color: '#1E293B',
   },
-  headerSubtitle: {
-    fontSize: 14,
-    color: "#e0f2fe",
-    marginTop: 2,
-  },
-  statusContainer: {
-    flexDirection: "row",
-    alignItems: "center",
-    marginTop: 6,
-  },
-  statusDot: {
-    width: 8,
-    height: 8,
-    borderRadius: 4,
-    marginRight: 6,
-  },
-  summaryText: {
-    fontSize: 12,
-    color: "#e0f2fe",
-    fontWeight: "500",
-  },
-  headerRight: {
-    flexDirection: "row",
-    alignItems: "center",
-    gap: 12,
-  },
-  notificationButton: {
-    position: "relative",
-    padding: 8,
+  profileButton: {
+    width: 40,
+    height: 40,
     borderRadius: 20,
-    backgroundColor: "rgba(255,255,255,0.1)",
+    backgroundColor: '#E2E8F0',
+    justifyContent: 'center',
+    alignItems: 'center',
   },
-  notificationIcon: {
+  profileIcon: {
     fontSize: 20,
-  },
-  notificationBadge: {
-    position: "absolute",
-    top: 4,
-    right: 4,
-    backgroundColor: "#ef4444",
-    borderRadius: 10,
-    width: 20,
-    height: 20,
-    justifyContent: "center",
-    alignItems: "center",
-  },
-  badgeText: {
-    fontSize: 10,
-    color: "#ffffff",
-    fontWeight: "bold",
-  },
-  profileIconContainer: {
-    width: 44,
-    height: 44,
-    borderRadius: 22,
-    backgroundColor: "rgba(255,255,255,0.1)",
-    justifyContent: "center",
-    alignItems: "center",
-  },
-  profileIconText: {
-    fontSize: 20,
-  },
-  tabContainer: {
-    flexDirection: "row",
-    backgroundColor: "#ffffff",
-    marginHorizontal: 20,
-    marginTop: -10,
-    borderRadius: 16,
-    padding: 6,
-    shadowColor: "#000",
-    shadowOffset: { width: 0, height: 4 },
-    shadowOpacity: 0.15,
-    shadowRadius: 8,
-    elevation: 8,
-  },
-  tabButton: {
-    flex: 1,
-    alignItems: "center",
-    paddingVertical: 12,
-    paddingHorizontal: 8,
-    borderRadius: 12,
-    position: "relative",
-  },
-  activeTabButton: {
-    backgroundColor: "#eff6ff",
-  },
-  tabIconContainer: {
-    width: 36,
-    height: 36,
-    borderRadius: 18,
-    justifyContent: "center",
-    alignItems: "center",
-    backgroundColor: "transparent",
-    marginBottom: 4,
-  },
-  activeTabIconContainer: {
-    backgroundColor: "#3b82f6",
-  },
-  tabIndicator: {
-    position: "absolute",
-    bottom: 4,
-    width: 20,
-    height: 3,
-    backgroundColor: "#3b82f6",
-    borderRadius: 2,
-  },
-  tabIcon: {
-    fontSize: 18,
-  },
-  activeTabIcon: {
-    fontSize: 18,
-    color: "#ffffff",
-  },
-  tabTitle: {
-    fontSize: 12,
-    color: "#6b7280",
-    fontWeight: "500",
-  },
-  activeTabTitle: {
-    color: "#2563eb",
-    fontWeight: "600",
-  },
-  section: {
-    padding: 20,
-  },
-  sectionTitle: {
-    fontSize: 18,
-    fontWeight: "600",
-    color: "#111827",
-    marginBottom: 16,
-  },
-  sectionHeader: {
-    flexDirection: "row",
-    justifyContent: "space-between",
-    alignItems: "center",
-    marginBottom: 16,
-  },
-  viewAllText: {
-    fontSize: 14,
-    color: "#3b82f6",
-    fontWeight: "500",
-  },
-  notificationsList: {
-    marginTop: 8,
-  },
-  kpiContainer: {
-    gap: 12,
-  },
-  kpiRow: {
-    flexDirection: "row",
-    gap: 12,
-  },
-  actionsContainer: {
-    flexDirection: "row",
-    flexWrap: "wrap",
-    gap: 12,
   },
   searchContainer: {
-    flexDirection: "row",
-    alignItems: "center",
-    backgroundColor: "#ffffff",
+    flexDirection: 'row',
+    alignItems: 'center',
+    marginHorizontal: 20,
+    marginBottom: 20,
+    backgroundColor: '#FFFFFF',
     borderRadius: 12,
     paddingHorizontal: 16,
-    paddingVertical: 4,
-    shadowColor: "#000",
-    shadowOffset: { width: 0, height: 2 },
+    paddingVertical: 12,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 1 },
     shadowOpacity: 0.1,
-    shadowRadius: 3.84,
-    elevation: 3,
+    shadowRadius: 3,
+    elevation: 2,
   },
   searchInput: {
     flex: 1,
-    paddingVertical: 12,
     fontSize: 16,
-    color: "#111827",
+    color: '#1E293B',
   },
-  clearButton: {
-    width: 24,
-    height: 24,
+  searchIcon: {
+    fontSize: 20,
+    marginLeft: 10,
+  },
+  kpiContainer: {
+    paddingHorizontal: 15,
+    marginBottom: 20,
+  },
+  chartContainer: {
+    backgroundColor: '#FFFFFF',
+    marginHorizontal: 20,
+    marginBottom: 20,
     borderRadius: 12,
-    backgroundColor: "#f3f4f6",
-    justifyContent: "center",
-    alignItems: "center",
-    marginLeft: 8,
-  },
-  clearButtonText: {
-    fontSize: 14,
-    color: "#6b7280",
-    fontWeight: "bold",
-  },
-  transactionsList: {
-    backgroundColor: "#ffffff",
-    borderRadius: 12,
-    overflow: "hidden",
-    shadowColor: "#000",
-    shadowOffset: { width: 0, height: 2 },
+    padding: 20,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 1 },
     shadowOpacity: 0.1,
-    shadowRadius: 3.84,
-    elevation: 3,
+    shadowRadius: 3,
+    elevation: 2,
   },
-  reportsGrid: {
-    backgroundColor: "transparent",
+  chartTitle: {
+    fontSize: 18,
+    fontWeight: 'bold',
+    color: '#1E293B',
+    marginBottom: 15,
   },
-  reportRow: {
-    justifyContent: "space-between",
+  chartArea: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'flex-end',
+    height: 120,
+    marginBottom: 15,
   },
-  reportCard: {
+  chartBar: {
+    alignItems: 'center',
     flex: 1,
-    backgroundColor: "#ffffff",
-    padding: 16,
-    borderRadius: 12,
-    marginHorizontal: 6,
-    marginBottom: 12,
-    borderLeftWidth: 4,
-    alignItems: "center",
-    shadowColor: "#000",
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.1,
-    shadowRadius: 3.84,
-    elevation: 3,
   },
-  reportIcon: {
-    fontSize: 24,
-    marginBottom: 8,
+  barContainer: {
+    height: 80,
+    justifyContent: 'flex-end',
+    alignItems: 'center',
+    position: 'relative',
   },
-  reportTitle: {
-    fontSize: 14,
-    fontWeight: "600",
-    color: "#374151",
-    textAlign: "center",
+  salesBar: {
+    width: 20,
+    backgroundColor: '#3B82F6',
+    borderRadius: 4,
+    position: 'absolute',
+    bottom: 0,
   },
-  reportDescription: {
+  targetBar: {
+    width: 20,
+    backgroundColor: '#E5E7EB',
+    borderRadius: 4,
+    position: 'absolute',
+    bottom: 0,
+    zIndex: -1,
+  },
+  chartLabel: {
     fontSize: 12,
-    color: "#6b7280",
-    textAlign: "center",
-    marginTop: 4,
+    color: '#64748B',
+    marginTop: 5,
   },
-  quickActionContainer: {
-    position: "absolute",
+  chartValue: {
+    fontSize: 10,
+    color: '#64748B',
+  },
+  chartLegend: {
+    flexDirection: 'row',
+    justifyContent: 'center',
+    marginTop: 10,
+  },
+  legendItem: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    marginHorizontal: 10,
+  },
+  legendColor: {
+    width: 12,
+    height: 12,
+    borderRadius: 6,
+    marginRight: 5,
+  },
+  legendText: {
+    fontSize: 12,
+    color: '#64748B',
+  },
+  metricsContainer: {
+    marginHorizontal: 20,
+    marginBottom: 20,
+  },
+  sectionTitle: {
+    fontSize: 18,
+    fontWeight: 'bold',
+    color: '#1E293B',
+    marginBottom: 15,
+  },
+  metricsGrid: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    justifyContent: 'space-between',
+  },
+  metricCard: {
+    backgroundColor: '#FFFFFF',
+    borderRadius: 12,
+    padding: 15,
+    width: '48%',
+    marginBottom: 10,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 1 },
+    shadowOpacity: 0.1,
+    shadowRadius: 3,
+    elevation: 2,
+  },
+  metricValue: {
+    fontSize: 20,
+    fontWeight: 'bold',
+    color: '#1E293B',
+  },
+  metricLabel: {
+    fontSize: 14,
+    color: '#64748B',
+    marginTop: 5,
+  },
+  quickActionsContainer: {
+    marginHorizontal: 20,
+    marginBottom: 20,
+  },
+  quickActionsGrid: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    justifyContent: 'space-between',
+  },
+  notificationsContainer: {
+    marginHorizontal: 20,
+    marginBottom: 20,
+  },
+  transactionsContainer: {
+    marginHorizontal: 20,
+    marginBottom: 20,
+  },
+  sectionHeader: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    marginBottom: 15,
+  },
+  viewAllText: {
+    fontSize: 14,
+    color: '#3B82F6',
+    fontWeight: '500',
+  },
+  quickSiteContainer: {
+    position: 'absolute',
     bottom: 100,
     right: 20,
-    alignItems: "flex-end",
+    alignItems: 'center',
   },
-  quickActionButton: {
-    width: 56,
-    height: 56,
-    borderRadius: 28,
-    backgroundColor: "#3b82f6",
-    justifyContent: "center",
-    alignItems: "center",
-    shadowColor: "#000",
-    shadowOffset: { width: 0, height: 4 },
-    shadowOpacity: 0.3,
-    shadowRadius: 6,
-    elevation: 8,
-    zIndex: 1000,
+  quickSiteMenu: {
+    marginBottom: 15,
+    alignItems: 'center',
   },
-  quickActionButtonOpen: {
-    backgroundColor: "#1e40af",
-  },
-  quickActionMainIcon: {
-    fontSize: 24,
-    color: "#ffffff",
-    fontWeight: "300",
-  },
-  quickActionOptions: {
-    position: "absolute",
-    bottom: 70,
-    right: 0,
-    alignItems: "flex-end",
-    gap: 12,
-  },
-
-  quickActionOption: {
-    flexDirection: "row",
-    alignItems: "center",
-    paddingHorizontal: 16,
-    paddingVertical: 12,
-    borderRadius: 24,
-    shadowColor: "#000",
-    shadowOffset: { width: 0, height: 3 },
-    shadowOpacity: 0.25,
-    shadowRadius: 4,
-    elevation: 6,
-    minWidth: 140,
-  },
-  quickActionIcon: {
-    fontSize: 18,
-    marginRight: 8,
-  },
-  quickActionLabel: {
-    color: "#ffffff",
-    fontSize: 13,
-    fontWeight: "600",
-  },
-  // Bottom bar styles
-  bottomBar: {
-    position: "absolute",
-    left: 0,
-    right: 0,
-    bottom: 24,
-    flexDirection: "row",
-    justifyContent: "space-evenly",
-    alignItems: "center",
-    zIndex: 100,
-    paddingHorizontal: 16,
-  },
-  leftButton: {
-    flex: 1,
-    marginRight: 8,
-    backgroundColor: "#20203a",
-    paddingVertical: 14,
-    borderRadius: 28,
-    alignItems: "center",
-    flexDirection: "row",
-    justifyContent: "center",
-    elevation: 3,
-    shadowColor: "#000",
+  quickSiteOption: {
+    width: 50,
+    height: 50,
+    borderRadius: 25,
+    justifyContent: 'center',
+    alignItems: 'center',
+    marginBottom: 10,
+    shadowColor: '#000',
     shadowOffset: { width: 0, height: 2 },
     shadowOpacity: 0.25,
     shadowRadius: 3.84,
+    elevation: 5,
   },
-  leftButtonText: {
-    color: "#fff",
-    fontSize: 14,
-    fontWeight: "bold",
+  quickSiteOptionText: {
+    fontSize: 20,
   },
-  centerButton: {
-    width: 56,
-    height: 56,
-    backgroundColor: "#4F46E5",
-    borderRadius: 28,
-    alignItems: "center",
-    justifyContent: "center",
-    marginHorizontal: 8,
-    elevation: 4,
-    shadowColor: "#000",
-    shadowOffset: { width: 0, height: 3 },
-    shadowOpacity: 0.3,
-    shadowRadius: 4.65,
-  },
-  plus: {
-    color: "#fff",
-    fontSize: 24,
-    fontWeight: "300",
-  },
-  rightButton: {
-    flex: 1,
-    marginLeft: 8,
-    backgroundColor: "#4F46E5",
-    paddingVertical: 14,
-    borderRadius: 28,
-    alignItems: "center",
-    flexDirection: "row",
-    justifyContent: "center",
-    elevation: 3,
-    shadowColor: "#000",
+  quickSiteButton: {
+    width: 60,
+    height: 60,
+    borderRadius: 30,
+    backgroundColor: '#3B82F6',
+    justifyContent: 'center',
+    alignItems: 'center',
+    shadowColor: '#000',
     shadowOffset: { width: 0, height: 2 },
     shadowOpacity: 0.25,
     shadowRadius: 3.84,
+    elevation: 5,
   },
-  rightButtonText: {
-    color: "#fff",
-    fontSize: 14,
-    fontWeight: "bold",
+  quickSiteButtonText: {
+    fontSize: 24,
+    color: '#FFFFFF',
+    fontWeight: 'bold',
   },
 });
 

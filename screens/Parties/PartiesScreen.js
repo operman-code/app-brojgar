@@ -18,23 +18,27 @@ import {
 // Import service
 import PartiesService from "./services/PartiesService";
 
-const PartiesScreen = () => {
+const PartiesScreen = ({ route }) => {
   const [parties, setParties] = useState([]);
   const [filteredParties, setFilteredParties] = useState([]);
   const [searchQuery, setSearchQuery] = useState("");
   const [refreshing, setRefreshing] = useState(false);
+  const [loading, setLoading] = useState(true);
   const [selectedTab, setSelectedTab] = useState("all"); // all, customers, suppliers
   const [modalVisible, setModalVisible] = useState(false);
   const [editingParty, setEditingParty] = useState(null);
+  const [statistics, setStatistics] = useState({});
   const [formData, setFormData] = useState({
     name: "",
     phone: "",
     email: "",
     address: "",
     gstNumber: "",
+    panNumber: "",
     type: "customer", // customer or supplier
     creditLimit: "",
-    paymentTerms: "",
+    creditDays: "30",
+    openingBalance: "0",
     notes: "",
   });
 
@@ -43,15 +47,31 @@ const PartiesScreen = () => {
   }, []);
 
   useEffect(() => {
+    // Handle navigation params
+    if (route?.params?.action === 'add') {
+      openAddModal(route.params.type || 'customer');
+    }
+  }, [route?.params]);
+
+  useEffect(() => {
     filterParties();
   }, [parties, searchQuery, selectedTab]);
 
   const loadParties = async () => {
+    setLoading(true);
     try {
-      const partiesData = await PartiesService.getAllParties();
+      const [partiesData, stats] = await Promise.all([
+        PartiesService.getAllParties(),
+        PartiesService.getPartiesStatistics()
+      ]);
+      
       setParties(partiesData);
+      setStatistics(stats);
     } catch (error) {
+      console.error('❌ Error loading parties:', error);
       Alert.alert("Error", "Failed to load parties");
+    } finally {
+      setLoading(false);
     }
   };
 
@@ -60,9 +80,13 @@ const PartiesScreen = () => {
 
     // Filter by tab
     if (selectedTab === "customers") {
-      filtered = filtered.filter(party => party.type === "customer");
+      filtered = filtered.filter(party => 
+        party.type === "customer" || party.type === "both"
+      );
     } else if (selectedTab === "suppliers") {
-      filtered = filtered.filter(party => party.type === "supplier");
+      filtered = filtered.filter(party => 
+        party.type === "supplier" || party.type === "both"
+      );
     }
 
     // Filter by search query
@@ -70,9 +94,9 @@ const PartiesScreen = () => {
       const query = searchQuery.toLowerCase();
       filtered = filtered.filter(party =>
         party.name.toLowerCase().includes(query) ||
-        party.phone.includes(query) ||
-        party.email.toLowerCase().includes(query) ||
-        party.gstNumber.toLowerCase().includes(query)
+        (party.phone && party.phone.includes(query)) ||
+        (party.email && party.email.toLowerCase().includes(query)) ||
+        (party.gstNumber && party.gstNumber.toLowerCase().includes(query))
       );
     }
 
@@ -93,9 +117,11 @@ const PartiesScreen = () => {
       email: "",
       address: "",
       gstNumber: "",
+      panNumber: "",
       type: type,
-      creditLimit: "",
-      paymentTerms: "",
+      creditLimit: "50000",
+      creditDays: "30",
+      openingBalance: "0",
       notes: "",
     });
     setModalVisible(true);
@@ -103,41 +129,61 @@ const PartiesScreen = () => {
 
   const openEditModal = (party) => {
     setEditingParty(party);
-    setFormData({ ...party });
+    setFormData({
+      name: party.name || "",
+      phone: party.phone || "",
+      email: party.email || "",
+      address: party.address || "",
+      gstNumber: party.gstNumber || "",
+      panNumber: party.panNumber || "",
+      type: party.type || "customer",
+      creditLimit: party.creditLimit?.toString() || "50000",
+      creditDays: party.credit_days?.toString() || "30",
+      openingBalance: party.opening_balance?.toString() || "0",
+      notes: party.notes || "",
+    });
     setModalVisible(true);
   };
 
-  const handleSave = async () => {
+  const handleSaveParty = async () => {
     if (!formData.name.trim()) {
-      Alert.alert("Validation Error", "Party name is required");
+      Alert.alert("Error", "Party name is required");
       return;
     }
 
     if (!formData.phone.trim()) {
-      Alert.alert("Validation Error", "Phone number is required");
+      Alert.alert("Error", "Phone number is required");
       return;
     }
 
     try {
+      const partyData = {
+        ...formData,
+        creditLimit: parseFloat(formData.creditLimit) || 0,
+        creditDays: parseInt(formData.creditDays) || 30,
+        openingBalance: parseFloat(formData.openingBalance) || 0,
+      };
+
       if (editingParty) {
-        await PartiesService.updateParty(editingParty.id, formData);
+        await PartiesService.updateParty(editingParty.id, partyData);
         Alert.alert("Success", "Party updated successfully");
       } else {
-        await PartiesService.addParty(formData);
+        await PartiesService.addParty(partyData);
         Alert.alert("Success", "Party added successfully");
       }
-      
+
       setModalVisible(false);
       await loadParties();
     } catch (error) {
-      Alert.alert("Error", "Failed to save party details");
+      console.error('❌ Error saving party:', error);
+      Alert.alert("Error", "Failed to save party");
     }
   };
 
-  const handleDelete = (party) => {
+  const handleDeleteParty = async (partyId) => {
     Alert.alert(
       "Delete Party",
-      `Are you sure you want to delete ${party.name}?`,
+      "Are you sure you want to delete this party?",
       [
         { text: "Cancel", style: "cancel" },
         {
@@ -145,10 +191,11 @@ const PartiesScreen = () => {
           style: "destructive",
           onPress: async () => {
             try {
-              await PartiesService.deleteParty(party.id);
+              await PartiesService.deleteParty(partyId);
               Alert.alert("Success", "Party deleted successfully");
               await loadParties();
             } catch (error) {
+              console.error('❌ Error deleting party:', error);
               Alert.alert("Error", "Failed to delete party");
             }
           },
@@ -157,21 +204,16 @@ const PartiesScreen = () => {
     );
   };
 
-  const getPartyBalance = (party) => {
-    return PartiesService.getPartyBalance(party.id);
-  };
-
   const renderPartyItem = ({ item }) => (
     <TouchableOpacity
       style={styles.partyCard}
       onPress={() => openEditModal(item)}
-      activeOpacity={0.7}
     >
       <View style={styles.partyHeader}>
         <View style={styles.partyInfo}>
           <Text style={styles.partyName}>{item.name}</Text>
           <Text style={styles.partyType}>
-            {item.type === "customer" ? "👤 Customer" : "🏢 Supplier"}
+            {item.type.charAt(0).toUpperCase() + item.type.slice(1)}
           </Text>
         </View>
         <View style={styles.partyActions}>
@@ -179,80 +221,109 @@ const PartiesScreen = () => {
             style={styles.editButton}
             onPress={() => openEditModal(item)}
           >
-            <Text style={styles.actionIcon}>✏️</Text>
+            <Text style={styles.editButtonText}>✏️</Text>
           </TouchableOpacity>
           <TouchableOpacity
             style={styles.deleteButton}
-            onPress={() => handleDelete(item)}
+            onPress={() => handleDeleteParty(item.id)}
           >
-            <Text style={styles.actionIcon}>🗑️</Text>
+            <Text style={styles.deleteButtonText}>🗑️</Text>
           </TouchableOpacity>
         </View>
       </View>
 
       <View style={styles.partyDetails}>
-        <View style={styles.detailRow}>
-          <Text style={styles.detailIcon}>📞</Text>
-          <Text style={styles.detailText}>{item.phone}</Text>
-        </View>
+        {item.phone && (
+          <Text style={styles.partyDetailText}>📞 {item.phone}</Text>
+        )}
         {item.email && (
-          <View style={styles.detailRow}>
-            <Text style={styles.detailIcon}>📧</Text>
-            <Text style={styles.detailText}>{item.email}</Text>
-          </View>
+          <Text style={styles.partyDetailText}>📧 {item.email}</Text>
         )}
         {item.gstNumber && (
-          <View style={styles.detailRow}>
-            <Text style={styles.detailIcon}>🏛️</Text>
-            <Text style={styles.detailText}>GST: {item.gstNumber}</Text>
-          </View>
+          <Text style={styles.partyDetailText}>🏢 GST: {item.gstNumber}</Text>
         )}
       </View>
 
       <View style={styles.partyFooter}>
-        <View style={styles.balanceContainer}>
-          <Text style={styles.balanceLabel}>Balance:</Text>
-          <Text style={[
-            styles.balanceAmount,
-            { color: getPartyBalance(item) >= 0 ? "#10b981" : "#ef4444" }
-          ]}>
-            ₹{Math.abs(getPartyBalance(item)).toLocaleString("en-IN")}
-            {getPartyBalance(item) < 0 ? " (You Owe)" : " (They Owe)"}
-          </Text>
-        </View>
-        <Text style={styles.joinedDate}>
-          Joined: {new Date(item.createdAt).toLocaleDateString("en-IN")}
+        <Text style={styles.balanceText}>
+          Balance: ₹{(item.balance || 0).toLocaleString('en-IN')}
+        </Text>
+        <Text style={styles.creditText}>
+          Credit: ₹{(item.creditLimit || 0).toLocaleString('en-IN')}
         </Text>
       </View>
     </TouchableOpacity>
   );
 
-  const renderTabButton = (tabId, title, count) => (
-    <TouchableOpacity
-      style={[styles.tabButton, selectedTab === tabId && styles.activeTabButton]}
-      onPress={() => setSelectedTab(tabId)}
-    >
-      <Text style={[styles.tabTitle, selectedTab === tabId && styles.activeTabTitle]}>
-        {title}
+  const renderEmptyState = () => (
+    <View style={styles.emptyContainer}>
+      <Text style={styles.emptyIcon}>👥</Text>
+      <Text style={styles.emptyTitle}>No Parties Found</Text>
+      <Text style={styles.emptySubtitle}>
+        {searchQuery 
+          ? "No parties match your search criteria" 
+          : "Start by adding your first customer or supplier"
+        }
       </Text>
-      <Text style={[styles.tabCount, selectedTab === tabId && styles.activeTabCount]}>
-        {count}
-      </Text>
-    </TouchableOpacity>
+      {!searchQuery && (
+        <TouchableOpacity
+          style={styles.emptyButton}
+          onPress={() => openAddModal('customer')}
+        >
+          <Text style={styles.emptyButtonText}>Add First Party</Text>
+        </TouchableOpacity>
+      )}
+    </View>
   );
 
-  const allCount = parties.length;
-  const customersCount = parties.filter(p => p.type === "customer").length;
-  const suppliersCount = parties.filter(p => p.type === "supplier").length;
+  if (loading) {
+    return (
+      <SafeAreaView style={styles.container}>
+        <StatusBar barStyle="dark-content" />
+        <View style={styles.loadingContainer}>
+          <Text style={styles.loadingText}>Loading Parties...</Text>
+        </View>
+      </SafeAreaView>
+    );
+  }
 
   return (
     <SafeAreaView style={styles.container}>
-      <StatusBar barStyle="dark-content" backgroundColor="#ffffff" />
-      
+      <StatusBar barStyle="dark-content" />
+
       {/* Header */}
       <View style={styles.header}>
         <Text style={styles.headerTitle}>Parties</Text>
-        <Text style={styles.headerSubtitle}>Manage customers and suppliers</Text>
+        <TouchableOpacity
+          style={styles.addButton}
+          onPress={() => openAddModal('customer')}
+        >
+          <Text style={styles.addButtonText}>+ Add</Text>
+        </TouchableOpacity>
+      </View>
+
+      {/* Statistics */}
+      <View style={styles.statsContainer}>
+        <View style={styles.statCard}>
+          <Text style={styles.statValue}>{statistics.totalCustomers || 0}</Text>
+          <Text style={styles.statLabel}>Customers</Text>
+        </View>
+        <View style={styles.statCard}>
+          <Text style={styles.statValue}>{statistics.totalSuppliers || 0}</Text>
+          <Text style={styles.statLabel}>Suppliers</Text>
+        </View>
+        <View style={styles.statCard}>
+          <Text style={styles.statValue}>
+            ₹{((statistics.totalReceivables || 0) / 1000).toFixed(0)}K
+          </Text>
+          <Text style={styles.statLabel}>To Collect</Text>
+        </View>
+        <View style={styles.statCard}>
+          <Text style={styles.statValue}>
+            ₹{((statistics.totalPayables || 0) / 1000).toFixed(0)}K
+          </Text>
+          <Text style={styles.statLabel}>To Pay</Text>
+        </View>
       </View>
 
       {/* Search Bar */}
@@ -262,65 +333,51 @@ const PartiesScreen = () => {
           placeholder="Search parties by name, phone, email, or GST..."
           value={searchQuery}
           onChangeText={setSearchQuery}
-          placeholderTextColor="#9ca3af"
         />
-        {searchQuery.length > 0 && (
-          <TouchableOpacity
-            style={styles.clearButton}
-            onPress={() => setSearchQuery("")}
-          >
-            <Text style={styles.clearButtonText}>✕</Text>
-          </TouchableOpacity>
-        )}
+        <Text style={styles.searchIcon}>🔍</Text>
       </View>
 
-      {/* Tabs */}
+      {/* Filter Tabs */}
       <View style={styles.tabContainer}>
-        {renderTabButton("all", "All Parties", allCount)}
-        {renderTabButton("customers", "Customers", customersCount)}
-        {renderTabButton("suppliers", "Suppliers", suppliersCount)}
+        {[
+          { key: "all", label: "All" },
+          { key: "customers", label: "Customers" },
+          { key: "suppliers", label: "Suppliers" },
+        ].map((tab) => (
+          <TouchableOpacity
+            key={tab.key}
+            style={[
+              styles.tab,
+              selectedTab === tab.key && styles.activeTab,
+            ]}
+            onPress={() => setSelectedTab(tab.key)}
+          >
+            <Text
+              style={[
+                styles.tabText,
+                selectedTab === tab.key && styles.activeTabText,
+              ]}
+            >
+              {tab.label}
+            </Text>
+          </TouchableOpacity>
+        ))}
       </View>
 
-      {/* Add Buttons */}
-      <View style={styles.addButtonsContainer}>
-        <TouchableOpacity
-          style={[styles.addButton, { backgroundColor: "#10b981" }]}
-          onPress={() => openAddModal("customer")}
-        >
-          <Text style={styles.addButtonIcon}>👤</Text>
-          <Text style={styles.addButtonText}>Add Customer</Text>
-        </TouchableOpacity>
-        <TouchableOpacity
-          style={[styles.addButton, { backgroundColor: "#3b82f6" }]}
-          onPress={() => openAddModal("supplier")}
-        >
-          <Text style={styles.addButtonIcon}>🏢</Text>
-          <Text style={styles.addButtonText}>Add Supplier</Text>
-        </TouchableOpacity>
-      </View>
-
-      {/* Parties List */}
+      {/* Party List */}
       <FlatList
         data={filteredParties}
         renderItem={renderPartyItem}
         keyExtractor={(item) => item.id}
-        style={styles.partiesList}
-        showsVerticalScrollIndicator={false}
         refreshControl={
           <RefreshControl refreshing={refreshing} onRefresh={handleRefresh} />
         }
-        ListEmptyComponent={
-          <View style={styles.emptyContainer}>
-            <Text style={styles.emptyIcon}>👥</Text>
-            <Text style={styles.emptyTitle}>No Parties Found</Text>
-            <Text style={styles.emptyMessage}>
-              {searchQuery ? "No parties match your search" : "Start by adding your first customer or supplier"}
-            </Text>
-          </View>
-        }
+        contentContainerStyle={styles.listContainer}
+        ListEmptyComponent={renderEmptyState}
+        showsVerticalScrollIndicator={false}
       />
 
-      {/* Add/Edit Modal */}
+      {/* Add/Edit Party Modal */}
       <Modal
         visible={modalVisible}
         animationType="slide"
@@ -328,163 +385,180 @@ const PartiesScreen = () => {
       >
         <SafeAreaView style={styles.modalContainer}>
           <View style={styles.modalHeader}>
-            <TouchableOpacity
-              style={styles.modalCloseButton}
-              onPress={() => setModalVisible(false)}
-            >
+            <TouchableOpacity onPress={() => setModalVisible(false)}>
               <Text style={styles.modalCloseText}>Cancel</Text>
             </TouchableOpacity>
             <Text style={styles.modalTitle}>
-              {editingParty ? "Edit Party" : "Add New Party"}
+              {editingParty ? "Edit Party" : "Add Party"}
             </Text>
-            <TouchableOpacity
-              style={styles.modalSaveButton}
-              onPress={handleSave}
-            >
+            <TouchableOpacity onPress={handleSaveParty}>
               <Text style={styles.modalSaveText}>Save</Text>
             </TouchableOpacity>
           </View>
 
-          <ScrollView style={styles.modalContent} showsVerticalScrollIndicator={false}>
-            {/* Party Type */}
-            <View style={styles.formGroup}>
-              <Text style={styles.formLabel}>Party Type *</Text>
-              <View style={styles.typeSelector}>
-                <TouchableOpacity
-                  style={[
-                    styles.typeButton,
-                    formData.type === "customer" && styles.activeTypeButton
-                  ]}
-                  onPress={() => setFormData({ ...formData, type: "customer" })}
-                >
-                  <Text style={[
-                    styles.typeButtonText,
-                    formData.type === "customer" && styles.activeTypeButtonText
-                  ]}>
-                    👤 Customer
-                  </Text>
-                </TouchableOpacity>
-                <TouchableOpacity
-                  style={[
-                    styles.typeButton,
-                    formData.type === "supplier" && styles.activeTypeButton
-                  ]}
-                  onPress={() => setFormData({ ...formData, type: "supplier" })}
-                >
-                  <Text style={[
-                    styles.typeButtonText,
-                    formData.type === "supplier" && styles.activeTypeButtonText
-                  ]}>
-                    🏢 Supplier
-                  </Text>
-                </TouchableOpacity>
+          <ScrollView style={styles.modalContent}>
+            {/* Basic Information */}
+            <View style={styles.section}>
+              <Text style={styles.sectionTitle}>Basic Information</Text>
+              
+              <View style={styles.inputGroup}>
+                <Text style={styles.inputLabel}>Name *</Text>
+                <TextInput
+                  style={styles.input}
+                  value={formData.name}
+                  onChangeText={(text) => setFormData({ ...formData, name: text })}
+                  placeholder="Enter party name"
+                />
+              </View>
+
+              <View style={styles.inputGroup}>
+                <Text style={styles.inputLabel}>Type</Text>
+                <View style={styles.typeSelector}>
+                  {[
+                    { key: "customer", label: "Customer" },
+                    { key: "supplier", label: "Supplier" },
+                    { key: "both", label: "Both" },
+                  ].map((type) => (
+                    <TouchableOpacity
+                      key={type.key}
+                      style={[
+                        styles.typeOption,
+                        formData.type === type.key && styles.activeTypeOption,
+                      ]}
+                      onPress={() => setFormData({ ...formData, type: type.key })}
+                    >
+                      <Text
+                        style={[
+                          styles.typeOptionText,
+                          formData.type === type.key && styles.activeTypeOptionText,
+                        ]}
+                      >
+                        {type.label}
+                      </Text>
+                    </TouchableOpacity>
+                  ))}
+                </View>
+              </View>
+
+              <View style={styles.inputGroup}>
+                <Text style={styles.inputLabel}>Phone *</Text>
+                <TextInput
+                  style={styles.input}
+                  value={formData.phone}
+                  onChangeText={(text) => setFormData({ ...formData, phone: text })}
+                  placeholder="Enter phone number"
+                  keyboardType="phone-pad"
+                />
+              </View>
+
+              <View style={styles.inputGroup}>
+                <Text style={styles.inputLabel}>Email</Text>
+                <TextInput
+                  style={styles.input}
+                  value={formData.email}
+                  onChangeText={(text) => setFormData({ ...formData, email: text })}
+                  placeholder="Enter email address"
+                  keyboardType="email-address"
+                  autoCapitalize="none"
+                />
+              </View>
+
+              <View style={styles.inputGroup}>
+                <Text style={styles.inputLabel}>Address</Text>
+                <TextInput
+                  style={[styles.input, styles.textArea]}
+                  value={formData.address}
+                  onChangeText={(text) => setFormData({ ...formData, address: text })}
+                  placeholder="Enter complete address"
+                  multiline
+                  numberOfLines={3}
+                />
               </View>
             </View>
 
-            {/* Name */}
-            <View style={styles.formGroup}>
-              <Text style={styles.formLabel}>Party Name *</Text>
-              <TextInput
-                style={styles.formInput}
-                value={formData.name}
-                onChangeText={(text) => setFormData({ ...formData, name: text })}
-                placeholder="Enter party name"
-                placeholderTextColor="#9ca3af"
-              />
+            {/* Business Information */}
+            <View style={styles.section}>
+              <Text style={styles.sectionTitle}>Business Information</Text>
+              
+              <View style={styles.inputGroup}>
+                <Text style={styles.inputLabel}>GST Number</Text>
+                <TextInput
+                  style={styles.input}
+                  value={formData.gstNumber}
+                  onChangeText={(text) => setFormData({ ...formData, gstNumber: text.toUpperCase() })}
+                  placeholder="Enter GST number"
+                  autoCapitalize="characters"
+                />
+              </View>
+
+              <View style={styles.inputGroup}>
+                <Text style={styles.inputLabel}>PAN Number</Text>
+                <TextInput
+                  style={styles.input}
+                  value={formData.panNumber}
+                  onChangeText={(text) => setFormData({ ...formData, panNumber: text.toUpperCase() })}
+                  placeholder="Enter PAN number"
+                  autoCapitalize="characters"
+                />
+              </View>
             </View>
 
-            {/* Phone */}
-            <View style={styles.formGroup}>
-              <Text style={styles.formLabel}>Phone Number *</Text>
-              <TextInput
-                style={styles.formInput}
-                value={formData.phone}
-                onChangeText={(text) => setFormData({ ...formData, phone: text })}
-                placeholder="Enter phone number"
-                keyboardType="phone-pad"
-                placeholderTextColor="#9ca3af"
-              />
+            {/* Financial Information */}
+            <View style={styles.section}>
+              <Text style={styles.sectionTitle}>Financial Information</Text>
+              
+              <View style={styles.inputGroup}>
+                <Text style={styles.inputLabel}>Credit Limit (₹)</Text>
+                <TextInput
+                  style={styles.input}
+                  value={formData.creditLimit}
+                  onChangeText={(text) => setFormData({ ...formData, creditLimit: text })}
+                  placeholder="Enter credit limit"
+                  keyboardType="numeric"
+                />
+              </View>
+
+              <View style={styles.inputGroup}>
+                <Text style={styles.inputLabel}>Credit Days</Text>
+                <TextInput
+                  style={styles.input}
+                  value={formData.creditDays}
+                  onChangeText={(text) => setFormData({ ...formData, creditDays: text })}
+                  placeholder="Enter credit days"
+                  keyboardType="numeric"
+                />
+              </View>
+
+              <View style={styles.inputGroup}>
+                <Text style={styles.inputLabel}>Opening Balance (₹)</Text>
+                <TextInput
+                  style={styles.input}
+                  value={formData.openingBalance}
+                  onChangeText={(text) => setFormData({ ...formData, openingBalance: text })}
+                  placeholder="Enter opening balance"
+                  keyboardType="numeric"
+                />
+              </View>
             </View>
 
-            {/* Email */}
-            <View style={styles.formGroup}>
-              <Text style={styles.formLabel}>Email</Text>
-              <TextInput
-                style={styles.formInput}
-                value={formData.email}
-                onChangeText={(text) => setFormData({ ...formData, email: text })}
-                placeholder="Enter email address"
-                keyboardType="email-address"
-                autoCapitalize="none"
-                placeholderTextColor="#9ca3af"
-              />
+            {/* Additional Information */}
+            <View style={styles.section}>
+              <Text style={styles.sectionTitle}>Additional Information</Text>
+              
+              <View style={styles.inputGroup}>
+                <Text style={styles.inputLabel}>Notes</Text>
+                <TextInput
+                  style={[styles.input, styles.textArea]}
+                  value={formData.notes}
+                  onChangeText={(text) => setFormData({ ...formData, notes: text })}
+                  placeholder="Enter any additional notes"
+                  multiline
+                  numberOfLines={3}
+                />
+              </View>
             </View>
 
-            {/* Address */}
-            <View style={styles.formGroup}>
-              <Text style={styles.formLabel}>Address</Text>
-              <TextInput
-                style={[styles.formInput, styles.textArea]}
-                value={formData.address}
-                onChangeText={(text) => setFormData({ ...formData, address: text })}
-                placeholder="Enter address"
-                multiline
-                numberOfLines={3}
-                placeholderTextColor="#9ca3af"
-              />
-            </View>
-
-            {/* GST Number */}
-            <View style={styles.formGroup}>
-              <Text style={styles.formLabel}>GST Number</Text>
-              <TextInput
-                style={styles.formInput}
-                value={formData.gstNumber}
-                onChangeText={(text) => setFormData({ ...formData, gstNumber: text })}
-                placeholder="Enter GST number"
-                autoCapitalize="characters"
-                placeholderTextColor="#9ca3af"
-              />
-            </View>
-
-            {/* Credit Limit */}
-            <View style={styles.formGroup}>
-              <Text style={styles.formLabel}>Credit Limit</Text>
-              <TextInput
-                style={styles.formInput}
-                value={formData.creditLimit}
-                onChangeText={(text) => setFormData({ ...formData, creditLimit: text })}
-                placeholder="Enter credit limit"
-                keyboardType="numeric"
-                placeholderTextColor="#9ca3af"
-              />
-            </View>
-
-            {/* Payment Terms */}
-            <View style={styles.formGroup}>
-              <Text style={styles.formLabel}>Payment Terms</Text>
-              <TextInput
-                style={styles.formInput}
-                value={formData.paymentTerms}
-                onChangeText={(text) => setFormData({ ...formData, paymentTerms: text })}
-                placeholder="e.g., Net 30 days"
-                placeholderTextColor="#9ca3af"
-              />
-            </View>
-
-            {/* Notes */}
-            <View style={styles.formGroup}>
-              <Text style={styles.formLabel}>Notes</Text>
-              <TextInput
-                style={[styles.formInput, styles.textArea]}
-                value={formData.notes}
-                onChangeText={(text) => setFormData({ ...formData, notes: text })}
-                placeholder="Additional notes..."
-                multiline
-                numberOfLines={3}
-                placeholderTextColor="#9ca3af"
-              />
-            </View>
+            <View style={{ height: 50 }} />
           </ScrollView>
         </SafeAreaView>
       </Modal>
@@ -495,144 +569,130 @@ const PartiesScreen = () => {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: "#f8fafc",
+    backgroundColor: '#F8FAFC',
+  },
+  loadingContainer: {
+    flex: 1,
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  loadingText: {
+    fontSize: 18,
+    color: '#64748B',
   },
   header: {
-    padding: 20,
-    backgroundColor: "#ffffff",
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    paddingHorizontal: 20,
+    paddingVertical: 15,
+    backgroundColor: '#FFFFFF',
     borderBottomWidth: 1,
-    borderBottomColor: "#e5e7eb",
+    borderBottomColor: '#E2E8F0',
   },
   headerTitle: {
     fontSize: 24,
-    fontWeight: "bold",
-    color: "#111827",
+    fontWeight: 'bold',
+    color: '#1E293B',
   },
-  headerSubtitle: {
-    fontSize: 14,
-    color: "#6b7280",
-    marginTop: 4,
+  addButton: {
+    backgroundColor: '#3B82F6',
+    paddingHorizontal: 16,
+    paddingVertical: 8,
+    borderRadius: 8,
+  },
+  addButtonText: {
+    color: '#FFFFFF',
+    fontWeight: '600',
+  },
+  statsContainer: {
+    flexDirection: 'row',
+    paddingHorizontal: 20,
+    paddingVertical: 15,
+    backgroundColor: '#FFFFFF',
+  },
+  statCard: {
+    flex: 1,
+    alignItems: 'center',
+  },
+  statValue: {
+    fontSize: 18,
+    fontWeight: 'bold',
+    color: '#1E293B',
+  },
+  statLabel: {
+    fontSize: 12,
+    color: '#64748B',
+    marginTop: 2,
   },
   searchContainer: {
-    flexDirection: "row",
-    alignItems: "center",
-    backgroundColor: "#ffffff",
-    margin: 20,
-    marginBottom: 0,
+    flexDirection: 'row',
+    alignItems: 'center',
+    marginHorizontal: 20,
+    marginVertical: 15,
+    backgroundColor: '#FFFFFF',
     borderRadius: 12,
     paddingHorizontal: 16,
-    shadowColor: "#000",
-    shadowOffset: { width: 0, height: 2 },
+    paddingVertical: 12,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 1 },
     shadowOpacity: 0.1,
-    shadowRadius: 3.84,
-    elevation: 3,
+    shadowRadius: 3,
+    elevation: 2,
   },
   searchInput: {
     flex: 1,
-    paddingVertical: 12,
     fontSize: 16,
-    color: "#111827",
+    color: '#1E293B',
   },
-  clearButton: {
-    width: 24,
-    height: 24,
-    borderRadius: 12,
-    backgroundColor: "#f3f4f6",
-    justifyContent: "center",
-    alignItems: "center",
-    marginLeft: 8,
-  },
-  clearButtonText: {
-    fontSize: 14,
-    color: "#6b7280",
-    fontWeight: "bold",
+  searchIcon: {
+    fontSize: 20,
+    marginLeft: 10,
   },
   tabContainer: {
-    flexDirection: "row",
-    backgroundColor: "#ffffff",
+    flexDirection: 'row',
     marginHorizontal: 20,
-    marginTop: 16,
-    borderRadius: 12,
-    overflow: "hidden",
-    shadowColor: "#000",
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.1,
-    shadowRadius: 3.84,
-    elevation: 3,
+    marginBottom: 15,
   },
-  tabButton: {
+  tab: {
     flex: 1,
-    alignItems: "center",
-    paddingVertical: 12,
-    backgroundColor: "#f9fafb",
-  },
-  activeTabButton: {
-    backgroundColor: "#3b82f6",
-  },
-  tabTitle: {
-    fontSize: 14,
-    fontWeight: "600",
-    color: "#6b7280",
-  },
-  activeTabTitle: {
-    color: "#ffffff",
-  },
-  tabCount: {
-    fontSize: 12,
-    color: "#9ca3af",
-    marginTop: 2,
-  },
-  activeTabCount: {
-    color: "#e0f2fe",
-  },
-  addButtonsContainer: {
-    flexDirection: "row",
-    paddingHorizontal: 20,
-    paddingTop: 16,
-    gap: 12,
-  },
-  addButton: {
-    flex: 1,
-    flexDirection: "row",
-    alignItems: "center",
-    justifyContent: "center",
-    paddingVertical: 12,
+    paddingVertical: 10,
+    paddingHorizontal: 16,
     borderRadius: 8,
-    shadowColor: "#000",
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.1,
-    shadowRadius: 3.84,
-    elevation: 3,
+    marginHorizontal: 4,
+    backgroundColor: '#F1F5F9',
+    alignItems: 'center',
   },
-  addButtonIcon: {
-    fontSize: 16,
-    marginRight: 8,
+  activeTab: {
+    backgroundColor: '#3B82F6',
   },
-  addButtonText: {
-    color: "#ffffff",
+  tabText: {
     fontSize: 14,
-    fontWeight: "600",
+    fontWeight: '500',
+    color: '#64748B',
   },
-  partiesList: {
-    flex: 1,
+  activeTabText: {
+    color: '#FFFFFF',
+  },
+  listContainer: {
     paddingHorizontal: 20,
-    paddingTop: 16,
+    paddingBottom: 20,
   },
   partyCard: {
-    backgroundColor: "#ffffff",
+    backgroundColor: '#FFFFFF',
     borderRadius: 12,
     padding: 16,
     marginBottom: 12,
-    shadowColor: "#000",
-    shadowOffset: { width: 0, height: 2 },
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 1 },
     shadowOpacity: 0.1,
-    shadowRadius: 3.84,
-    elevation: 3,
+    shadowRadius: 3,
+    elevation: 2,
   },
   partyHeader: {
-    flexDirection: "row",
-    justifyContent: "space-between",
-    alignItems: "center",
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'flex-start',
     marginBottom: 12,
   },
   partyInfo: {
@@ -640,184 +700,176 @@ const styles = StyleSheet.create({
   },
   partyName: {
     fontSize: 18,
-    fontWeight: "600",
-    color: "#111827",
+    fontWeight: 'bold',
+    color: '#1E293B',
   },
   partyType: {
     fontSize: 14,
-    color: "#6b7280",
+    color: '#3B82F6',
     marginTop: 2,
   },
   partyActions: {
-    flexDirection: "row",
-    gap: 8,
+    flexDirection: 'row',
   },
   editButton: {
-    width: 36,
-    height: 36,
-    borderRadius: 18,
-    backgroundColor: "#f3f4f6",
-    justifyContent: "center",
-    alignItems: "center",
+    padding: 8,
+    marginLeft: 8,
+  },
+  editButtonText: {
+    fontSize: 16,
   },
   deleteButton: {
-    width: 36,
-    height: 36,
-    borderRadius: 18,
-    backgroundColor: "#fee2e2",
-    justifyContent: "center",
-    alignItems: "center",
+    padding: 8,
+    marginLeft: 8,
   },
-  actionIcon: {
+  deleteButtonText: {
     fontSize: 16,
   },
   partyDetails: {
-    gap: 8,
     marginBottom: 12,
   },
-  detailRow: {
-    flexDirection: "row",
-    alignItems: "center",
-  },
-  detailIcon: {
+  partyDetailText: {
     fontSize: 14,
-    marginRight: 8,
-    width: 20,
-  },
-  detailText: {
-    fontSize: 14,
-    color: "#374151",
-    flex: 1,
+    color: '#64748B',
+    marginBottom: 4,
   },
   partyFooter: {
-    borderTopWidth: 1,
-    borderTopColor: "#f3f4f6",
+    flexDirection: 'row',
+    justifyContent: 'space-between',
     paddingTop: 12,
-    flexDirection: "row",
-    justifyContent: "space-between",
-    alignItems: "center",
+    borderTopWidth: 1,
+    borderTopColor: '#F1F5F9',
   },
-  balanceContainer: {
-    flexDirection: "row",
-    alignItems: "center",
-  },
-  balanceLabel: {
-    fontSize: 12,
-    color: "#6b7280",
-    marginRight: 6,
-  },
-  balanceAmount: {
+  balanceText: {
     fontSize: 14,
-    fontWeight: "600",
+    fontWeight: '600',
+    color: '#059669',
   },
-  joinedDate: {
-    fontSize: 12,
-    color: "#9ca3af",
+  creditText: {
+    fontSize: 14,
+    color: '#64748B',
   },
   emptyContainer: {
-    alignItems: "center",
+    alignItems: 'center',
+    justifyContent: 'center',
     paddingVertical: 60,
   },
   emptyIcon: {
-    fontSize: 48,
+    fontSize: 64,
     marginBottom: 16,
   },
   emptyTitle: {
-    fontSize: 18,
-    fontWeight: "600",
-    color: "#374151",
+    fontSize: 20,
+    fontWeight: 'bold',
+    color: '#1E293B',
     marginBottom: 8,
   },
-  emptyMessage: {
-    fontSize: 14,
-    color: "#6b7280",
-    textAlign: "center",
-    lineHeight: 20,
+  emptySubtitle: {
+    fontSize: 16,
+    color: '#64748B',
+    textAlign: 'center',
+    marginBottom: 24,
+    paddingHorizontal: 40,
+  },
+  emptyButton: {
+    backgroundColor: '#3B82F6',
+    paddingHorizontal: 24,
+    paddingVertical: 12,
+    borderRadius: 8,
+  },
+  emptyButtonText: {
+    color: '#FFFFFF',
+    fontWeight: '600',
   },
   modalContainer: {
     flex: 1,
-    backgroundColor: "#ffffff",
+    backgroundColor: '#F8FAFC',
   },
   modalHeader: {
-    flexDirection: "row",
-    justifyContent: "space-between",
-    alignItems: "center",
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
     paddingHorizontal: 20,
-    paddingVertical: 16,
+    paddingVertical: 15,
+    backgroundColor: '#FFFFFF',
     borderBottomWidth: 1,
-    borderBottomColor: "#e5e7eb",
-  },
-  modalCloseButton: {
-    padding: 8,
+    borderBottomColor: '#E2E8F0',
   },
   modalCloseText: {
     fontSize: 16,
-    color: "#6b7280",
+    color: '#64748B',
   },
   modalTitle: {
     fontSize: 18,
-    fontWeight: "600",
-    color: "#111827",
-  },
-  modalSaveButton: {
-    padding: 8,
+    fontWeight: 'bold',
+    color: '#1E293B',
   },
   modalSaveText: {
     fontSize: 16,
-    color: "#3b82f6",
-    fontWeight: "600",
+    color: '#3B82F6',
+    fontWeight: '600',
   },
   modalContent: {
     flex: 1,
     paddingHorizontal: 20,
   },
-  formGroup: {
-    marginBottom: 20,
+  section: {
+    marginTop: 24,
   },
-  formLabel: {
-    fontSize: 16,
-    fontWeight: "600",
-    color: "#374151",
+  sectionTitle: {
+    fontSize: 18,
+    fontWeight: 'bold',
+    color: '#1E293B',
+    marginBottom: 16,
+  },
+  inputGroup: {
+    marginBottom: 16,
+  },
+  inputLabel: {
+    fontSize: 14,
+    fontWeight: '500',
+    color: '#374151',
     marginBottom: 8,
   },
-  formInput: {
+  input: {
+    backgroundColor: '#FFFFFF',
     borderWidth: 1,
-    borderColor: "#d1d5db",
+    borderColor: '#D1D5DB',
     borderRadius: 8,
     paddingHorizontal: 12,
     paddingVertical: 12,
     fontSize: 16,
-    color: "#111827",
-    backgroundColor: "#ffffff",
+    color: '#1E293B',
   },
   textArea: {
     height: 80,
-    textAlignVertical: "top",
+    textAlignVertical: 'top',
   },
   typeSelector: {
-    flexDirection: "row",
-    gap: 12,
+    flexDirection: 'row',
   },
-  typeButton: {
+  typeOption: {
     flex: 1,
     paddingVertical: 12,
     paddingHorizontal: 16,
+    borderWidth: 1,
+    borderColor: '#D1D5DB',
+    backgroundColor: '#FFFFFF',
+    alignItems: 'center',
+    marginRight: 8,
     borderRadius: 8,
-    borderWidth: 2,
-    borderColor: "#d1d5db",
-    alignItems: "center",
   },
-  activeTypeButton: {
-    borderColor: "#3b82f6",
-    backgroundColor: "#eff6ff",
+  activeTypeOption: {
+    backgroundColor: '#3B82F6',
+    borderColor: '#3B82F6',
   },
-  typeButtonText: {
+  typeOptionText: {
     fontSize: 14,
-    fontWeight: "600",
-    color: "#6b7280",
+    fontWeight: '500',
+    color: '#64748B',
   },
-  activeTypeButtonText: {
-    color: "#3b82f6",
+  activeTypeOptionText: {
+    color: '#FFFFFF',
   },
 });
 
