@@ -252,3 +252,5 @@ class InvoiceService {
     };
   }
 }
+
+export default new InvoiceService();
