@@ -42,7 +42,7 @@ const DashboardScreen = ({ navigation }) => {
   const [searchQuery, setSearchQuery] = useState("");
   const [filteredTransactions, setFilteredTransactions] = useState(recentTransactions);
   const [activeTab, setActiveTab] = useState("overview");
-  const [isQuickMenuOpen, setIsQuickMenuOpen] = useState(false);
+  const [isQuickSiteOpen, setIsQuickSiteOpen] = useState(false);
   
   // Animation values
   const fadeAnim = useRef(new Animated.Value(0)).current;
@@ -117,9 +117,9 @@ const DashboardScreen = ({ navigation }) => {
 
   };
 
-  const toggleQuickMenu = () => {
-    const toValue = isQuickMenuOpen ? 0 : 1;
-    setIsQuickMenuOpen(!isQuickMenuOpen);
+  const toggleQuickSite = () => {
+    const toValue = isQuickSiteOpen ? 0 : 1;
+    setIsQuickSiteOpen(!isQuickSiteOpen);
     
     Animated.spring(quickMenuAnim, {
       toValue,
@@ -127,6 +127,14 @@ const DashboardScreen = ({ navigation }) => {
       tension: 100,
       friction: 8,
     }).start();
+  };
+
+  const handleBillInvoice = () => {
+    navigation?.navigate('Invoice');
+  };
+
+  const handleReceivedPayment = () => {
+    Alert.alert("Received Payment", "Navigate to payment receiving screen");
   };
 
   const handleViewAllTransactions = () => {
@@ -381,73 +389,83 @@ const DashboardScreen = ({ navigation }) => {
         </Animated.View>
       </ScrollView>
       
-      {/* Quick Action Circle */}
-      <View style={styles.quickActionContainer}>
-        {/* Quick Action Options - Animated */}
-        {isQuickMenuOpen && (
-          <Animated.View 
-            style={[
-              styles.quickActionOptions,
-              {
-                opacity: quickMenuAnim,
-                transform: [{
-                  scale: quickMenuAnim.interpolate({
-                    inputRange: [0, 1],
-                    outputRange: [0.3, 1],
-                  })
-                }]
-              }
-            ]}
-          >
+      {/* QuickSite Options - Animated overlay */}
+      {isQuickSiteOpen && (
+        <Animated.View 
+          style={[
+            styles.quickSiteOverlay,
+            {
+              opacity: quickMenuAnim,
+              transform: [{
+                scale: quickMenuAnim.interpolate({
+                  inputRange: [0, 1],
+                  outputRange: [0.3, 1],
+                })
+              }]
+            }
+          ]}
+        >
+          <TouchableOpacity
+            style={styles.overlayBackground}
+            onPress={toggleQuickSite}
+            activeOpacity={1}
+          />
+          <View style={styles.quickSiteContainer}>
             <TouchableOpacity
-              style={[styles.quickActionOption, { backgroundColor: '#10b981' }]}
+              style={[styles.quickSiteOption, { backgroundColor: '#10b981' }]}
               onPress={() => handleQuickAction('new_invoice')}
             >
-              <Text style={styles.quickActionIcon}>📝</Text>
-              <Text style={styles.quickActionLabel}>New Invoice</Text>
+              <Text style={styles.quickSiteIcon}>📝</Text>
+              <Text style={styles.quickSiteLabel}>New Invoice</Text>
             </TouchableOpacity>
             
             <TouchableOpacity
-              style={[styles.quickActionOption, { backgroundColor: '#3b82f6' }]}
+              style={[styles.quickSiteOption, { backgroundColor: '#3b82f6' }]}
               onPress={() => handleQuickAction('receive_payment')}
             >
-              <Text style={styles.quickActionIcon}>💰</Text>
-              <Text style={styles.quickActionLabel}>Receive Payment</Text>
+              <Text style={styles.quickSiteIcon}>💰</Text>
+              <Text style={styles.quickSiteLabel}>Receive Payment</Text>
             </TouchableOpacity>
             
             <TouchableOpacity
-              style={[styles.quickActionOption, { backgroundColor: '#f59e0b' }]}
+              style={[styles.quickSiteOption, { backgroundColor: '#f59e0b' }]}
               onPress={() => handleQuickAction('add_expense')}
             >
-              <Text style={styles.quickActionIcon}>💳</Text>
-              <Text style={styles.quickActionLabel}>Add Expense</Text>
+              <Text style={styles.quickSiteIcon}>💳</Text>
+              <Text style={styles.quickSiteLabel}>Add Expense</Text>
             </TouchableOpacity>
             
             <TouchableOpacity
-              style={[styles.quickActionOption, { backgroundColor: '#8b5cf6' }]}
+              style={[styles.quickSiteOption, { backgroundColor: '#8b5cf6' }]}
               onPress={() => handleQuickAction('add_customer')}
             >
-              <Text style={styles.quickActionIcon}>👥</Text>
-              <Text style={styles.quickActionLabel}>Add Customer</Text>
+              <Text style={styles.quickSiteIcon}>👥</Text>
+              <Text style={styles.quickSiteLabel}>Add Customer</Text>
             </TouchableOpacity>
             
             <TouchableOpacity
-              style={[styles.quickActionOption, { backgroundColor: '#ef4444' }]}
+              style={[styles.quickSiteOption, { backgroundColor: '#ef4444' }]}
               onPress={() => handleQuickAction('inventory_alert')}
             >
-              <Text style={styles.quickActionIcon}>📦</Text>
-              <Text style={styles.quickActionLabel}>Stock Alert</Text>
+              <Text style={styles.quickSiteIcon}>📦</Text>
+              <Text style={styles.quickSiteLabel}>Stock Alert</Text>
             </TouchableOpacity>
-          </Animated.View>
-        )}
-        
-        {/* Main Quick Action Button */}
+          </View>
+        </Animated.View>
+      )}
+
+      {/* Bottom Bar */}
+      <View style={styles.bottomBar}>
         <TouchableOpacity
-          style={[
-            styles.quickActionButton,
-            isQuickMenuOpen && styles.quickActionButtonOpen
-          ]}
-          onPress={toggleQuickMenu}
+          style={styles.leftButton}
+          onPress={handleReceivedPayment}
+          activeOpacity={0.8}
+        >
+          <Text style={styles.leftButtonText}>Received Payment</Text>
+        </TouchableOpacity>
+        <TouchableOpacity
+          style={styles.centerButton}
+          onPress={toggleQuickSite}
           activeOpacity={0.8}
         >
           <Animated.View
@@ -460,8 +478,15 @@ const DashboardScreen = ({ navigation }) => {
               }]
             }}
           >
-            <Text style={styles.quickActionMainIcon}>+</Text>
+            <Text style={styles.plus}>+</Text>
           </Animated.View>
+        </TouchableOpacity>
+            <TouchableOpacity
+          style={styles.rightButton}
+          onPress={handleBillInvoice}
+          activeOpacity={0.8}
+        >
+          <Text style={styles.rightButtonText}>Bill / Invoice</Text>
         </TouchableOpacity>
       </View>
     </SafeAreaView>
@@ -738,7 +763,7 @@ const styles = StyleSheet.create({
   },
   quickActionContainer: {
     position: "absolute",
-
+    bottom: 100,
     right: 20,
     alignItems: "flex-end",
   },
@@ -793,6 +818,77 @@ const styles = StyleSheet.create({
     color: "#ffffff",
     fontSize: 13,
     fontWeight: "600",
+  },
+  // Bottom bar styles
+  bottomBar: {
+    position: "absolute",
+    left: 0,
+    right: 0,
+    bottom: 24,
+    flexDirection: "row",
+    justifyContent: "space-evenly",
+    alignItems: "center",
+    zIndex: 100,
+    paddingHorizontal: 16,
+  },
+  leftButton: {
+    flex: 1,
+    marginRight: 8,
+    backgroundColor: "#20203a",
+    paddingVertical: 14,
+    borderRadius: 28,
+    alignItems: "center",
+    flexDirection: "row",
+    justifyContent: "center",
+    elevation: 3,
+    shadowColor: "#000",
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.25,
+    shadowRadius: 3.84,
+  },
+  leftButtonText: {
+    color: "#fff",
+    fontSize: 14,
+    fontWeight: "bold",
+  },
+  centerButton: {
+    width: 56,
+    height: 56,
+    backgroundColor: "#4F46E5",
+    borderRadius: 28,
+    alignItems: "center",
+    justifyContent: "center",
+    marginHorizontal: 8,
+    elevation: 4,
+    shadowColor: "#000",
+    shadowOffset: { width: 0, height: 3 },
+    shadowOpacity: 0.3,
+    shadowRadius: 4.65,
+  },
+  plus: {
+    color: "#fff",
+    fontSize: 24,
+    fontWeight: "300",
+  },
+  rightButton: {
+    flex: 1,
+    marginLeft: 8,
+    backgroundColor: "#4F46E5",
+    paddingVertical: 14,
+    borderRadius: 28,
+    alignItems: "center",
+    flexDirection: "row",
+    justifyContent: "center",
+    elevation: 3,
+    shadowColor: "#000",
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.25,
+    shadowRadius: 3.84,
+  },
+  rightButtonText: {
+    color: "#fff",
+    fontSize: 14,
+    fontWeight: "bold",
   },
 });
 
