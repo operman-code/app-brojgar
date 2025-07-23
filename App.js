@@ -1,9 +1,10 @@
 // App.js
 import React, { useState, useEffect } from 'react';
 import { View, Text, StyleSheet, ActivityIndicator, StatusBar, SafeAreaView } from 'react-native';
+import { NavigationContainer } from '@react-navigation/native';
 
-// Import tab navigation
-import TabLayout from './app/(tabs)/_layout';
+// Import working tab navigation
+import BottomTabNavigator from './navigation/BottomTabNavigator';
 
 export default function App() {
   const [isLoading, setIsLoading] = useState(true);
@@ -65,7 +66,11 @@ export default function App() {
     );
   }
 
-  return <TabLayout />;
+  return (
+    <NavigationContainer>
+      <BottomTabNavigator />
+    </NavigationContainer>
+  );
 }
 
 const styles = StyleSheet.create({
