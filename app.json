@@ -25,17 +25,7 @@
       },
       "package": "com.operman.brojgar"
     },
-    "web": {
-      "favicon": "./assets/favicon.png",
-      "bundler": "metro"
-    },
-    "platforms": ["ios", "android", "web"],
-    "plugins": [
-      "expo-router"
-    ],
-    "scheme": "brojgar",
-    "experiments": {
-      "typedRoutes": false
-    }
+    "platforms": ["ios", "android"],
+    "sdkVersion": "50.0.0"
   }
 }
