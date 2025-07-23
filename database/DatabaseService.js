@@ -1,5 +1,4 @@
 // database/DatabaseService.js
-// database/DatabaseService.js
 import * as SQLite from 'expo-sqlite';
 
 class DatabaseService {
@@ -39,21 +38,8 @@ class DatabaseService {
     }
   }
 
-  // Get database instance
+  // Get database instance (SINGLE METHOD - removed duplicate)
   async getDatabase() {
-    if (!this.isInitialized) {
-      await this.init();
-    }
-    return this.db;
-  }
-
-  // Get database instance
-  async getDatabase() {
-    if (Platform.OS === 'web') {
-      console.log('⚠️  SQLite not available on web');
-      return null;
-    }
-
     if (!this.isInitialized) {
       await this.init();
     }
@@ -62,8 +48,6 @@ class DatabaseService {
 
   // Create all database tables
   async createTables() {
-    if (Platform.OS === 'web') return;
-
     const tables = [
       // Settings table
       `CREATE TABLE IF NOT EXISTS settings (
@@ -239,14 +223,11 @@ class DatabaseService {
 
   // Run database migrations
   async runMigrations() {
-    if (Platform.OS === 'web') return;
     console.log('✅ Migrations completed');
   }
 
   // Insert initial configuration data
   async insertInitialData() {
-    if (Platform.OS === 'web') return;
-
     try {
       console.log('⚙️  Inserting initial configuration...');
       
@@ -290,11 +271,6 @@ class DatabaseService {
 
   // Utility method to execute raw SQL
   async executeQuery(sql, params = []) {
-    if (Platform.OS === 'web') {
-      console.log('⚠️  Database query skipped on web:', sql);
-      return null;
-    }
-
     try {
       const db = await this.getDatabase();
       return await db.getAllAsync(sql, params);
@@ -306,8 +282,6 @@ class DatabaseService {
 
   // Close database connection
   async close() {
-    if (Platform.OS === 'web') return;
-    
     if (this.db) {
       await this.db.closeAsync();
       this.db = null;
