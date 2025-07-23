@@ -1,9 +1,10 @@
+// screens/Dashboard/components/NotificationCard.js
 import React from "react";
 import { View, Text, StyleSheet, TouchableOpacity } from "react-native";
 
 const NotificationCard = ({ notification, onPress, onDismiss }) => {
   const getNotificationStyle = (type) => {
-    switch (type) {
+    switch (type?.toLowerCase()) {
       case "warning":
         return {
           backgroundColor: "#fef3c7",
@@ -11,6 +12,7 @@ const NotificationCard = ({ notification, onPress, onDismiss }) => {
           iconColor: "#d97706",
         };
       case "error":
+      case "critical":
         return {
           backgroundColor: "#fee2e2",
           borderColor: "#ef4444",
@@ -33,10 +35,11 @@ const NotificationCard = ({ notification, onPress, onDismiss }) => {
   };
 
   const getNotificationIcon = (type) => {
-    switch (type) {
+    switch (type?.toLowerCase()) {
       case "warning":
         return "⚠️";
       case "error":
+      case "critical":
         return "❌";
       case "success":
         return "✅";
@@ -46,119 +49,119 @@ const NotificationCard = ({ notification, onPress, onDismiss }) => {
     }
   };
 
+  const formatDate = (dateString) => {
+    try {
+      const date = new Date(dateString);
+      const now = new Date();
+      const diffTime = now - date;
+      const diffHours = Math.floor(diffTime / (1000 * 60 * 60));
+      const diffDays = Math.floor(diffTime / (1000 * 60 * 60 * 24));
+
+      if (diffHours < 1) return "Just now";
+      if (diffHours < 24) return `${diffHours}h ago`;
+      if (diffDays < 7) return `${diffDays}d ago`;
+      
+      return date.toLocaleDateString('en-IN', {
+        day: '2-digit',
+        month: 'short'
+      });
+    } catch (error) {
+      return dateString;
+    }
+  };
+
   const style = getNotificationStyle(notification.type);
 
   return (
     <TouchableOpacity 
-      style={[styles.card, { backgroundColor: style.backgroundColor, borderColor: style.borderColor }]}
+      style={[styles.container, { backgroundColor: style.backgroundColor, borderColor: style.borderColor }]}
       onPress={onPress}
       activeOpacity={0.8}
     >
-      <View style={styles.header}>
-        <View style={styles.titleContainer}>
-          <Text style={styles.icon}>{getNotificationIcon(notification.type)}</Text>
-          <Text style={[styles.title, { color: style.iconColor }]} numberOfLines={1}>
-            {notification.title}
+      <View style={styles.content}>
+        <View style={styles.header}>
+          <Text style={[styles.icon, { color: style.iconColor }]}>
+            {getNotificationIcon(notification.type)}
           </Text>
+          <View style={styles.headerText}>
+            <Text style={styles.title}>{notification.title}</Text>
+            <Text style={styles.time}>
+              {formatDate(notification.created_at || notification.timestamp)}
+            </Text>
+          </View>
+          {onDismiss && (
+            <TouchableOpacity 
+              style={styles.dismissButton}
+              onPress={(e) => {
+                e.stopPropagation();
+                onDismiss();
+              }}
+            >
+              <Text style={styles.dismissText}>✕</Text>
+            </TouchableOpacity>
+          )}
         </View>
-        <TouchableOpacity 
-          style={styles.dismissButton}
-          onPress={(e) => {
-            e.stopPropagation();
-            onDismiss();
-          }}
-        >
-          <Text style={styles.dismissText}>✕</Text>
-        </TouchableOpacity>
+        <Text style={styles.message}>{notification.message}</Text>
+        {notification.action && (
+          <Text style={[styles.action, { color: style.iconColor }]}>
+            {notification.action}
+          </Text>
+        )}
       </View>
-      
-      <Text style={styles.message} numberOfLines={2}>
-        {notification.message}
-      </Text>
-      
-      {notification.timestamp && (
-        <Text style={styles.timestamp}>
-          {notification.timestamp}
-        </Text>
-      )}
-      
-      {notification.actionLabel && (
-        <View style={styles.actionContainer}>
-          <Text style={[styles.actionText, { color: style.iconColor }]}>
-            {notification.actionLabel} →
-          </Text>
-        </View>
-      )}
     </TouchableOpacity>
   );
 };
 
 const styles = StyleSheet.create({
-  card: {
-    width: 280,
-    padding: 16,
-    borderRadius: 12,
+  container: {
+    borderRadius: 8,
     borderWidth: 1,
-    marginRight: 12,
-    shadowColor: "#000",
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.1,
-    shadowRadius: 3.84,
-    elevation: 3,
+    marginBottom: 12,
+    overflow: "hidden",
+  },
+  content: {
+    padding: 16,
   },
   header: {
     flexDirection: "row",
-    justifyContent: "space-between",
     alignItems: "flex-start",
     marginBottom: 8,
   },
-  titleContainer: {
-    flexDirection: "row",
-    alignItems: "center",
-    flex: 1,
-  },
   icon: {
-    fontSize: 16,
-    marginRight: 8,
+    fontSize: 20,
+    marginRight: 12,
+  },
+  headerText: {
+    flex: 1,
   },
   title: {
-    fontSize: 14,
+    fontSize: 16,
     fontWeight: "600",
-    flex: 1,
+    color: "#333",
+    marginBottom: 2,
+  },
+  time: {
+    fontSize: 12,
+    color: "#666",
   },
   dismissButton: {
-    width: 20,
-    height: 20,
-    borderRadius: 10,
-    backgroundColor: "rgba(0,0,0,0.1)",
-    justifyContent: "center",
-    alignItems: "center",
-    marginLeft: 8,
+    padding: 4,
   },
   dismissText: {
-    fontSize: 12,
-    color: "#6b7280",
+    fontSize: 16,
+    color: "#999",
     fontWeight: "bold",
   },
   message: {
-    fontSize: 13,
-    color: "#374151",
-    lineHeight: 18,
+    fontSize: 14,
+    color: "#555",
+    lineHeight: 20,
     marginBottom: 8,
   },
-  timestamp: {
-    fontSize: 11,
-    color: "#9ca3af",
-    marginBottom: 8,
-  },
-  actionContainer: {
-    paddingTop: 8,
-    borderTopWidth: 1,
-    borderTopColor: "rgba(0,0,0,0.1)",
-  },
-  actionText: {
-    fontSize: 12,
+  action: {
+    fontSize: 14,
     fontWeight: "600",
+    textDecorationLine: "underline",
   },
 });
 
