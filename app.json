@@ -4,13 +4,7 @@
     "slug": "brojgar-app",
     "version": "1.0.0",
     "orientation": "portrait",
-    "icon": "./assets/icon.png",
     "userInterfaceStyle": "light",
-    "splash": {
-      "image": "./assets/splash.png",
-      "resizeMode": "contain",
-      "backgroundColor": "#1e40af"
-    },
     "assetBundlePatterns": [
       "**/*"
     ],
@@ -19,10 +13,6 @@
       "bundleIdentifier": "com.operman.brojgar"
     },
     "android": {
-      "adaptiveIcon": {
-        "foregroundImage": "./assets/adaptive-icon.png",
-        "backgroundColor": "#1e40af"
-      },
       "package": "com.operman.brojgar"
     },
     "platforms": ["ios", "android"],
