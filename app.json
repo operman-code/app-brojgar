@@ -5,15 +5,18 @@
     "version": "1.0.0",
     "orientation": "portrait",
     "userInterfaceStyle": "light",
+    "newArchEnabled": false,
     "assetBundlePatterns": [
       "**/*"
     ],
     "ios": {
       "supportsTablet": true,
-      "bundleIdentifier": "com.operman.brojgar"
+      "bundleIdentifier": "com.operman.brojgar",
+      "newArchEnabled": false
     },
     "android": {
-      "package": "com.operman.brojgar"
+      "package": "com.operman.brojgar",
+      "newArchEnabled": false
     },
     "platforms": ["ios", "android"],
     "sdkVersion": "53.0.0"
