@@ -5,6 +5,8 @@ import PartiesScreen from "../screens/Parties/PartiesScreen";
 import InventoryScreen from "../screens/Inventory/InventoryScreen";
 import ReportsScreen from "../screens/Reports/ReportsScreen";
 import SettingsScreen from "../screens/Settings/SettingsScreen";
+import InvoiceScreen from "../screens/Invoice/InvoiceScreen";
+import InvoiceTemplateScreen from "../screens/Invoice/InvoiceTemplateScreen";
 import { View, Text, TouchableOpacity } from "react-native";
 
 const Tab = createBottomTabNavigator();
