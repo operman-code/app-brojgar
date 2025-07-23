@@ -1,5 +1,10 @@
 // database/DatabaseService.js
-import * as SQLite from 'expo-sqlite';
+import { Platform } from 'react-native';
+
+let SQLite;
+if (Platform.OS !== 'web') {
+  SQLite = require('expo-sqlite');
+}
 
 class DatabaseService {
   constructor() {
@@ -12,23 +17,43 @@ class DatabaseService {
   // Initialize database connection
   async init() {
     try {
+      if (Platform.OS === 'web') {
+        console.log('⚠️  SQLite not available on web, using mock data');
+        this.isInitialized = true;
+        return null;
+      }
+
       if (this.isInitialized) return this.db;
 
       console.log('🔌 Connecting to SQLite database...');
       this.db = await SQLite.openDatabaseAsync(this.DATABASE_NAME);
       
-      console.log('✅ Database connected successfully');
+      // Enable foreign keys
+      await this.db.execAsync('PRAGMA foreign_keys = ON;');
+      
+      // Create all tables
+      await this.createTables();
+      
+      // Run migrations if needed
+      await this.runMigrations();
+      
       this.isInitialized = true;
+      console.log('✅ Database connected successfully');
       
       return this.db;
     } catch (error) {
-      console.error('❌ Database connection failed:', error);
+      console.error('❌ Database initialization error:', error);
       throw error;
     }
   }
 
   // Get database instance
   async getDatabase() {
+    if (Platform.OS === 'web') {
+      console.log('⚠️  SQLite not available on web');
+      return null;
+    }
+
     if (!this.isInitialized) {
       await this.init();
     }
@@ -37,6 +62,8 @@ class DatabaseService {
 
   // Create all database tables
   async createTables() {
+    if (Platform.OS === 'web') return;
+
     const tables = [
       // Settings table
       `CREATE TABLE IF NOT EXISTS settings (
@@ -52,74 +79,78 @@ class DatabaseService {
       `CREATE TABLE IF NOT EXISTS categories (
         id INTEGER PRIMARY KEY AUTOINCREMENT,
         name TEXT UNIQUE NOT NULL,
+        type TEXT NOT NULL DEFAULT 'item',
+        icon TEXT DEFAULT '📦',
+        color TEXT DEFAULT '#3b82f6',
         description TEXT,
-        color TEXT DEFAULT '#3B82F6',
         is_active INTEGER DEFAULT 1,
         created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
         updated_at DATETIME DEFAULT CURRENT_TIMESTAMP
       );`,
 
-      // Parties table (customers/suppliers)
+      // Parties table (customers and suppliers)
       `CREATE TABLE IF NOT EXISTS parties (
         id INTEGER PRIMARY KEY AUTOINCREMENT,
         name TEXT NOT NULL,
-        type TEXT NOT NULL CHECK (type IN ('customer', 'supplier', 'both')),
-        phone TEXT,
+        type TEXT NOT NULL DEFAULT 'customer',
         email TEXT,
-        address_line1 TEXT,
-        address_line2 TEXT,
+        phone TEXT,
+        gst_number TEXT,
+        pan_number TEXT,
+        address TEXT,
         city TEXT,
         state TEXT,
         pincode TEXT,
         country TEXT DEFAULT 'India',
-        gst_number TEXT,
-        pan_number TEXT,
-        credit_limit DECIMAL(10,2) DEFAULT 0,
+        outstanding_balance REAL DEFAULT 0,
+        credit_limit REAL DEFAULT 0,
         credit_days INTEGER DEFAULT 30,
-        current_balance DECIMAL(10,2) DEFAULT 0,
-        opening_balance DECIMAL(10,2) DEFAULT 0,
-        is_active INTEGER DEFAULT 1,
-        notes TEXT,
-        created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
-        updated_at DATETIME DEFAULT CURRENT_TIMESTAMP
-      );`,
-
-      // Items table
-      `CREATE TABLE IF NOT EXISTS items (
-        id INTEGER PRIMARY KEY AUTOINCREMENT,
-        name TEXT NOT NULL,
-        description TEXT,
-        sku TEXT UNIQUE,
-        barcode TEXT UNIQUE,
-        category_id INTEGER,
-        unit TEXT DEFAULT 'pcs',
-        cost_price DECIMAL(10,2) DEFAULT 0,
-        selling_price DECIMAL(10,2) DEFAULT 0,
-        mrp DECIMAL(10,2) DEFAULT 0,
-        tax_rate DECIMAL(5,2) DEFAULT 0,
-        current_stock DECIMAL(10,3) DEFAULT 0,
-        minimum_stock DECIMAL(10,3) DEFAULT 0,
-        maximum_stock DECIMAL(10,3) DEFAULT 0,
-        reorder_point DECIMAL(10,3) DEFAULT 0,
-        location TEXT,
         is_active INTEGER DEFAULT 1,
         notes TEXT,
         created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
         updated_at DATETIME DEFAULT CURRENT_TIMESTAMP,
-        FOREIGN KEY (category_id) REFERENCES categories (id)
+        deleted_at DATETIME
+      );`,
+
+      // Items table (inventory/products)
+      `CREATE TABLE IF NOT EXISTS items (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        name TEXT NOT NULL,
+        description TEXT,
+        category_id INTEGER,
+        sku TEXT UNIQUE,
+        barcode TEXT,
+        hsn_code TEXT,
+        brand TEXT,
+        unit TEXT DEFAULT 'pcs',
+        cost_price REAL DEFAULT 0,
+        selling_price REAL DEFAULT 0,
+        mrp REAL DEFAULT 0,
+        current_stock REAL DEFAULT 0,
+        minimum_stock REAL DEFAULT 0,
+        reorder_level REAL DEFAULT 5,
+        location TEXT,
+        supplier_id INTEGER,
+        tax_rate REAL DEFAULT 18,
+        is_active INTEGER DEFAULT 1,
+        created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+        updated_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+        deleted_at DATETIME,
+        FOREIGN KEY (category_id) REFERENCES categories(id),
+        FOREIGN KEY (supplier_id) REFERENCES parties(id)
       );`,
 
       // Stock movements table
       `CREATE TABLE IF NOT EXISTS stock_movements (
         id INTEGER PRIMARY KEY AUTOINCREMENT,
         item_id INTEGER NOT NULL,
-        movement_type TEXT NOT NULL CHECK (movement_type IN ('in', 'out', 'adjustment')),
-        quantity DECIMAL(10,3) NOT NULL,
+        movement_type TEXT NOT NULL,
+        quantity REAL NOT NULL,
         reference_type TEXT,
         reference_id INTEGER,
         notes TEXT,
         created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
-        FOREIGN KEY (item_id) REFERENCES items (id)
+        FOREIGN KEY (item_id) REFERENCES items(id)
       );`,
 
       // Invoices table
@@ -129,35 +160,33 @@ class DatabaseService {
         party_id INTEGER NOT NULL,
         invoice_date DATE NOT NULL,
         due_date DATE,
-        subtotal DECIMAL(10,2) DEFAULT 0,
-        tax_amount DECIMAL(10,2) DEFAULT 0,
-        discount_amount DECIMAL(10,2) DEFAULT 0,
-        total_amount DECIMAL(10,2) DEFAULT 0,
-        paid_amount DECIMAL(10,2) DEFAULT 0,
-        balance_amount DECIMAL(10,2) DEFAULT 0,
-        status TEXT DEFAULT 'draft' CHECK (status IN ('draft', 'sent', 'paid', 'overdue', 'cancelled')),
+        subtotal REAL DEFAULT 0,
+        tax_rate REAL DEFAULT 18,
+        tax_amount REAL DEFAULT 0,
+        discount_amount REAL DEFAULT 0,
+        total REAL DEFAULT 0,
+        status TEXT DEFAULT 'pending',
         notes TEXT,
-        terms TEXT,
+        terms_conditions TEXT,
         created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
         updated_at DATETIME DEFAULT CURRENT_TIMESTAMP,
-        FOREIGN KEY (party_id) REFERENCES parties (id)
+        deleted_at DATETIME,
+        FOREIGN KEY (party_id) REFERENCES parties(id)
       );`,
 
       // Invoice items table
       `CREATE TABLE IF NOT EXISTS invoice_items (
         id INTEGER PRIMARY KEY AUTOINCREMENT,
         invoice_id INTEGER NOT NULL,
-        item_id INTEGER,
-        item_name TEXT NOT NULL,
-        description TEXT,
-        quantity DECIMAL(10,3) NOT NULL,
-        unit_price DECIMAL(10,2) NOT NULL,
-        tax_rate DECIMAL(5,2) DEFAULT 0,
-        tax_amount DECIMAL(10,2) DEFAULT 0,
-        line_total DECIMAL(10,2) NOT NULL,
+        item_id INTEGER NOT NULL,
+        quantity REAL NOT NULL,
+        unit_price REAL NOT NULL,
+        discount REAL DEFAULT 0,
+        total REAL NOT NULL,
         created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
-        FOREIGN KEY (invoice_id) REFERENCES invoices (id) ON DELETE CASCADE,
-        FOREIGN KEY (item_id) REFERENCES items (id)
+        updated_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+        FOREIGN KEY (invoice_id) REFERENCES invoices(id),
+        FOREIGN KEY (item_id) REFERENCES items(id)
       );`,
 
       // Payments table
@@ -165,27 +194,27 @@ class DatabaseService {
         id INTEGER PRIMARY KEY AUTOINCREMENT,
         invoice_id INTEGER,
         party_id INTEGER NOT NULL,
+        amount REAL NOT NULL,
+        payment_method TEXT DEFAULT 'cash',
         payment_date DATE NOT NULL,
-        amount DECIMAL(10,2) NOT NULL,
-        payment_method TEXT DEFAULT 'cash' CHECK (payment_method IN ('cash', 'card', 'bank_transfer', 'cheque', 'upi', 'other')),
-        reference_number TEXT,
         notes TEXT,
         created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
-        FOREIGN KEY (invoice_id) REFERENCES invoices (id),
-        FOREIGN KEY (party_id) REFERENCES parties (id)
+        updated_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+        FOREIGN KEY (invoice_id) REFERENCES invoices(id),
+        FOREIGN KEY (party_id) REFERENCES parties(id)
       );`,
 
       // Expenses table
       `CREATE TABLE IF NOT EXISTS expenses (
         id INTEGER PRIMARY KEY AUTOINCREMENT,
-        title TEXT NOT NULL,
-        amount DECIMAL(10,2) NOT NULL,
-        category TEXT,
+        category TEXT NOT NULL,
+        amount REAL NOT NULL,
+        description TEXT,
         expense_date DATE NOT NULL,
         payment_method TEXT DEFAULT 'cash',
-        reference_number TEXT,
-        description TEXT,
-        created_at DATETIME DEFAULT CURRENT_TIMESTAMP
+        notes TEXT,
+        created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+        updated_at DATETIME DEFAULT CURRENT_TIMESTAMP
       );`,
 
       // Audit log table
@@ -193,70 +222,102 @@ class DatabaseService {
         id INTEGER PRIMARY KEY AUTOINCREMENT,
         table_name TEXT NOT NULL,
         record_id INTEGER NOT NULL,
-        action TEXT NOT NULL CHECK (action IN ('INSERT', 'UPDATE', 'DELETE')),
+        action TEXT NOT NULL,
         old_values TEXT,
         new_values TEXT,
-        user_info TEXT,
+        user_id TEXT,
         created_at DATETIME DEFAULT CURRENT_TIMESTAMP
       );`
     ];
 
-    for (const tableSQL of tables) {
-      await this.db.execAsync(tableSQL);
+    console.log('🗄️  Creating database tables...');
+    for (const sql of tables) {
+      await this.db.execAsync(sql);
     }
-
-    // Enable foreign keys
-    await this.db.execAsync('PRAGMA foreign_keys = ON;');
-    
-    console.log('✅ All database tables created successfully');
+    console.log('✅ All tables created successfully');
   }
 
   // Run database migrations
   async runMigrations() {
-    // Check current version
-    const versionResult = await this.db.getFirstAsync('PRAGMA user_version;');
-    const currentVersion = versionResult?.user_version || 0;
+    if (Platform.OS === 'web') return;
+    
+    // Future migrations will go here
+    console.log('✅ Migrations completed');
+  }
 
-    if (currentVersion < this.DATABASE_VERSION) {
-      console.log(`🔄 Running migrations from version ${currentVersion} to ${this.DATABASE_VERSION}`);
+  // Insert initial configuration data
+  async insertInitialData() {
+    if (Platform.OS === 'web') return;
+
+    try {
+      console.log('⚙️  Inserting initial configuration...');
       
-      // Add migration logic here when needed
+      // Check if settings already exist
+      const existingSettings = await this.db.getFirstAsync(
+        'SELECT COUNT(*) as count FROM settings'
+      );
       
-      // Update version
-      await this.db.execAsync(`PRAGMA user_version = ${this.DATABASE_VERSION};`);
-      console.log('✅ Database migrations completed');
+      if (existingSettings.count > 0) {
+        console.log('ℹ️  Initial data already exists');
+        return;
+      }
+
+      // Insert default settings
+      const defaultSettings = [
+        { key: 'business_name', value: 'Brojgar Business', type: 'string' },
+        { key: 'owner_name', value: 'Business Owner', type: 'string' },
+        { key: 'gst_number', value: '27XXXXX1234X1Z5', type: 'string' },
+        { key: 'phone', value: '+91 98765 43210', type: 'string' },
+        { key: 'email', value: 'business@brojgar.com', type: 'string' },
+        { key: 'address', value: 'Business Address, City, State', type: 'string' },
+        { key: 'currency', value: 'INR', type: 'string' },
+        { key: 'tax_rate', value: '18', type: 'number' },
+        { key: 'invoice_prefix', value: 'INV', type: 'string' },
+        { key: 'invoice_starting_number', value: '1', type: 'number' }
+      ];
+
+      for (const setting of defaultSettings) {
+        await this.db.runAsync(
+          'INSERT INTO settings (key, value, type) VALUES (?, ?, ?)',
+          [setting.key, setting.value, setting.type]
+        );
+      }
+
+      console.log('✅ Initial configuration inserted');
+    } catch (error) {
+      console.error('❌ Error inserting initial data:', error);
+      throw error;
+    }
+  }
+
+  // Utility method to execute raw SQL
+  async executeQuery(sql, params = []) {
+    if (Platform.OS === 'web') {
+      console.log('⚠️  Database query skipped on web:', sql);
+      return null;
+    }
+
+    try {
+      const db = await this.getDatabase();
+      return await db.getAllAsync(sql, params);
+    } catch (error) {
+      console.error('❌ Query execution error:', error);
+      throw error;
     }
   }
 
   // Close database connection
   async close() {
+    if (Platform.OS === 'web') return;
+    
     if (this.db) {
       await this.db.closeAsync();
       this.db = null;
       this.isInitialized = false;
-      console.log('🔌 Database connection closed');
+      console.log('🔒 Database connection closed');
     }
-  }
-
-  // Execute raw SQL
-  async execute(sql, params = []) {
-    const db = await this.getDatabase();
-    return await db.runAsync(sql, params);
-  }
-
-  // Get single record
-  async getFirst(sql, params = []) {
-    const db = await this.getDatabase();
-    return await db.getFirstAsync(sql, params);
-  }
-
-  // Get multiple records
-  async getAll(sql, params = []) {
-    const db = await this.getDatabase();
-    return await db.getAllAsync(sql, params);
   }
 }
 
 // Export singleton instance
-const databaseService = new DatabaseService();
-export default databaseService;
+export default new DatabaseService();
