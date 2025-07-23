@@ -38,7 +38,7 @@ class DatabaseService {
     }
   }
 
-  // Get database instance (SINGLE METHOD - removed duplicate)
+  // Get database instance
   async getDatabase() {
     if (!this.isInitialized) {
       await this.init();
