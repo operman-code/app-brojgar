@@ -26,13 +26,6 @@
       "package": "com.operman.brojgar"
     },
     "platforms": ["ios", "android"],
-    "sdkVersion": "53.0.0",
-    "plugins": [
-      "expo-router"
-    ],
-    "scheme": "brojgar",
-    "experiments": {
-      "typedRoutes": false
-    }
+    "sdkVersion": "53.0.0"
   }
 }
