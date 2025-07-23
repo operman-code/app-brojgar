@@ -26,6 +26,8 @@ class DatabaseService {
       if (this.isInitialized) return this.db;
 
       console.log('🔌 Connecting to SQLite database...');
+      
+      // SDK 53 API - Use openDatabaseAsync
       this.db = await SQLite.openDatabaseAsync(this.DATABASE_NAME);
       
       // Enable foreign keys
@@ -240,8 +242,6 @@ class DatabaseService {
   // Run database migrations
   async runMigrations() {
     if (Platform.OS === 'web') return;
-    
-    // Future migrations will go here
     console.log('✅ Migrations completed');
   }
 
