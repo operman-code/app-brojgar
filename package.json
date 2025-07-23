@@ -1,3 +1,425 @@
+now i am getting the error in lunch the app from expo go on phone is like 
+
+turbomoduleregistry.get.enforcing(..):'platformconstants' could not be found
+This error is related to Expo SDK version compatibility issues. The PlatformConstants TurboModule error typically occurs when there are version mismatches between Expo SDK, React Native, and the Expo Go app.
+
+Here's how to fix this:
+
+Solution 1: Update Expo CLI and Clear Cache
+# Update Expo CLI globally
+npm install -g @expo/cli@latest
+
+# Clear all caches
+npx expo install --fix
+npm start -- --clear
+
+# Or try clearing Metro cache specifically
+npx expo start --clear
+Solution 2: Fix Version Compatibility in package.json
+Replace your package.json with this corrected version that has proper SDK 50 compatibility:
+
+{
+  "name": "brojgar-app",
+  "version": "1.0.0",
+  "description": "Complete Business Management App with SQLite Database",
+  "main": "node_modules/expo/AppEntry.js",
+  "scripts": {
+    "start": "expo start",
+    "android": "expo start --android",
+    "ios": "expo start --ios"
+  },
+  "dependencies": {
+    "expo": "~50.0.0",
+    "expo-constants": "~15.4.0",
+    "expo-sqlite": "~13.2.0",
+    "expo-status-bar": "~1.11.0",
+    "expo-file-system": "~16.0.0",
+    "expo-sharing": "~11.10.0",
+    "expo-print": "~12.8.0",
+    "react": "18.2.0",
+    "react-native": "0.73.6",
+    "react-native-web": "~0.19.6",
+    "react-native-screens": "~3.29.0",
+    "react-native-safe-area-context": "4.8.2",
+    "react-native-gesture-handler": "~2.14.0",
+    "react-native-reanimated": "~3.6.2",
+    "@react-navigation/native": "^6.1.9",
+    "@react-navigation/bottom-tabs": "^6.5.11"
+  },
+  "devDependencies": {
+    "@babel/core": "^7.20.0",
+    "@expo/metro-config": "~0.17.0"
+  },
+  "keywords": [
+    "business",
+    "management",
+    "inventory",
+    "invoice",
+    "sqlite",
+    "expo",
+    "react-native"
+  ],
+  "author": "operman.in",
+  "license": "MIT",
+  "private": true
+}
+Solution 3: Update app.json
+Make sure your app.json has the correct SDK version:
+
+{
+  "expo": {
+    "name": "Brojgar",
+    "slug": "brojgar-app",
+    "version": "1.0.0",
+    "orientation": "portrait",
+    "icon": "./assets/icon.png",
+    "userInterfaceStyle": "light",
+    "splash": {
+      "image": "./assets/splash.png",
+      "resizeMode": "contain",
+      "backgroundColor": "#1e40af"
+    },
+    "assetBundlePatterns": [
+      "**/*"
+    ],
+    "ios": {
+      "supportsTablet": true,
+      "bundleIdentifier": "com.operman.brojgar"
+    },
+    "android": {
+      "adaptiveIcon": {
+        "foregroundImage": "./assets/adaptive-icon.png",
+        "backgroundColor": "#1e40af"
+      },
+      "package": "com.operman.brojgar"
+    },
+    "platforms": ["ios", "android"],
+    "sdkVersion": "50.0.0"
+  }
+}
+Solution 4: Complete Reset Process
+# Delete node_modules and package-lock.json
+rm -rf node_modules package-lock.json
+
+# Install with the corrected package.json
+npm install
+
+# Start with cache clearing
+npx expo start --clear
+Solution 5: Update Expo Go App
+Make sure you have the latest version of Expo Go installed on your phone from the app store.
+
+Solution 6: Alternative - Use Development Build
+If the above doesn't work, you might need to create a development build instead of using Expo Go:
+
+# Install EAS CLI
+npm install -g eas-cli
+
+# Create development build
+eas build --profile development --platform android
+Try Solution 1 and 2 first (update CLI and fix package.json versions). The main issue is the SDK version mismatch - you had SDK 53 dependencies but most likely an older Expo Go app that doesn't support it yet.
+
+Let me know which solution works for you!
+
+we need sdk 53 as suggested on phone expo while lunch periously
+You're right! If Expo Go is asking for SDK 53, then we need to keep SDK 53. The error is likely due to some other compatibility issues. Let me provide the corrected package.json for SDK 53:
+
+Updated package.json for SDK 53
+{
+  "name": "brojgar-app",
+  "version": "1.0.0",
+  "description": "Complete Business Management App with SQLite Database",
+  "main": "node_modules/expo/AppEntry.js",
+  "scripts": {
+    "start": "expo start",
+    "android": "expo start --android",
+    "ios": "expo start --ios"
+  },
+  "dependencies": {
+    "expo": "~53.0.0",
+    "expo-constants": "~17.1.7",
+    "expo-sqlite": "~15.2.14",
+    "expo-status-bar": "~2.2.3",
+    "expo-file-system": "~18.1.3",
+    "expo-sharing": "~13.1.4",
+    "expo-print": "~14.1.3",
+    "react": "18.2.0",
+    "react-native": "0.73.6",
+    "react-native-web": "~0.19.6",
+    "react-native-screens": "~3.29.0",
+    "react-native-safe-area-context": "4.8.2",
+    "react-native-gesture-handler": "~2.14.0",
+    "react-native-reanimated": "~3.6.2",
+    "@react-navigation/native": "^6.1.9",
+    "@react-navigation/bottom-tabs": "^6.5.11"
+  },
+  "devDependencies": {
+    "@babel/core": "^7.20.0",
+    "@expo/metro-config": "~0.20.0"
+  },
+  "keywords": [
+    "business",
+    "management",
+    "inventory",
+    "invoice",
+    "sqlite",
+    "expo",
+    "react-native"
+  ],
+  "author": "operman.in",
+  "license": "MIT",
+  "private": true
+}
+Updated app.json for SDK 53
+{
+  "expo": {
+    "name": "Brojgar",
+    "slug": "brojgar-app",
+    "version": "1.0.0",
+    "orientation": "portrait",
+    "icon": "./assets/icon.png",
+    "userInterfaceStyle": "light",
+    "splash": {
+      "image": "./assets/splash.png",
+      "resizeMode": "contain",
+      "backgroundColor": "#1e40af"
+    },
+    "assetBundlePatterns": [
+      "**/*"
+    ],
+    "ios": {
+      "supportsTablet": true,
+      "bundleIdentifier": "com.operman.brojgar"
+    },
+    "android": {
+      "adaptiveIcon": {
+        "foregroundImage": "./assets/adaptive-icon.png",
+        "backgroundColor": "#1e40af"
+      },
+      "package": "com.operman.brojgar"
+    },
+    "platforms": ["ios", "android"],
+    "sdkVersion": "53.0.0"
+  }
+}
+Fix the React Native version mismatch
+The key change is using React 18.2.0 and React Native 0.73.6 which are compatible with SDK 53.
+
+Steps to fix:
+Update your package.json with the above content
+Delete node_modules and lock file:
+rm -rf node_modules package-lock.json
+Install dependencies:
+npm install
+Update Expo CLI (make sure you have the latest):
+npm install -g @expo/cli@latest
+Start with cleared cache:
+npx expo start --clear
+Make sure your Expo Go app is updated to the latest version on your phone.
+The main issue was likely the React version mismatch. SDK 53 expects React 18.2.0, not 18.3.1. This should resolve the PlatformConstants TurboModule error.
+
+Try this and let me know if you still get the error!
+
+ubuntu@ip-172-31-87-85:~/app-brojgar$ npx expo start
+Starting project at /home/ubuntu/app-brojgar
+Error: Cannot find module 'metro/src/ModuleGraph/worker/importLocationsPlugin'
+Require stack:
+- /home/ubuntu/app-brojgar/node_modules/@expo/metro-config/build/serializer/reconcileTransformSerializerPlugin.js
+- /home/ubuntu/app-brojgar/node_modules/@expo/metro-config/build/serializer/withExpoSerializers.js
+- /home/ubuntu/app-brojgar/node_modules/@expo/metro-config/build/ExpoMetroConfig.js
+- /home/ubuntu/app-brojgar/metro.config.js
+- /home/ubuntu/app-brojgar/node_modules/import-fresh/index.js
+- /home/ubuntu/app-brojgar/node_modules/cosmiconfig/dist/loaders.js
+- /home/ubuntu/app-brojgar/node_modules/cosmiconfig/dist/createExplorer.js
+- /home/ubuntu/app-brojgar/node_modules/cosmiconfig/dist/index.js
+- /home/ubuntu/app-brojgar/node_modules/metro-config/src/loadConfig.js
+- /home/ubuntu/app-brojgar/node_modules/metro-config/src/index.js
+- /home/ubuntu/app-brojgar/node_modules/@expo/cli/build/src/start/server/metro/instantiateMetro.js
+- /home/ubuntu/app-brojgar/node_modules/@expo/cli/build/src/start/server/metro/MetroBundlerDevServer.js
+- /home/ubuntu/app-brojgar/node_modules/@expo/cli/build/src/start/server/DevServerManager.js
+- /home/ubuntu/app-brojgar/node_modules/@expo/cli/build/src/start/startAsync.js
+- /home/ubuntu/app-brojgar/node_modules/@expo/cli/build/src/start/index.js
+- /home/ubuntu/app-brojgar/node_modules/@expo/cli/build/bin/cli
+- /home/ubuntu/app-brojgar/node_modules/expo/bin/cli
+Error: Cannot find module 'metro/src/ModuleGraph/worker/importLocationsPlugin'
+Require stack:
+- /home/ubuntu/app-brojgar/node_modules/@expo/metro-config/build/serializer/reconcileTransformSerializerPlugin.js
+- /home/ubuntu/app-brojgar/node_modules/@expo/metro-config/build/serializer/withExpoSerializers.js
+- /home/ubuntu/app-brojgar/node_modules/@expo/metro-config/build/ExpoMetroConfig.js
+- /home/ubuntu/app-brojgar/metro.config.js
+- /home/ubuntu/app-brojgar/node_modules/import-fresh/index.js
+- /home/ubuntu/app-brojgar/node_modules/cosmiconfig/dist/loaders.js
+- /home/ubuntu/app-brojgar/node_modules/cosmiconfig/dist/createExplorer.js
+- /home/ubuntu/app-brojgar/node_modules/cosmiconfig/dist/index.js
+- /home/ubuntu/app-brojgar/node_modules/metro-config/src/loadConfig.js
+- /home/ubuntu/app-brojgar/node_modules/metro-config/src/index.js
+- /home/ubuntu/app-brojgar/node_modules/@expo/cli/build/src/start/server/metro/instantiateMetro.js
+- /home/ubuntu/app-brojgar/node_modules/@expo/cli/build/src/start/server/metro/MetroBundlerDevServer.js
+- /home/ubuntu/app-brojgar/node_modules/@expo/cli/build/src/start/server/DevServerManager.js
+- /home/ubuntu/app-brojgar/node_modules/@expo/cli/build/src/start/startAsync.js
+- /home/ubuntu/app-brojgar/node_modules/@expo/cli/build/src/start/index.js
+- /home/ubuntu/app-brojgar/node_modules/@expo/cli/build/bin/cli
+- /home/ubuntu/app-brojgar/node_modules/expo/bin/cli
+    at Function.Module._resolveFilename (node:internal/modules/cjs/loader:1225:15)
+    at Function.Module._load (node:internal/modules/cjs/loader:1051:27)
+    at Module.require (node:internal/modules/cjs/loader:1311:19)
+    at require (node:internal/modules/helpers:179:18)
+    at Object.<anonymous> (/home/ubuntu/app-brojgar/node_modules/@expo/metro-config/src/serializer/reconcileTransformSerializerPlugin.ts:12:1)
+    at Module._compile (node:internal/modules/cjs/loader:1469:14)
+    at Object.Module._extensions..js (node:internal/modules/cjs/loader:1548:10)
+    at Module.load (node:internal/modules/cjs/loader:1288:32)
+    at Function.Module._load (node:internal/modules/cjs/loader:1104:12)
+    at Module.require (node:internal/modules/cjs/loader:1311:19)
+ubuntu@ip-172-31-87-85:~/app-brojgar$
+This is a Metro bundler compatibility issue with the @expo/metro-config version. Let's fix this step by step:
+
+Solution 1: Update package.json with correct Metro config version
+Replace your package.json with this corrected version:
+
+{
+  "name": "brojgar-app",
+  "version": "1.0.0",
+  "description": "Complete Business Management App with SQLite Database",
+  "main": "node_modules/expo/AppEntry.js",
+  "scripts": {
+    "start": "expo start",
+    "android": "expo start --android",
+    "ios": "expo start --ios"
+  },
+  "dependencies": {
+    "expo": "~53.0.0",
+    "expo-constants": "~17.1.7",
+    "expo-sqlite": "~15.2.14",
+    "expo-status-bar": "~2.2.3",
+    "expo-file-system": "~18.1.3",
+    "expo-sharing": "~13.1.4",
+    "expo-print": "~14.1.3",
+    "react": "18.2.0",
+    "react-native": "0.73.6",
+    "react-native-web": "~0.19.6",
+    "react-native-screens": "~3.29.0",
+    "react-native-safe-area-context": "4.8.2",
+    "react-native-gesture-handler": "~2.14.0",
+    "react-native-reanimated": "~3.6.2",
+    "@react-navigation/native": "^6.1.9",
+    "@react-navigation/bottom-tabs": "^6.5.11"
+  },
+  "devDependencies": {
+    "@babel/core": "^7.20.0",
+    "@expo/metro-config": "~0.18.0"
+  },
+  "keywords": [
+    "business",
+    "management",
+    "inventory",
+    "invoice",
+    "sqlite",
+    "expo",
+    "react-native"
+  ],
+  "author": "operman.in",
+  "license": "MIT",
+  "private": true
+}
+Solution 2: Create a simpler metro.config.js
+Replace your metro.config.js with this simpler version:
+
+const { getDefaultConfig } = require('expo/metro-config');
+
+const config = getDefaultConfig(__dirname);
+
+module.exports = config;
+Solution 3: Clear everything and reinstall
+# Remove node_modules and lock files
+rm -rf node_modules package-lock.json
+
+# Clear npm cache
+npm cache clean --force
+
+# Install dependencies
+npm install
+
+# Use expo install to ensure compatibility
+npx expo install --fix
+Solution 4: If the above doesn't work, try this alternative approach
+If you're still getting errors, let's create a completely fresh Expo project and copy our files:
+
+# Go to parent directory
+cd ..
+
+# Create a new Expo project with SDK 53
+npx create-expo-app brojgar-fresh --template blank
+
+# Move to new project
+cd brojgar-fresh
+
+# Copy your source files from old project
+cp -r ../app-brojgar/screens ./
+cp -r ../app-brojgar/database ./
+cp -r ../app-brojgar/navigation ./
+cp ../app-brojgar/App.js ./
+cp ../app-brojgar/AppLoader.js ./
+cp ../app-brojgar/index.js ./
+
+# Install additional dependencies we need
+npx expo install expo-sqlite expo-file-system expo-sharing expo-print @react-navigation/native @react-navigation/bottom-tabs react-native-screens react-native-safe-area-context react-native-gesture-handler react-native-reanimated
+Solution 5: Alternative metro.config.js (if needed)
+If you still have metro issues, try this metro config:
+
+const { getDefaultConfig } = require('@expo/metro-config');
+
+const config = getDefaultConfig(__dirname, {
+  // Enable CSS support
+  isCSSEnabled: true,
+});
+
+module.exports = config;
+Try Solution 1, 2, and 3 first - the main issue is the @expo/metro-config version incompatibility. The version 0.20.0 you had is too new and expects a different Metro version than what's installed.
+
+Let me know if this resolves the Metro error!
+
+npm warn using --force Recommended protections disabled.
+npm error code ERESOLVE
+npm error ERESOLVE unable to resolve dependency tree
+npm error
+npm error While resolving: brojgar-app@1.0.0
+npm error Found: react@18.2.0
+npm error node_modules/react
+npm error   react@"18.2.0" from the root project
+npm error   peer react@"^18.0.0" from react-native-web@0.19.13
+npm error   node_modules/react-native-web
+npm error     react-native-web@"~0.19.6" from the root project
+npm error
+npm error Could not resolve dependency:
+npm error peer react@"^18.3.1" from react-dom@18.3.1
+npm error node_modules/react-dom
+npm error   peer react-dom@"^18.0.0" from react-native-web@0.19.13
+npm error   node_modules/react-native-web
+npm error     react-native-web@"~0.19.6" from the root project
+npm error
+npm error Fix the upstream dependency conflict, or retry
+npm error this command with --force or --legacy-peer-deps
+npm error to accept an incorrect (and potentially broken) dependency resolution.
+npm error
+npm error
+npm error For a full report see:
+npm error /home/ubuntu/.npm/_logs/2025-07-23T11_55_46_864Z-eresolve-report.txt
+npm error A complete log of this run can be found in: /home/ubuntu/.npm/_logs/2025-07-23T11_55_46_864Z-debug-0.log
+WARNING: The legacy expo-cli does not support Node +17. Migrate to the new local Expo CLI: https://blog.expo.dev/the-new-expo-cli-f4250d8e3421.
+
+  error: unknown option `--fix'
+
+ubuntu@ip-172-31-87-85:~/app-brojgar$
+There are multiple issues here. Let's fix them step by step:
+
+Issue 1: React version conflict
+The error shows React DOM expects React 18.3.1 but we have 18.2.0.
+
+Issue 2: Legacy Expo CLI
+You're using the old expo-cli which doesn't support newer Node versions.
+
+Solution: Let's fix everything at once
+Step 1: Update to correct package.json with proper React versions
 {
   "name": "brojgar-app",
   "version": "1.0.0",
@@ -23,6 +445,870 @@
     "react-native-safe-area-context": "~4.12.0",
     "react-native-gesture-handler": "~2.20.0",
     "react-native-reanimated": "~3.16.0",
+    "@react-navigation/native": "^6.1.9",
+    "@react-navigation/bottom-tabs": "^6.5.11"
+  },
+  "devDependencies": {
+    "@babel/core": "^7.20.0",
+    "@expo/metro-config": "~0.20.0"
+  },
+  "keywords": [
+    "business",
+    "management",
+    "inventory",
+    "invoice",
+    "sqlite",
+    "expo",
+    "react-native"
+  ],
+  "author": "operman.in",
+  "license": "MIT",
+  "private": true
+}
+Step 2: Install with legacy peer deps to bypass conflicts
+# Remove everything
+rm -rf node_modules package-lock.json
+
+# Install with legacy peer deps to bypass the React version conflict
+npm install --legacy-peer-deps
+
+# Update Expo CLI globally to the new version
+npm uninstall -g expo-cli
+npm install -g @expo/cli@latest
+Step 3: Alternative - Force install if needed
+If the above doesn't work:
+
+# Clean everything
+rm -rf node_modules package-lock.json
+
+# Force install to override conflicts
+npm install --force
+Step 4: Start the project
+# Use the new Expo CLI
+npx expo start --clear
+Step 5: If you still get errors, try this complete reset:
+# Go to a fresh directory
+cd ..
+rm -rf app-brojgar
+
+# Create new Expo project
+npx create-expo-app app-brojgar --template blank
+
+# Navigate to project
+cd app-brojgar
+
+# Install additional dependencies we need
+npm install --legacy-peer-deps @react-navigation/native @react-navigation/bottom-tabs react-native-screens react-native-safe-area-context react-native-gesture-handler react-native-reanimated expo-sqlite expo-file-system expo-sharing expo-print
+Then you can copy your source files (screens/, database/, navigation/, App.js, etc.) into this fresh project.
+
+The key changes:
+
+✅ Using React 18.3.1 (matches what React DOM expects)
+✅ Using React Native 0.76.3 (compatible with SDK 53)
+✅ Using --legacy-peer-deps to bypass version conflicts
+✅ Updating to new Expo CLI
+Try this approach and let me know if you still get errors!
+
+ubuntu@ip-172-31-87-85:~/app-brojgar$ # Remove everything
+rm -rf node_modules package-lock.json
+
+# Install with legacy peer deps to bypass the React version conflict
+npm install --legacy-peer-deps
+
+# Update Expo CLI globally to the new version
+npm uninstall -g expo-cli
+npm install -g @expo/cli@latest
+npm warn deprecated @babel/plugin-proposal-nullish-coalescing-operator@7.18.6: This proposal has been merged to the ECMAScript standard and thus this plugin is no longer maintained. Please use @babel/plugin-transform-nullish-coalescing-operator instead.
+npm warn deprecated @babel/plugin-proposal-class-properties@7.18.6: This proposal has been merged to the ECMAScript standard and thus this plugin is no longer maintained. Please use @babel/plugin-transform-class-properties instead.
+npm warn deprecated inflight@1.0.6: This module is not supported, and leaks memory. Do not use it. Check out lru-cache if you want a good and tested way to coalesce async requests by a key value, which is much more comprehensive and powerful.
+npm warn deprecated @babel/plugin-proposal-optional-chaining@7.21.0: This proposal has been merged to the ECMAScript standard and thus this plugin is no longer maintained. Please use @babel/plugin-transform-optional-chaining instead.
+npm warn deprecated rimraf@3.0.2: Rimraf versions prior to v4 are no longer supported
+npm warn deprecated rimraf@2.6.3: Rimraf versions prior to v4 are no longer supported
+npm warn deprecated glob@7.2.3: Glob versions prior to v9 are no longer supported
+npm warn deprecated glob@7.2.3: Glob versions prior to v9 are no longer supported
+npm warn deprecated glob@7.2.3: Glob versions prior to v9 are no longer supported
+npm warn deprecated glob@7.2.3: Glob versions prior to v9 are no longer supported
+npm warn deprecated glob@7.2.3: Glob versions prior to v9 are no longer supported
+npm warn deprecated glob@7.2.3: Glob versions prior to v9 are no longer supported
+
+added 769 packages, and audited 770 packages in 59s
+
+66 packages are looking for funding
+  run `npm fund` for details
+
+found 0 vulnerabilities
+npm error code EACCES
+npm error syscall rename
+npm error path /usr/local/lib/node_modules/expo-cli
+npm error dest /usr/local/lib/node_modules/.expo-cli-dKBr48UN
+npm error errno -13
+npm error Error: EACCES: permission denied, rename '/usr/local/lib/node_modules/expo-cli' -> '/usr/local/lib/node_modules/.expo-cli-dKBr48UN'
+npm error     at async Object.rename (node:internal/fs/promises:782:10)
+npm error     at async moveFile (/usr/local/lib/node_modules/npm/node_modules/@npmcli/fs/lib/move-file.js:30:5)
+npm error     at async Promise.allSettled (index 0)
+npm error     at async [reifyPackages] (/usr/local/lib/node_modules/npm/node_modules/@npmcli/arborist/lib/arborist/reify.js:325:11)
+npm error     at async Arborist.reify (/usr/local/lib/node_modules/npm/node_modules/@npmcli/arborist/lib/arborist/reify.js:142:5)
+npm error     at async Uninstall.exec (/usr/local/lib/node_modules/npm/lib/commands/uninstall.js:51:5)
+npm error     at async Npm.exec (/usr/local/lib/node_modules/npm/lib/npm.js:207:9)
+npm error     at async module.exports (/usr/local/lib/node_modules/npm/lib/cli/entry.js:74:5) {
+npm error   errno: -13,
+npm error   code: 'EACCES',
+npm error   syscall: 'rename',
+npm error   path: '/usr/local/lib/node_modules/expo-cli',
+npm error   dest: '/usr/local/lib/node_modules/.expo-cli-dKBr48UN'
+npm error }
+npm error
+npm error The operation was rejected by your operating system.
+npm error It is likely you do not have the permissions to access this file as the current user
+npm error
+npm error If you believe this might be a permissions issue, please double-check the
+npm error permissions of the file and its containing directories, or try running
+npm error the command again as root/Administrator.
+npm error A complete log of this run can be found in: /home/ubuntu/.npm/_logs/2025-07-23T11_58_25_063Z-debug-0.log
+npm error code EACCES
+npm error syscall mkdir
+npm error path /usr/local/lib/node_modules/@expo
+npm error errno -13
+npm error Error: EACCES: permission denied, mkdir '/usr/local/lib/node_modules/@expo'
+npm error     at async mkdir (node:internal/fs/promises:858:10)
+npm error     at async /usr/local/lib/node_modules/npm/node_modules/@npmcli/arborist/lib/arborist/reify.js:624:20
+npm error     at async Promise.allSettled (index 0)
+npm error     at async [reifyPackages] (/usr/local/lib/node_modules/npm/node_modules/@npmcli/arborist/lib/arborist/reify.js:325:11)
+npm error     at async Arborist.reify (/usr/local/lib/node_modules/npm/node_modules/@npmcli/arborist/lib/arborist/reify.js:142:5)
+npm error     at async Install.exec (/usr/local/lib/node_modules/npm/lib/commands/install.js:150:5)
+npm error     at async Npm.exec (/usr/local/lib/node_modules/npm/lib/npm.js:207:9)
+npm error     at async module.exports (/usr/local/lib/node_modules/npm/lib/cli/entry.js:74:5) {
+npm error   errno: -13,
+npm error   code: 'EACCES',
+npm error   syscall: 'mkdir',
+npm error   path: '/usr/local/lib/node_modules/@expo'
+npm error }
+npm error
+npm error The operation was rejected by your operating system.
+npm error It is likely you do not have the permissions to access this file as the current user
+npm error
+npm error If you believe this might be a permissions issue, please double-check the
+npm error permissions of the file and its containing directories, or try running
+npm error the command again as root/Administrator.
+npm error A complete log of this run can be found in: /home/ubuntu/.npm/_logs/2025-07-23T11_58_27_333Z-debug-0.log
+ubuntu@ip-172-31-87-85:~/app-brojgar$
+Great! The local project dependencies installed successfully with --legacy-peer-deps. The errors are just permission issues with global packages, which we can work around.
+
+Let's skip the global CLI updates and just start the project:
+
+Step 1: Try starting with the local Expo CLI (which should work now)
+npx expo start --clear
+Step 2: If you get permission errors when using npx, use sudo for global installs
+# Use sudo for global package management
+sudo npm uninstall -g expo-cli
+sudo npm install -g @expo/cli@latest
+Step 3: Alternative - Use yarn instead of npm for global packages
+# Install yarn if you don't have it
+sudo npm install -g yarn
+
+# Use yarn for global Expo CLI
+yarn global add @expo/cli@latest
+Step 4: If none of the above work, just use npx (no global install needed)
+You don't actually need to install Expo CLI globally. You can use it directly with npx:
+
+# This should work without any global installations
+npx @expo/cli@latest start --clear
+Step 5: Create the missing asset files
+If you get errors about missing assets, create them:
+
+# Create assets directory
+mkdir -p assets
+
+# Create placeholder asset files (you can replace these with real images later)
+touch assets/icon.png
+touch assets/splash.png
+touch assets/adaptive-icon.png
+touch assets/favicon.png
+The main thing is that your local project dependencies are now installed correctly with --legacy-peer-deps. Try running:
+
+npx expo start --clear
+This should work now since the dependency conflicts have been resolved. Let me know what happens when you run this command!
+
+after this 
+Logs for your project will appear below. Press Ctrl+C to exit.
+Android Bundled 42229ms node_modules/expo/AppEntry.js (881 modules)
+Android Bundled 102ms node_modules/expo/AppEntry.js (1 module)
+
+
+getting this error on phone 
+TurboModuleRegistry.getEnforcing(...): 'PlatformConstants' could not be found. Verify that a module by this name is registered in the native binary.
+This PlatformConstants error is a common issue with Expo SDK 53 and newer versions of Expo Go. Here are several solutions to try:
+
+Solution 1: Use Expo Development Build (Recommended)
+The issue is that your project uses SDK 53 features that aren't fully compatible with the current Expo Go app. Let's create a development build:
+
+# Install EAS CLI
+npm install -g eas-cli
+
+# Login to Expo (create account if needed)
+npx expo login
+
+# Initialize EAS
+eas build:configure
+
+# Create a development build for Android
+eas build --profile development --platform android
+Solution 2: Downgrade to SDK 50 (Stable with Expo Go)
+Update your package.json to use SDK 50 which is more stable with Expo Go:
+
+{
+  "name": "brojgar-app",
+  "version": "1.0.0",
+  "description": "Complete Business Management App with SQLite Database",
+  "main": "node_modules/expo/AppEntry.js",
+  "scripts": {
+    "start": "expo start",
+    "android": "expo start --android",
+    "ios": "expo start --ios"
+  },
+  "dependencies": {
+    "expo": "~50.0.0",
+    "expo-constants": "~15.4.0",
+    "expo-sqlite": "~13.2.0",
+    "expo-status-bar": "~1.11.0",
+    "expo-file-system": "~16.0.0",
+    "expo-sharing": "~11.10.0",
+    "expo-print": "~12.8.0",
+    "react": "18.2.0",
+    "react-native": "0.73.6",
+    "react-native-web": "~0.19.6",
+    "react-native-screens": "~3.29.0",
+    "react-native-safe-area-context": "4.8.2",
+    "react-native-gesture-handler": "~2.14.0",
+    "react-native-reanimated": "~3.6.2",
+    "@react-navigation/native": "^6.1.9",
+    "@react-navigation/bottom-tabs": "^6.5.11"
+  },
+  "devDependencies": {
+    "@babel/core": "^7.20.0",
+    "@expo/metro-config": "~0.17.0"
+  },
+  "keywords": [
+    "business",
+    "management",
+    "inventory",
+    "invoice",
+    "sqlite",
+    "expo",
+    "react-native"
+  ],
+  "author": "operman.in",
+  "license": "MIT",
+  "private": true
+}
+And update app.json:
+
+{
+  "expo": {
+    "name": "Brojgar",
+    "slug": "brojgar-app",
+    "version": "1.0.0",
+    "orientation": "portrait",
+    "icon": "./assets/icon.png",
+    "userInterfaceStyle": "light",
+    "splash": {
+      "image": "./assets/splash.png",
+      "resizeMode": "contain",
+      "backgroundColor": "#1e40af"
+    },
+    "assetBundlePatterns": [
+      "**/*"
+    ],
+    "ios": {
+      "supportsTablet": true,
+      "bundleIdentifier": "com.operman.brojgar"
+    },
+    "android": {
+      "adaptiveIcon": {
+        "foregroundImage": "./assets/adaptive-icon.png",
+        "backgroundColor": "#1e40af"
+      },
+      "package": "com.operman.brojgar"
+    },
+    "platforms": ["ios", "android"],
+    "sdkVersion": "50.0.0"
+  }
+}
+Then reinstall:
+
+rm -rf node_modules package-lock.json
+npm install --legacy-peer-deps
+npx expo start --clear
+Solution 3: Try Expo Go Beta
+Install Expo Go Beta from the Play Store which has better SDK 53 support.
+
+Solution 4: Use Tunnel Connection
+Sometimes this helps with compatibility:
+
+npx expo start --tunnel
+Solution 5: Check Database Service Import
+The error might be related to the SQLite module. Update your database/DatabaseService.js to handle the platform check better:
+
+// database/DatabaseService.js
+import { Platform } from 'react-native';
+
+let SQLite;
+try {
+  if (Platform.OS !== 'web') {
+    SQLite = require('expo-sqlite');
+  }
+} catch (error) {
+  console.warn('SQLite not available:', error);
+  SQLite = null;
+}
+
+class DatabaseService {
+  constructor() {
+    this.db = null;
+    this.isInitialized = false;
+    this.DATABASE_NAME = 'brojgar_business.db';
+    this.DATABASE_VERSION = 1;
+  }
+
+  // Initialize database connection
+  async init() {
+    try {
+      if (Platform.OS === 'web' || !SQLite) {
+        console.log('⚠️  SQLite not available, using mock data');
+        this.isInitialized = true;
+        return null;
+      }
+
+      if (this.isInitialized) return this.db;
+
+      console.log('🔌 Connecting to SQLite database...');
+      
+      // SDK 50/53 API - Use openDatabaseAsync
+      this.db = await SQLite.openDatabaseAsync(this.DATABASE_NAME);
+      
+      // Enable foreign keys
+      await this.db.execAsync('PRAGMA foreign_keys = ON;');
+      
+      // Create all tables
+      await this.createTables();
+      
+      // Run migrations if needed
+      await this.runMigrations();
+      
+      this.isInitialized = true;
+      console.log('✅ Database connected successfully');
+      
+      return this.db;
+    } catch (error) {
+      console.error('❌ Database initialization error:', error);
+      throw error;
+    }
+  }
+  
+  // ... rest of your code
+}
+
+export default new DatabaseService();
+I recommend trying Solution 2 first (downgrade to SDK 50) as it's the quickest fix and SDK 50 is very stable with Expo Go.
+
+Which solution would you like to try first?
+
+but before it was working with 53
+You're absolutely right! If it was working with SDK 53 before, then something changed. Let's troubleshoot what might have caused this:
+
+Potential Causes & Solutions:
+1. Expo Go App Update
+The most likely cause - your Expo Go app might have updated and lost SDK 53 compatibility.
+
+Try this:
+
+Check your Expo Go app version in the app store
+Look for Expo Go Beta or Expo Go Preview versions that support SDK 53
+Or try downgrading Expo Go if possible
+2. Metro Cache Issues
+Clear all caches thoroughly:
+
+# Clear everything
+npx expo start --clear
+rm -rf node_modules/.cache
+rm -rf .expo
+npx expo start --clear --reset-cache
+3. Dependencies Changed
+When you reinstalled with --legacy-peer-deps, some package versions might have changed.
+
+Check what changed:
+
+# See what's actually installed
+npm ls expo
+npm ls react-native
+npm ls @expo/metro-config
+4. Node Version Issue
+Check your Node version:
+
+node --version
+If it's too new (>18), try using Node 18:
+
+# If you have nvm
+nvm use 18
+# Or install Node 18 if needed
+5. Try the Original Working Configuration
+Let's go back to your exact original package.json that was working:
+
+{
+  "name": "brojgar-app",
+  "version": "1.0.0",
+  "description": "Complete Business Management App with SQLite Database",
+  "main": "node_modules/expo/AppEntry.js",
+  "scripts": {
+    "start": "expo start",
+    "android": "expo start --android",
+    "ios": "expo start --ios"
+  },
+  "dependencies": {
+    "expo": "~53.0.0",
+    "expo-constants": "~17.1.7",
+    "expo-sqlite": "~15.2.14",
+    "expo-status-bar": "~2.2.3",
+    "expo-file-system": "~18.1.3",
+    "expo-sharing": "~13.1.4",
+    "expo-print": "~14.1.3",
+    "react": "18.3.1",
+    "react-native": "0.76.3",
+    "react-native-web": "~0.19.6",
+    "react-native-screens": "~4.0.0",
+    "react-native-safe-area-context": "~4.12.0",
+    "react-native-gesture-handler": "~2.20.0",
+    "react-native-reanimated": "~3.16.0",
+    "@react-navigation/native": "^6.1.9",
+    "@react-navigation/bottom-tabs": "^6.5.11"
+  },
+  "devDependencies": {
+    "@babel/core": "^7.20.0",
+    "@expo/metro-config": "~0.20.0"
+  },
+  "keywords": [
+    "business",
+    "management",
+    "inventory",
+    "invoice",
+    "sqlite",
+    "expo",
+    "react-native"
+  ],
+  "author": "operman.in",
+  "license": "MIT",
+  "private": true
+}
+Then reinstall exactly:
+
+rm -rf node_modules package-lock.json
+npm install --legacy-peer-deps
+6. Check Expo Go Version Compatibility
+Run this to see what your project expects vs what Expo Go supports:
+
+npx expo doctor
+7. Try Different Connection Methods
+# Try tunnel mode
+npx expo start --tunnel
+
+# Or try local mode
+npx expo start --localhost
+
+# Or development mode
+npx expo start --dev-client
+What I suspect happened: When you ran npm install --legacy-peer-deps, it might have installed different versions of some packages than what you had before. The --legacy-peer-deps flag can sometimes install different dependency versions.
+
+Quick test: Can you check what version of Expo Go you have installed on your phone? The error suggests the current Expo Go doesn't have the PlatformConstants module that your SDK 53 project expects.
+
+Which of these solutions would you like to try first?
+
+TurboModuleRegistry.getEnforcing(...): 'PlatformConstants' could not be found. Verify that a module by this name is registered in the native binary.
+This PlatformConstants error is a known issue with SDK 53 and the current Expo Go app. Let's fix it with the most reliable solution:
+
+Solution: Use Expo Development Build
+The issue is that Expo Go doesn't fully support all SDK 53 features. Let's create a development build that will work perfectly:
+
+Step 1: Install EAS CLI and setup
+# Install EAS CLI globally
+sudo npm install -g eas-cli
+
+# Login to Expo (create free account if needed)
+npx expo login
+
+# Initialize EAS in your project
+eas build:configure
+Step 2: Create development build
+# Build development version for Android
+eas build --profile development --platform android
+This will:
+
+Upload your code to Expo's servers
+Build a custom APK with all the native modules your app needs
+Give you a download link for the APK
+Step 3: Install the development build on your phone
+Download the APK from the link EAS provides
+Install it on your Android device
+Open the custom app (not Expo Go)
+Connect to your development server
+Alternative Quick Fix: Temporarily Downgrade
+If you want to continue using Expo Go immediately, downgrade to SDK 50:
+
+Update package.json:
+{
+  "name": "brojgar-app",
+  "version": "1.0.0",
+  "description": "Complete Business Management App with SQLite Database",
+  "main": "node_modules/expo/AppEntry.js",
+  "scripts": {
+    "start": "expo start",
+    "android": "expo start --android",
+    "ios": "expo start --ios"
+  },
+  "dependencies": {
+    "expo": "~50.0.0",
+    "expo-constants": "~15.4.0",
+    "expo-sqlite": "~13.2.0",
+    "expo-status-bar": "~1.11.0",
+    "expo-file-system": "~16.0.0",
+    "expo-sharing": "~11.10.0",
+    "expo-print": "~12.8.0",
+    "react": "18.2.0",
+    "react-native": "0.73.6",
+    "react-native-web": "~0.19.6",
+    "react-native-screens": "~3.29.0",
+    "react-native-safe-area-context": "4.8.2",
+    "react-native-gesture-handler": "~2.14.0",
+    "react-native-reanimated": "~3.6.2",
+    "@react-navigation/native": "^6.1.9",
+    "@react-navigation/bottom-tabs": "^6.5.11"
+  },
+  "devDependencies": {
+    "@babel/core": "^7.20.0",
+    "@expo/metro-config": "~0.17.0"
+  },
+  "keywords": [
+    "business",
+    "management",
+    "inventory",
+    "invoice",
+    "sqlite",
+    "expo",
+    "react-native"
+  ],
+  "author": "operman.in",
+  "license": "MIT",
+  "private": true
+}
+Update app.json:
+{
+  "expo": {
+    "name": "Brojgar",
+    "slug": "brojgar-app",
+    "version": "1.0.0",
+    "orientation": "portrait",
+    "icon": "./assets/icon.png",
+    "userInterfaceStyle": "light",
+    "splash": {
+      "image": "./assets/splash.png",
+      "resizeMode": "contain",
+      "backgroundColor": "#1e40af"
+    },
+    "assetBundlePatterns": [
+      "**/*"
+    ],
+    "ios": {
+      "supportsTablet": true,
+      "bundleIdentifier": "com.operman.brojgar"
+    },
+    "android": {
+      "adaptiveIcon": {
+        "foregroundImage": "./assets/adaptive-icon.png",
+        "backgroundColor": "#1e40af"
+      },
+      "package": "com.operman.brojgar"
+    },
+    "platforms": ["ios", "android"],
+    "sdkVersion": "50.0.0"
+  }
+}
+Then reinstall:
+rm -rf node_modules package-lock.json
+npm install --legacy-peer-deps
+npx expo start --clear
+My Recommendation:
+Use the development build approach - it's the proper long-term solution and will give you access to all SDK 53 features without compatibility issues.
+
+The PlatformConstants module is part of the native layer that Expo Go doesn't expose for SDK 53, but a development build will have it.
+
+Which approach would you prefer to try?
+
+ubuntu@ip-172-31-87-85:~/app-brojgar$ # Install EAS CLI globally
+sudo npm install -g eas-cli
+
+# Login to Expo (create free account if needed)
+npx expo login
+
+# Initialize EAS in your project
+eas build:configure
+npm warn deprecated inflight@1.0.6: This module is not supported, and leaks memory. Do not use it. Check out lru-cache if you want a good and tested way to coalesce async requests by a key value, which is much more comprehensive and powerful.
+npm warn deprecated rimraf@2.4.5: Rimraf versions prior to v4 are no longer supported
+npm warn deprecated glob@6.0.4: Glob versions prior to v9 are no longer supported
+npm warn deprecated sudo-prompt@9.1.1: Package no longer supported. Contact Support at https://www.npmjs.com/support for more info.
+npm warn deprecated @oclif/screen@3.0.8: Package no longer supported. Contact Support at https://www.npmjs.com/support for more info.
+npm warn deprecated @xmldom/xmldom@0.7.13: this version is no longer supported, please update to at least 0.8.*
+npm warn deprecated lodash.get@4.4.2: This package is deprecated. Use the optional chaining (?.) operator instead.
+
+added 446 packages in 30s
+
+55 packages are looking for funding
+  run `npm fund` for details
+Log in to EAS with email or username (exit and run 'npx expo login --help' for other login options)
+✔ Email or username … operman-code
+✔ Password … ***********
+EAS project not configured.
+✔ Would you like to automatically create an EAS project for @operman-code/brojgar-app? … yes
+✔ Created @operman-code/brojgar-app: https://expo.dev/accounts/operman-code/projects/brojgar-app on EAS
+✔ Linked local project to EAS project cbcdbf34-9e6f-4223-9d09-c99ae2507d4b
+💡 The following process will configure your iOS and/or Android project to be compatible with EAS Build. These changes only apply to your local project files and you can safely revert them at any time.
+
+? Which platforms would you like to configure for EAS Build? › - Use arrow-keys. Return to submit.
+❯   All
+    iOS
+    Android
+Great! EAS is setting up. Choose "All" to configure both iOS and Android platforms (even if you only plan to use Android for now, it's good to have both configured).
+
+Press Enter to select "All".
+
+After that completes, you should see EAS create configuration files. Then continue with:
+
+Step 2: Build the development version
+# Build development version for Android
+eas build --profile development --platform android
+This process will:
+
+Upload your project to Expo's build servers
+Create a custom APK with all the native modules
+Give you a download link
+The build usually takes 5-15 minutes. You'll get output like:
+
+✔ Build completed!
+🤖 Android app:
+https://expo.dev/artifacts/eas/[some-id].apk
+Step 3: While the build is running, let's prepare
+Make sure you have placeholder assets (the build might fail without them):
+
+# Create simple placeholder images
+mkdir -p assets
+
+# Create 1024x1024 placeholder icon (you can use any PNG image)
+# For now, just create empty files - the build will warn but won't fail
+touch assets/icon.png
+touch assets/splash.png
+touch assets/adaptive-icon.png
+touch assets/favicon.png
+Step 4: Once build completes
+Download the APK file from the link EAS provides
+Install it on your Android device (you may need to enable "Install from unknown sources")
+Open the new app (it will be called "Brojgar" and have your icon)
+Run your development server: npx expo start --dev-client
+Scan the QR code with your custom app (not Expo Go)
+This custom development build will have all the native modules properly included, so the PlatformConstants error should be completely resolved.
+
+Let me know when the EAS configuration finishes and we'll proceed with the build!
+
+✔ Do you want EAS CLI to install expo-dev-client for you? … yes
+
+Running expo install expo-dev-client
+
+[expo-cli] › Installing 1 SDK 53.0.0 compatible native module using npm
+[expo-cli] > npm install
+[expo-cli] added 46 packages, and audited 816 packages in 10s
+[expo-cli] 68 packages are looking for funding
+[expo-cli]   run `npm fund` for details
+[expo-cli] found 0 vulnerabilities
+
+Resolved "development" environment for the build. Learn more: https://docs.expo.dev/eas/environment-variables/#setting-the-environment-for-your-builds
+No environment variables with visibility "Plain text" and "Sensitive" found for the "development" environment on EAS.
+
+No remote versions are configured for this project, versionCode will be initialized based on the value from the local project.
+✔ Initialized versionCode with 1.
+✔ Using remote Android credentials (Expo server)
+? Generate a new Android Keystore? › (Y/n)
+Perfect! EAS is progressing well. For the keystore question, press Y (or just press Enter) to generate a new Android Keystore. This is needed to sign your Android app.
+
+Y
+After that, the build process will continue. You should see something like:
+
+✔ Generated a new Android Keystore
+✔ Build queued...
+Then it will show you a link to track the build progress, something like:
+
+🔗 https://expo.dev/accounts/operman-code/projects/brojgar-app/builds/[build-id]
+While the build is running (5-15 minutes):
+The build process will:
+
+✅ Install expo-dev-client (already done)
+✅ Generate Android keystore (in progress)
+Upload your code to build servers
+Compile the native Android app with all required modules
+Provide download link for the APK
+What happens next:
+Build completes → You get an APK download link
+Download APK → Install on your Android device
+Start dev server → npx expo start --dev-client
+Connect your custom app → Scan QR code with your new app (not Expo Go)
+✅ No more PlatformConstants error!
+The development build will have all the native modules (including PlatformConstants) properly compiled in, so your SDK 53 project will work perfectly.
+
+Just wait for the build to complete and let me know when you get the download link!
+
+Error: [android.dangerous]: withAndroidDangerousBaseMod: Could not find MIME for Buffer <null>
+Error: [android.dangerous]: withAndroidDangerousBaseMod: Could not find MIME for Buffer <null>
+    at Jimp.parseBitmap (/home/expo/workingdir/build/node_modules/jimp-compact/dist/jimp.js:1:125518)
+    at Jimp.parseBitmap (/home/expo/workingdir/build/node_modules/jimp-compact/dist/jimp.js:1:8514)
+    at /home/expo/workingdir/build/node_modules/jimp-compact/dist/jimp.js:1:7613
+    at FSReqCallback.readFileAfterClose [as oncomplete] (node:internal/fs/read/context:68:3)
+npx expo prebuild --no-install --platform android exited with non-zero code: 1
+The error is caused by missing or invalid image assets. The build system is trying to process your app icons but finding empty/null files. Let's fix this:
+
+Solution: Create proper placeholder images
+# Go to your project directory
+cd ~/app-brojgar
+
+# Remove the empty placeholder files
+rm -f assets/*.png
+
+# Create a simple colored square as a placeholder icon
+# We'll use ImageMagick or create a simple base64 encoded PNG
+
+# Method 1: If you have imagemagick installed
+convert -size 1024x1024 xc:"#1e40af" assets/icon.png
+convert -size 1242x2436 xc:"#1e40af" assets/splash.png
+convert -size 1024x1024 xc:"#1e40af" assets/adaptive-icon.png
+convert -size 32x32 xc:"#1e40af" assets/favicon.png
+If ImageMagick is not available, let's create the images manually:
+# Install ImageMagick
+sudo apt update
+sudo apt install imagemagick -y
+
+# Then create the images
+convert -size 1024x1024 xc:"#1e40af" assets/icon.png
+convert -size 1242x2436 xc:"#1e40af" assets/splash.png  
+convert -size 1024x1024 xc:"#1e40af" assets/adaptive-icon.png
+convert -size 32x32 xc:"#1e40af" assets/favicon.png
+Alternative method - Download sample images:
+# Create simple placeholder PNGs using curl (these are valid PNG files)
+# App Icon (1024x1024)
+curl -o assets/icon.png "https://via.placeholder.com/1024x1024/1e40af/ffffff.png?text=B"
+
+# Splash Screen (1242x2436) 
+curl -o assets/splash.png "https://via.placeholder.com/1242x2436/1e40af/ffffff.png?text=Brojgar"
+
+# Adaptive Icon (1024x1024)
+curl -o assets/adaptive-icon.png "https://via.placeholder.com/1024x1024/1e40af/ffffff.png?text=B"
+
+# Favicon (32x32)
+curl -o assets/favicon.png "https://via.placeholder.com/32x32/1e40af/ffffff.png?text=B"
+After creating the images, retry the build:
+# Try the build again
+eas build --profile development --platform android
+Alternative: Simplify app.json temporarily
+If you still get errors, let's temporarily remove the asset references:
+
+{
+  "expo": {
+    "name": "Brojgar",
+    "slug": "brojgar-app",
+    "version": "1.0.0",
+    "orientation": "portrait",
+    "userInterfaceStyle": "light",
+    "assetBundlePatterns": [
+      "**/*"
+    ],
+    "ios": {
+      "supportsTablet": true,
+      "bundleIdentifier": "com.operman.brojgar"
+    },
+    "android": {
+      "package": "com.operman.brojgar"
+    },
+    "platforms": ["ios", "android"],
+    "sdkVersion": "53.0.0"
+  }
+}
+Try the curl method first to download proper placeholder images, then retry the build. The images just need to be valid PNG files, not empty files.
+
+Let me know if you need help with any of these steps!
+
+Running "expo doctor"
+Running 15 checks on your project...
+13/15 checks passed. 2 checks failed. Possible issues detected:
+Use the --verbose flag to see more details about passed checks.
+✖ Check that native modules use compatible support package versions for installed Expo SDK
+Expected package metro@^0.82.0
+Found invalid:
+  metro@0.81.5
+  (for more info, run: npm why metro)
+Expected package metro-resolver@^0.82.0
+Found invalid:
+  metro-resolver@0.81.5
+  (for more info, run: npm why metro-resolver)
+Expected package metro-config@^0.82.0
+Found invalid:
+  metro-config@0.81.5
+  (for more info, run: npm why metro-config)
+Advice:
+Upgrade dependencies that are using the invalid package versions.
+✖ Check that packages match versions required by installed Expo SDK
+The following packages should be updated for best compatibility with the installed expo version:
+  react@18.3.1 - expected version: 19.0.0
+  react-native@0.76.3 - expected version: 0.79.5
+  react-native-web@0.19.13 - expected version: ^0.20.0
+  react-native-screens@4.0.0 - expected version: ~4.11.1
+  react-native-safe-area-context@4.12.0 - expected version: 5.4.0
+  react-native-gesture-handler@2.20.2 - expected version: ~2.24.0
+  react-native-reanimated@3.16.7 - expected version: ~3.17.4
+Your project may not work correctly until you install the expected versions of the packages.
+Found outdated dependencies
+Advice:
+Use 'npx expo install --check' to review and upgrade your dependencies.
+2 checks failed, indicating possible issues with the project.
+Command "expo doctor" failed.
+npx -y expo-doctor exited with non-zero code: 1
+
+
+Build failed: Gradle build failed with unknown error. See logs for the "Run gradlew" phase for more information.
+The build failed because of version mismatches. Let's fix the dependencies to match what SDK 53 actually expects:
+
+Step 1: Update package.json with correct SDK 53 versions
+Replace your package.json with this corrected version:
+
+{
+  "name": "brojgar-app",
+  "version": "1.0.0",
+  "description": "Complete Business Management App with SQLite Database",
+  "main": "node_modules/expo/AppEntry.js",
+  "scripts": {
+    "start": "expo start",
+    "android": "expo start --android",
+    "ios": "expo start --ios"
+  },
+  "dependencies": {
+    "expo": "~53.0.0",
+    "expo-constants": "~17.1.7",
+    "expo-sqlite": "~15.2.14",
+    "expo-status-bar": "~2.2.3",
+    "expo-file-system": "~18.1.3",
+    "expo-sharing": "~13.1.4",
+    "expo-print": "~14.1.3",
+    "expo-dev-client": "~5.4.0",
+    "react": "19.0.0",
+    "react-native": "0.79.5",
+    "react-native-web": "^0.20.0",
+    "react-native-screens": "~4.11.1",
+    "react-native-safe-area-context": "5.4.0",
+    "react-native-gesture-handler": "~2.24.0",
+    "react-native-reanimated": "~3.17.4",
     "@react-navigation/native": "^6.1.9",
     "@react-navigation/bottom-tabs": "^6.5.11"
   },
