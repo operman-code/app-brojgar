@@ -1,10 +1,6 @@
 // database/DatabaseService.js
-import { Platform } from 'react-native';
-
-let SQLite;
-if (Platform.OS !== 'web') {
-  SQLite = require('expo-sqlite');
-}
+// database/DatabaseService.js
+import * as SQLite from 'expo-sqlite';
 
 class DatabaseService {
   constructor() {
@@ -17,12 +13,6 @@ class DatabaseService {
   // Initialize database connection
   async init() {
     try {
-      if (Platform.OS === 'web') {
-        console.log('⚠️  SQLite not available on web, using mock data');
-        this.isInitialized = true;
-        return null;
-      }
-
       if (this.isInitialized) return this.db;
 
       console.log('🔌 Connecting to SQLite database...');
@@ -47,6 +37,14 @@ class DatabaseService {
       console.error('❌ Database initialization error:', error);
       throw error;
     }
+  }
+
+  // Get database instance
+  async getDatabase() {
+    if (!this.isInitialized) {
+      await this.init();
+    }
+    return this.db;
   }
 
   // Get database instance
