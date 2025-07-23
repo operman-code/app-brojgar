@@ -29,8 +29,7 @@
   "devDependencies": {
     "@babel/core": "^7.20.0",
     "@expo/metro-config": "~0.20.0",
-    "hermes-parser": "^0.23.1",
-    "metro-hermes-compiler": "^0.82.0"
+    "hermes-parser": "^0.20.1"
   },
   "keywords": [
     "business",
