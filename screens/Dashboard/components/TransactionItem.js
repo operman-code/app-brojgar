@@ -1,106 +1,84 @@
 // screens/Dashboard/components/TransactionItem.js
-import React from "react";
-import { View, Text, StyleSheet, TouchableOpacity } from "react-native";
+import React from 'react';
+import { View, Text, TouchableOpacity, StyleSheet } from 'react-native';
 
 const TransactionItem = ({ transaction, onPress }) => {
-  const formatCurrency = (amount) => {
-    return `₹${amount.toLocaleString("en-IN")}`;
+  const formatAmount = (amount) => {
+    if (typeof amount === 'number') {
+      return `₹${amount.toLocaleString('en-IN')}`;
+    }
+    return amount;
   };
 
   const formatDate = (dateString) => {
-    try {
-      const date = new Date(dateString);
-      return date.toLocaleDateString('en-IN', {
-        day: '2-digit',
-        month: 'short'
-      });
-    } catch (error) {
-      return dateString;
-    }
+    if (!dateString) return '';
+    const date = new Date(dateString);
+    return date.toLocaleDateString('en-IN', {
+      day: 'numeric',
+      month: 'short'
+    });
   };
 
   const getStatusColor = (status) => {
     switch (status?.toLowerCase()) {
-      case "paid":
-      case "received":
-      case "completed":
-        return "#10b981";
-      case "pending":
-        return "#f59e0b";
-      case "overdue":
-      case "failed":
-        return "#ef4444";
-      case "partial":
-        return "#3b82f6";
+      case 'paid':
+      case 'received':
+      case 'completed':
+        return '#10b981';
+      case 'pending':
+      case 'due':
+        return '#f59e0b';
+      case 'overdue':
+      case 'cancelled':
+        return '#ef4444';
       default:
-        return "#6b7280";
+        return '#6b7280';
     }
   };
 
-  const getTypeIcon = (type) => {
+  const getTypeColor = (type) => {
     switch (type?.toLowerCase()) {
-      case "sale":
-      case "invoice":
-        return "💰";
-      case "purchase":
-        return "🛒";
-      case "payment":
-        return "💳";
-      case "expense":
-        return "💸";
-      case "stock":
-        return "📦";
+      case 'sale':
+      case 'income':
+        return '#10b981';
+      case 'purchase':
+      case 'expense':
+        return '#ef4444';
+      case 'payment':
+        return '#3b82f6';
       default:
-        return "📄";
-    }
-  };
-
-  const getAmountColor = (type) => {
-    switch (type?.toLowerCase()) {
-      case "sale":
-      case "invoice":
-      case "payment":
-        return "#10b981"; // Green for income
-      case "purchase":
-      case "expense":
-        return "#ef4444"; // Red for expense
-      default:
-        return "#333";
+        return '#6b7280';
     }
   };
 
   return (
-    <TouchableOpacity 
-      style={styles.container}
-      onPress={onPress}
-      activeOpacity={0.7}
-    >
+    <TouchableOpacity style={styles.container} onPress={onPress} activeOpacity={0.7}>
       <View style={styles.leftSection}>
-        <View style={styles.iconContainer}>
-          <Text style={styles.typeIcon}>{getTypeIcon(transaction.type)}</Text>
+        <View style={[styles.iconContainer, { backgroundColor: getTypeColor(transaction.type) }]}>
+          <Text style={styles.icon}>{transaction.icon || '💼'}</Text>
         </View>
+        
         <View style={styles.details}>
-          <View style={styles.headerRow}>
+          <Text style={styles.customer} numberOfLines={1}>
+            {transaction.customer || 'Unknown'}
+          </Text>
+          <View style={styles.subDetails}>
             <Text style={styles.reference}>{transaction.reference}</Text>
-            <Text style={[styles.status, { color: getStatusColor(transaction.status) }]}>
-              {transaction.status}
-            </Text>
+            <Text style={styles.separator}>•</Text>
+            <Text style={styles.date}>{formatDate(transaction.date)}</Text>
           </View>
-          <Text style={styles.party}>
-            {transaction.customer || transaction.supplier || transaction.party || 'N/A'}
-          </Text>
-          <Text style={styles.date}>
-            {formatDate(transaction.date || transaction.created_at)}
-          </Text>
         </View>
       </View>
-      
+
       <View style={styles.rightSection}>
-        <Text style={[styles.amount, { color: getAmountColor(transaction.type) }]}>
-          {transaction.type?.toLowerCase() === 'purchase' || transaction.type?.toLowerCase() === 'expense' ? '-' : '+'}
-          {formatCurrency(transaction.amount)}
+        <Text style={[styles.amount, { color: getTypeColor(transaction.type) }]}>
+          {formatAmount(transaction.amount)}
         </Text>
-        <Text style={styles.type}>{transaction.type}</Text>
+        {transaction.status && (
+          <View style={[styles.statusBadge, { backgroundColor: getStatusColor(transaction.status) }]}>
+            <Text style={styles.statusText}>{transaction.status}</Text>
+          </View>
+        )}
       </View>
     </TouchableOpacity>
   );
@@ -108,76 +86,75 @@ const TransactionItem = ({ transaction, onPress }) => {
 
 const styles = StyleSheet.create({
   container: {
-    flexDirection: "row",
-    backgroundColor: "#fff",
-    borderRadius: 8,
-    padding: 16,
-    marginBottom: 8,
-    elevation: 2,
-    shadowColor: "#000",
-    shadowOffset: { width: 0, height: 1 },
-    shadowOpacity: 0.1,
-    shadowRadius: 2,
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    paddingVertical: 12,
+    paddingHorizontal: 16,
+    borderBottomWidth: 1,
+    borderBottomColor: '#f3f4f6',
   },
   leftSection: {
-    flexDirection: "row",
+    flexDirection: 'row',
+    alignItems: 'center',
     flex: 1,
-    alignItems: "center",
   },
   iconContainer: {
     width: 40,
     height: 40,
     borderRadius: 20,
-    backgroundColor: "#f8f9fa",
-    justifyContent: "center",
-    alignItems: "center",
+    justifyContent: 'center',
+    alignItems: 'center',
     marginRight: 12,
   },
-  typeIcon: {
-    fontSize: 18,
+  icon: {
+    fontSize: 16,
   },
   details: {
     flex: 1,
   },
-  headerRow: {
-    flexDirection: "row",
-    justifyContent: "space-between",
-    alignItems: "center",
-    marginBottom: 4,
+  customer: {
+    fontSize: 16,
+    fontWeight: '600',
+    color: '#111827',
+    marginBottom: 2,
+  },
+  subDetails: {
+    flexDirection: 'row',
+    alignItems: 'center',
   },
   reference: {
-    fontSize: 16,
-    fontWeight: "600",
-    color: "#333",
-    flex: 1,
-  },
-  status: {
     fontSize: 12,
-    fontWeight: "600",
-    textTransform: "capitalize",
+    color: '#6b7280',
+    fontWeight: '500',
   },
-  party: {
-    fontSize: 14,
-    color: "#666",
-    marginBottom: 2,
+  separator: {
+    fontSize: 12,
+    color: '#d1d5db',
+    marginHorizontal: 6,
   },
   date: {
     fontSize: 12,
-    color: "#999",
+    color: '#6b7280',
   },
   rightSection: {
-    alignItems: "flex-end",
-    justifyContent: "center",
+    alignItems: 'flex-end',
   },
   amount: {
     fontSize: 16,
-    fontWeight: "bold",
+    fontWeight: 'bold',
     marginBottom: 4,
   },
-  type: {
-    fontSize: 12,
-    color: "#666",
-    textTransform: "capitalize",
+  statusBadge: {
+    paddingHorizontal: 8,
+    paddingVertical: 2,
+    borderRadius: 12,
+  },
+  statusText: {
+    color: '#ffffff',
+    fontSize: 10,
+    fontWeight: '600',
+    textTransform: 'capitalize',
   },
 });
 
