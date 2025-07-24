@@ -10,16 +10,31 @@ import {
   Animated,
   Switch,
   Alert,
+  TextInput,
+  Modal,
+  RefreshControl,
 } from 'react-native';
+import SettingsService from './services/SettingsService';
 
 const SettingsScreen = ({ navigation }) => {
   const [fadeAnim] = useState(new Animated.Value(0));
+  const [settings, setSettings] = useState({});
+  const [businessProfile, setBusinessProfile] = useState({});
+  const [loading, setLoading] = useState(true);
+  const [refreshing, setRefreshing] = useState(false);
+  const [profileModalVisible, setProfileModalVisible] = useState(false);
+  const [editingProfile, setEditingProfile] = useState({});
+
+  // App preferences state
   const [notificationsEnabled, setNotificationsEnabled] = useState(true);
   const [darkModeEnabled, setDarkModeEnabled] = useState(false);
   const [autoBackupEnabled, setAutoBackupEnabled] = useState(true);
   const [biometricEnabled, setBiometricEnabled] = useState(false);
 
   useEffect(() => {
+    loadSettings();
+    loadBusinessProfile();
+    
     Animated.timing(fadeAnim, {
       toValue: 1,
       duration: 600,
@@ -27,13 +42,93 @@ const SettingsScreen = ({ navigation }) => {
     }).start();
   }, []);
 
+  const loadSettings = async () => {
+    try {
+      setLoading(true);
+      const settingsData = await SettingsService.getAllSettings();
+      setSettings(settingsData);
+    } catch (error) {
+      console.error('Error loading settings:', error);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const loadBusinessProfile = async () => {
+    try {
+      const profile = await SettingsService.getBusinessProfile();
+      setBusinessProfile(profile);
+      setEditingProfile(profile);
+    } catch (error) {
+      console.error('Error loading business profile:', error);
+    }
+  };
+
+  const onRefresh = async () => {
+    setRefreshing(true);
+    await Promise.all([loadSettings(), loadBusinessProfile()]);
+    setRefreshing(false);
+  };
+
+  const updateBusinessProfile = async () => {
+    try {
+      await SettingsService.updateBusinessProfile(editingProfile);
+      setBusinessProfile(editingProfile);
+      setProfileModalVisible(false);
+      Alert.alert('Success', 'Business profile updated successfully');
+    } catch (error) {
+      console.error('Error updating business profile:', error);
+      Alert.alert('Error', 'Failed to update business profile');
+    }
+  };
+
+  const toggleSetting = async (key, value) => {
+    try {
+      await SettingsService.updateSetting(key, value, 'boolean');
+      // Update local state based on key
+      switch (key) {
+        case 'notifications_enabled':
+          setNotificationsEnabled(value);
+          break;
+        case 'dark_mode_enabled':
+          setDarkModeEnabled(value);
+          break;
+        case 'auto_backup_enabled':
+          setAutoBackupEnabled(value);
+          break;
+        case 'biometric_enabled':
+          setBiometricEnabled(value);
+          break;
+      }
+    } catch (error) {
+      console.error('Error updating setting:', error);
+      Alert.alert('Error', 'Failed to update setting');
+    }
+  };
+
   const settingsData = [
     {
       section: 'Account',
       items: [
-        { title: 'Business Profile', subtitle: 'Update business information', icon: '🏢', action: () => {} },
-        { title: 'User Settings', subtitle: 'Manage user preferences', icon: '👤', action: () => {} },
-        { title: 'Subscription', subtitle: 'Manage your plan', icon: '💳', badge: 'Pro', action: () => {} },
+        { 
+          title: 'Business Profile', 
+          subtitle: 'Update business information', 
+          icon: '🏢', 
+          action: () => setProfileModalVisible(true)
+        },
+        { 
+          title: 'Tax Settings', 
+          subtitle: 'GST and tax configuration', 
+          icon: '📋', 
+          action: () => Alert.alert('Coming Soon', 'Tax settings will be available soon')
+        },
+        { 
+          title: 'Subscription', 
+          subtitle: 'Manage your plan', 
+          icon: '💳', 
+          badge: 'Free', 
+          action: () => Alert.alert('Subscription', 'You are on the free plan')
+        },
       ]
     },
     {
@@ -45,7 +140,7 @@ const SettingsScreen = ({ navigation }) => {
           icon: '🔔', 
           toggle: true,
           value: notificationsEnabled,
-          onToggle: setNotificationsEnabled
+          onToggle: (value) => toggleSetting('notifications_enabled', value)
         },
         { 
           title: 'Dark Mode', 
@@ -53,7 +148,7 @@ const SettingsScreen = ({ navigation }) => {
           icon: '🌙', 
           toggle: true,
           value: darkModeEnabled,
-          onToggle: setDarkModeEnabled
+          onToggle: (value) => toggleSetting('dark_mode_enabled', value)
         },
         { 
           title: 'Auto Backup', 
@@ -61,7 +156,7 @@ const SettingsScreen = ({ navigation }) => {
           icon: '☁️', 
           toggle: true,
           value: autoBackupEnabled,
-          onToggle: setAutoBackupEnabled
+          onToggle: (value) => toggleSetting('auto_backup_enabled', value)
         },
         { 
           title: 'Biometric Lock', 
@@ -69,34 +164,89 @@ const SettingsScreen = ({ navigation }) => {
           icon: '🔐', 
           toggle: true,
           value: biometricEnabled,
-          onToggle: setBiometricEnabled
+          onToggle: (value) => toggleSetting('biometric_enabled', value)
         },
       ]
     },
     {
       section: 'Data & Privacy',
       items: [
-        { title: 'Backup & Restore', subtitle: 'Manage your data', icon: '💾', action: () => navigation.navigate('Search') },
-        { title: 'Export Data', subtitle: 'Download reports', icon: '📤', action: () => {} },
-        { title: 'Privacy Policy', subtitle: 'Terms and conditions', icon: '🛡️', action: () => {} },
-        { title: 'Data Usage', subtitle: 'Storage and sync', icon: '📊', action: () => {} },
+        { 
+          title: 'Backup & Restore', 
+          subtitle: 'Manage your data', 
+          icon: '💾', 
+          action: () => Alert.alert('Coming Soon', 'Backup features coming soon')
+        },
+        { 
+          title: 'Export Data', 
+          subtitle: 'Download reports', 
+          icon: '📤', 
+          action: () => navigation.navigate('Reports')
+        },
+        { 
+          title: 'Privacy Policy', 
+          subtitle: 'Terms and conditions', 
+          icon: '🛡️', 
+          action: () => Alert.alert('Privacy Policy', 'Privacy policy will be displayed here')
+        },
+        { 
+          title: 'Data Usage', 
+          subtitle: 'Storage and sync info', 
+          icon: '📊', 
+          action: () => Alert.alert('Data Usage', 'Total storage used: 2.5 MB')
+        },
       ]
     },
     {
       section: 'Support',
       items: [
-        { title: 'Help Center', subtitle: 'FAQs and guides', icon: '❓', action: () => {} },
-        { title: 'Contact Support', subtitle: 'Get help from our team', icon: '💬', action: () => {} },
-        { title: 'Feature Requests', subtitle: 'Suggest improvements', icon: '💡', action: () => {} },
-        { title: 'Rate App', subtitle: 'Share your feedback', icon: '⭐', action: () => {} },
+        { 
+          title: 'Help Center', 
+          subtitle: 'FAQs and guides', 
+          icon: '❓', 
+          action: () => Alert.alert('Help Center', 'Help documentation coming soon')
+        },
+        { 
+          title: 'Contact Support', 
+          subtitle: 'Get help from our team', 
+          icon: '💬', 
+          action: () => Alert.alert('Contact Support', 'Email: support@brojgar.com')
+        },
+        { 
+          title: 'Feature Requests', 
+          subtitle: 'Suggest improvements', 
+          icon: '💡', 
+          action: () => Alert.alert('Feature Requests', 'Send requests to: feedback@brojgar.com')
+        },
+        { 
+          title: 'Rate App', 
+          subtitle: 'Share your feedback', 
+          icon: '⭐', 
+          action: () => Alert.alert('Rate App', 'Thank you for using our app!')
+        },
       ]
     },
     {
       section: 'About',
       items: [
-        { title: 'App Version', subtitle: 'v2.1.0 (Build 234)', icon: '📱', action: () => {} },
-        { title: 'Terms of Service', subtitle: 'Legal information', icon: '📄', action: () => {} },
-        { title: 'Licenses', subtitle: 'Open source libraries', icon: '📋', action: () => {} },
+        { 
+          title: 'App Version', 
+          subtitle: 'v2.1.0 (Build 234)', 
+          icon: '📱', 
+          action: () => Alert.alert('Version Info', 'App Version: 2.1.0\nBuild: 234\nSDK: Expo 53')
+        },
+        { 
+          title: 'Terms of Service', 
+          subtitle: 'Legal information', 
+          icon: '📄', 
+          action: () => Alert.alert('Terms of Service', 'Terms of service will be displayed here')
+        },
+        { 
+          title: 'Licenses', 
+          subtitle: 'Open source libraries', 
+          icon: '📋', 
+          action: () => Alert.alert('Licenses', 'Open source licenses information')
+        },
       ]
     }
   ];
@@ -107,7 +257,11 @@ const SettingsScreen = ({ navigation }) => {
       'Are you sure you want to logout?',
       [
         { text: 'Cancel', style: 'cancel' },
-        { text: 'Logout', style: 'destructive', onPress: () => {} }
+        { 
+          text: 'Logout', 
+          style: 'destructive', 
+          onPress: () => Alert.alert('Logged Out', 'You have been logged out successfully')
+        }
       ]
     );
   };
@@ -171,7 +325,10 @@ const SettingsScreen = ({ navigation }) => {
             <Text style={styles.headerTitle}>Settings</Text>
             <Text style={styles.headerSubtitle}>Manage your app preferences</Text>
           </View>
-          <TouchableOpacity style={styles.notificationButton} onPress={() => navigation.navigate('Notifications')}>
+          <TouchableOpacity 
+            style={styles.notificationButton} 
+            onPress={() => navigation.navigate('Notifications')}
+          >
             <Text style={styles.notificationIcon}>🔔</Text>
             <View style={styles.notificationBadge}>
               <Text style={styles.notificationBadgeText}>3</Text>
@@ -179,18 +336,29 @@ const SettingsScreen = ({ navigation }) => {
           </TouchableOpacity>
         </View>
 
-        <ScrollView style={styles.scrollContent} showsVerticalScrollIndicator={false}>
+        <ScrollView 
+          style={styles.scrollContent} 
+          showsVerticalScrollIndicator={false}
+          refreshControl={
+            <RefreshControl refreshing={refreshing} onRefresh={onRefresh} />
+          }
+        >
           {/* User Profile Card */}
           <View style={styles.profileCard}>
             <View style={styles.profileAvatar}>
-              <Text style={styles.profileAvatarText}>JD</Text>
+              <Text style={styles.profileAvatarText}>
+                {businessProfile.businessName ? businessProfile.businessName.charAt(0) : 'B'}
+              </Text>
             </View>
             <View style={styles.profileInfo}>
-              <Text style={styles.profileName}>John Doe</Text>
-              <Text style={styles.profileEmail}>john.doe@example.com</Text>
-              <Text style={styles.profileBusiness}>Doe Electronics Store</Text>
+              <Text style={styles.profileName}>{businessProfile.businessName || 'Your Business'}</Text>
+              <Text style={styles.profileEmail}>{businessProfile.email || 'business@example.com'}</Text>
+              <Text style={styles.profileBusiness}>{businessProfile.ownerName || 'Business Owner'}</Text>
             </View>
-            <TouchableOpacity style={styles.editProfileButton}>
+            <TouchableOpacity 
+              style={styles.editProfileButton}
+              onPress={() => setProfileModalVisible(true)}
+            >
               <Text style={styles.editProfileText}>Edit</Text>
             </TouchableOpacity>
           </View>
@@ -209,6 +377,87 @@ const SettingsScreen = ({ navigation }) => {
           <View style={styles.bottomSpacer} />
         </ScrollView>
       </Animated.View>
+
+      {/* Business Profile Edit Modal */}
+      <Modal visible={profileModalVisible} animationType="slide" presentationStyle="pageSheet">
+        <SafeAreaView style={styles.modalContainer}>
+          <View style={styles.modalHeader}>
+            <TouchableOpacity onPress={() => setProfileModalVisible(false)}>
+              <Text style={styles.modalCloseText}>Cancel</Text>
+            </TouchableOpacity>
+            <Text style={styles.modalTitle}>Edit Business Profile</Text>
+            <TouchableOpacity onPress={updateBusinessProfile}>
+              <Text style={styles.modalSaveText}>Save</Text>
+            </TouchableOpacity>
+          </View>
+          
+          <ScrollView style={styles.modalContent}>
+            <View style={styles.formGroup}>
+              <Text style={styles.formLabel}>Business Name</Text>
+              <TextInput
+                style={styles.formInput}
+                value={editingProfile.businessName}
+                onChangeText={(text) => setEditingProfile({...editingProfile, businessName: text})}
+                placeholder="Enter business name"
+              />
+            </View>
+            
+            <View style={styles.formGroup}>
+              <Text style={styles.formLabel}>Owner Name</Text>
+              <TextInput
+                style={styles.formInput}
+                value={editingProfile.ownerName}
+                onChangeText={(text) => setEditingProfile({...editingProfile, ownerName: text})}
+                placeholder="Enter owner name"
+              />
+            </View>
+            
+            <View style={styles.formGroup}>
+              <Text style={styles.formLabel}>Email</Text>
+              <TextInput
+                style={styles.formInput}
+                value={editingProfile.email}
+                onChangeText={(text) => setEditingProfile({...editingProfile, email: text})}
+                placeholder="Enter email"
+                keyboardType="email-address"
+              />
+            </View>
+            
+            <View style={styles.formGroup}>
+              <Text style={styles.formLabel}>Phone</Text>
+              <TextInput
+                style={styles.formInput}
+                value={editingProfile.phone}
+                onChangeText={(text) => setEditingProfile({...editingProfile, phone: text})}
+                placeholder="Enter phone number"
+                keyboardType="phone-pad"
+              />
+            </View>
+            
+            <View style={styles.formGroup}>
+              <Text style={styles.formLabel}>GST Number</Text>
+              <TextInput
+                style={styles.formInput}
+                value={editingProfile.gstNumber}
+                onChangeText={(text) => setEditingProfile({...editingProfile, gstNumber: text})}
+                placeholder="Enter GST number"
+              />
+            </View>
+            
+            <View style={styles.formGroup}>
+              <Text style={styles.formLabel}>Address</Text>
+              <TextInput
+                style={[styles.formInput, styles.textArea]}
+                value={editingProfile.address}
+                onChangeText={(text) => setEditingProfile({...editingProfile, address: text})}
+                placeholder="Enter business address"
+                multiline
+                numberOfLines={3}
+              />
+            </View>
+          </ScrollView>
+        </SafeAreaView>
+      </Modal>
     </SafeAreaView>
   );
 };
@@ -451,6 +700,60 @@ const styles = StyleSheet.create({
   },
   bottomSpacer: {
     height: 40,
+  },
+  modalContainer: {
+    flex: 1,
+    backgroundColor: '#ffffff',
+  },
+  modalHeader: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    paddingHorizontal: 20,
+    paddingVertical: 16,
+    borderBottomWidth: 1,
+    borderBottomColor: '#e2e8f0',
+  },
+  modalCloseText: {
+    fontSize: 16,
+    color: '#64748b',
+  },
+  modalTitle: {
+    fontSize: 18,
+    fontWeight: 'bold',
+    color: '#0f172a',
+  },
+  modalSaveText: {
+    fontSize: 16,
+    fontWeight: '600',
+    color: '#3b82f6',
+  },
+  modalContent: {
+    flex: 1,
+    padding: 20,
+  },
+  formGroup: {
+    marginBottom: 20,
+  },
+  formLabel: {
+    fontSize: 14,
+    fontWeight: '600',
+    color: '#374151',
+    marginBottom: 8,
+  },
+  formInput: {
+    backgroundColor: '#f8fafc',
+    borderWidth: 1,
+    borderColor: '#e2e8f0',
+    borderRadius: 12,
+    paddingHorizontal: 16,
+    paddingVertical: 12,
+    fontSize: 16,
+    color: '#0f172a',
+  },
+  textArea: {
+    height: 80,
+    textAlignVertical: 'top',
   },
 });
 
