@@ -261,6 +261,82 @@ class DatabaseService {
     }
   }
 
+  // Insert minimal sample data for first-time users
+  async insertSampleData() {
+    if (Platform.OS === 'web') return;
+
+    try {
+      console.log('📝 Inserting minimal sample data...');
+      
+      // Check if sample data already exists
+      const existingParties = await this.db.getFirstAsync('SELECT COUNT(*) as count FROM parties');
+      if (existingParties.count > 0) {
+        console.log('ℹ️  Sample data already exists');
+        return;
+      }
+
+      // 1. Insert one sample category
+      await this.db.runAsync(`
+        INSERT INTO categories (name, icon, color, description, created_at, updated_at)
+        VALUES (?, ?, ?, ?, datetime('now'), datetime('now'))
+      `, ['Electronics', '📱', '#3b82f6', 'Mobile phones and accessories']);
+
+      // 2. Insert one sample customer
+      const customerResult = await this.db.runAsync(`
+        INSERT INTO parties (name, type, phone, email, address, outstanding_balance, created_at, updated_at)
+        VALUES (?, ?, ?, ?, ?, ?, datetime('now'), datetime('now'))
+      `, ['John Doe', 'Customer', '+91 98765 43210', 'john@example.com', 'Sample Address, City', 5000]);
+
+      const customerId = customerResult.lastInsertRowId;
+
+      // 3. Insert one sample item
+      const itemResult = await this.db.runAsync(`
+        INSERT INTO inventory_items (name, description, category_id, sku, unit, purchase_price, sale_price, current_stock, min_stock, created_at, updated_at)
+        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, datetime('now'), datetime('now'))
+      `, ['Sample Product', 'Demo product for testing', 1, 'DEMO-001', 'pcs', 100, 150, 10, 5]);
+
+      const itemId = itemResult.lastInsertRowId;
+
+      // 4. Insert one sample invoice
+      const invoiceResult = await this.db.runAsync(`
+        INSERT INTO invoices (invoice_number, party_id, invoice_date, due_date, subtotal, tax_amount, total, status, created_at, updated_at)
+        VALUES (?, ?, ?, ?, ?, ?, ?, ?, datetime('now'), datetime('now'))
+      `, ['INV-2024-001', customerId, new Date().toISOString().split('T')[0], new Date(Date.now() + 30 * 24 * 60 * 60 * 1000).toISOString().split('T')[0], 150, 27, 177, 'pending']);
+
+      const invoiceId = invoiceResult.lastInsertRowId;
+
+      // 5. Insert one invoice item
+      await this.db.runAsync(`
+        INSERT INTO invoice_items (invoice_id, item_id, item_name, quantity, unit_price, tax_rate, total, created_at, updated_at)
+        VALUES (?, ?, ?, ?, ?, ?, ?, datetime('now'), datetime('now'))
+      `, [invoiceId, itemId, 'Sample Product', 1, 150, 18, 150]);
+
+      // 6. Insert one sample transaction
+      await this.db.runAsync(`
+        INSERT INTO transactions (reference_number, party_id, type, amount, payment_method, transaction_date, description, invoice_id, created_at, updated_at)
+        VALUES (?, ?, ?, ?, ?, ?, ?, ?, datetime('now'), datetime('now'))
+      `, ['TXN-001', customerId, 'sale', 177, 'cash', new Date().toISOString().split('T')[0], 'Sample transaction', invoiceId]);
+
+      // 7. Insert one welcome notification
+      await this.db.runAsync(`
+        INSERT INTO notifications (title, message, type, priority, created_at, updated_at)
+        VALUES (?, ?, ?, ?, datetime('now'), datetime('now'))
+      `, ['Welcome to Brojgar Business!', 'Your business app is ready. Start by exploring the dashboard.', 'info', 'low']);
+
+      // 8. Update business name
+      await this.db.runAsync(`
+        INSERT OR REPLACE INTO business_settings (setting_key, setting_value, created_at, updated_at)
+        VALUES (?, ?, datetime('now'), datetime('now'))
+      `, ['business_name', 'Sample Business']);
+
+      console.log('✅ Minimal sample data created: 1 customer, 1 product, 1 invoice, 1 transaction');
+      
+    } catch (error) {
+      console.error('❌ Error inserting sample data:', error);
+      throw error;
+    }
+  }
+
   // Insert initial data
   async insertInitialData() {
     if (Platform.OS === 'web') return;
@@ -278,7 +354,7 @@ class DatabaseService {
         return;
       }
 
-      // Insert default settings
+      // Insert default settings first
       const defaultSettings = [
         { setting_key: 'business_name', setting_value: 'Your Business Name' },
         { setting_key: 'owner_name', setting_value: 'Business Owner' },
@@ -298,6 +374,9 @@ class DatabaseService {
           [setting.setting_key, setting.setting_value]
         );
       }
+
+      // Insert sample data for better user experience
+      await this.insertSampleData();
 
       console.log('✅ Initial data inserted successfully');
     } catch (error) {
