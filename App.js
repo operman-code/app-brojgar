@@ -21,12 +21,15 @@ export default function App() {
     try {
       console.log('🚀 Initializing Brojgar Business App...');
       
-      // RESET DATABASE - Run this ONCE then comment out
+      // RESET DATABASE FIRST - Run this ONCE then comment out
       await resetDatabase();
       
-      // Initialize database first
+      // Initialize database AFTER reset
       await DatabaseService.init();
       console.log('✅ Database initialized');
+      
+      // Small delay to ensure database is ready
+      await new Promise(resolve => setTimeout(resolve, 1000));
       
       // Initialize all services with error handling
       try {
@@ -80,6 +83,10 @@ export default function App() {
     try {
       console.log('🗑️ Resetting database completely...');
       
+      // Get database connection without initializing
+      const SQLite = require('expo-sqlite');
+      const db = await SQLite.openDatabaseAsync('brojgar_business.db');
+      
       // Drop all tables
       const tables = [
         'parties', 'inventory_items', 'categories', 'invoices', 
@@ -87,18 +94,16 @@ export default function App() {
         'business_settings', 'recent_searches', 'backups'
       ];
       
-      const db = await DatabaseService.getDatabase();
-      if (db) {
-        for (const table of tables) {
-          try {
-            await db.execAsync(`DROP TABLE IF EXISTS ${table}`);
-            console.log(`Dropped table: ${table}`);
-          } catch (error) {
-            console.warn(`Could not drop table ${table}:`, error);
-          }
+      for (const table of tables) {
+        try {
+          await db.execAsync(`DROP TABLE IF EXISTS ${table}`);
+          console.log(`✅ Dropped table: ${table}`);
+        } catch (error) {
+          console.warn(`Could not drop table ${table}:`, error);
         }
       }
       
+      await db.closeAsync();
       console.log('✅ Database reset complete');
     } catch (error) {
       console.error('❌ Error resetting database:', error);
