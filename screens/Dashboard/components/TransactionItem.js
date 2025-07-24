@@ -3,82 +3,64 @@ import React from 'react';
 import { View, Text, TouchableOpacity, StyleSheet } from 'react-native';
 
 const TransactionItem = ({ transaction, onPress }) => {
-  const formatAmount = (amount) => {
-    if (typeof amount === 'number') {
-      return `₹${amount.toLocaleString('en-IN')}`;
-    }
-    return amount;
-  };
-
-  const formatDate = (dateString) => {
-    if (!dateString) return '';
-    const date = new Date(dateString);
-    return date.toLocaleDateString('en-IN', {
-      day: 'numeric',
-      month: 'short'
-    });
-  };
-
-  const getStatusColor = (status) => {
-    switch (status?.toLowerCase()) {
-      case 'paid':
-      case 'received':
-      case 'completed':
-        return '#10b981';
-      case 'pending':
-      case 'due':
-        return '#f59e0b';
-      case 'overdue':
-      case 'cancelled':
-        return '#ef4444';
+  const getTypeIcon = (type) => {
+    switch (type) {
+      case 'income':
+        return '💰';
+      case 'expense':
+        return '💳';
+      case 'sale':
+        return '🛒';
       default:
-        return '#6b7280';
+        return '📋';
     }
   };
 
   const getTypeColor = (type) => {
-    switch (type?.toLowerCase()) {
-      case 'sale':
+    switch (type) {
       case 'income':
+      case 'sale':
         return '#10b981';
-      case 'purchase':
       case 'expense':
         return '#ef4444';
-      case 'payment':
-        return '#3b82f6';
       default:
         return '#6b7280';
     }
   };
 
+  const formatDate = (dateString) => {
+    try {
+      const date = new Date(dateString);
+      return date.toLocaleDateString('en-IN');
+    } catch (error) {
+      return dateString;
+    }
+  };
+
+  const formatAmount = (amount) => {
+    if (typeof amount === 'number') {
+      return amount.toLocaleString('en-IN');
+    }
+    return amount || '0';
+  };
+
   return (
-    <TouchableOpacity style={styles.container} onPress={onPress} activeOpacity={0.7}>
+    <TouchableOpacity style={styles.container} onPress={onPress}>
       <View style={styles.leftSection}>
-        <View style={[styles.iconContainer, { backgroundColor: getTypeColor(transaction.type) }]}>
-          <Text style={styles.icon}>{transaction.icon || '💼'}</Text>
+        <View style={[styles.iconContainer, { backgroundColor: getTypeColor(transaction.type) + '20' }]}>
+          <Text style={styles.icon}>{getTypeIcon(transaction.type)}</Text>
         </View>
-        
         <View style={styles.details}>
-          <Text style={styles.customer} numberOfLines={1}>
-            {transaction.customer || 'Unknown'}
-          </Text>
-          <View style={styles.subDetails}>
-            <Text style={styles.reference}>{transaction.reference}</Text>
-            <Text style={styles.separator}>•</Text>
-            <Text style={styles.date}>{formatDate(transaction.date)}</Text>
-          </View>
+          <Text style={styles.customer}>{transaction.customer || transaction.description || 'Transaction'}</Text>
+          <Text style={styles.reference}>{transaction.reference || `#${transaction.id}`}</Text>
+          <Text style={styles.date}>{formatDate(transaction.date || transaction.created_at)}</Text>
         </View>
       </View>
-
       <View style={styles.rightSection}>
         <Text style={[styles.amount, { color: getTypeColor(transaction.type) }]}>
-          {formatAmount(transaction.amount)}
+          ₹{formatAmount(transaction.amount)}
         </Text>
-        {transaction.status && (
-          <View style={[styles.statusBadge, { backgroundColor: getStatusColor(transaction.status) }]}>
-            <Text style={styles.statusText}>{transaction.status}</Text>
-          </View>
-        )}
+        <Text style={styles.type}>{transaction.type}</Text>
       </View>
     </TouchableOpacity>
   );
@@ -87,12 +69,19 @@ const TransactionItem = ({ transaction, onPress }) => {
 const styles = StyleSheet.create({
   container: {
     flexDirection: 'row',
-    justifyContent: 'space-between',
     alignItems: 'center',
-    paddingVertical: 12,
-    paddingHorizontal: 16,
-    borderBottomWidth: 1,
-    borderBottomColor: '#f3f4f6',
+    backgroundColor: '#ffffff',
+    padding: 16,
+    marginVertical: 4,
+    borderRadius: 8,
+    shadowColor: '#000',
+    shadowOffset: {
+      width: 0,
+      height: 1,
+    },
+    shadowOpacity: 0.1,
+    shadowRadius: 2,
+    elevation: 2,
   },
   leftSection: {
     flexDirection: 'row',
@@ -103,12 +92,12 @@ const styles = StyleSheet.create({
     width: 40,
     height: 40,
     borderRadius: 20,
-    justifyContent: 'center',
     alignItems: 'center',
+    justifyContent: 'center',
     marginRight: 12,
   },
   icon: {
-    fontSize: 16,
+    fontSize: 20,
   },
   details: {
     flex: 1,
@@ -119,23 +108,14 @@ const styles = StyleSheet.create({
     color: '#111827',
     marginBottom: 2,
   },
-  subDetails: {
-    flexDirection: 'row',
-    alignItems: 'center',
-  },
   reference: {
-    fontSize: 12,
+    fontSize: 14,
     color: '#6b7280',
-    fontWeight: '500',
-  },
-  separator: {
-    fontSize: 12,
-    color: '#d1d5db',
-    marginHorizontal: 6,
+    marginBottom: 2,
   },
   date: {
     fontSize: 12,
-    color: '#6b7280',
+    color: '#9ca3af',
   },
   rightSection: {
     alignItems: 'flex-end',
@@ -143,17 +123,11 @@ const styles = StyleSheet.create({
   amount: {
     fontSize: 16,
     fontWeight: 'bold',
-    marginBottom: 4,
+    marginBottom: 2,
   },
-  statusBadge: {
-    paddingHorizontal: 8,
-    paddingVertical: 2,
-    borderRadius: 12,
-  },
-  statusText: {
-    color: '#ffffff',
-    fontSize: 10,
-    fontWeight: '600',
+  type: {
+    fontSize: 12,
+    color: '#6b7280',
     textTransform: 'capitalize',
   },
 });
