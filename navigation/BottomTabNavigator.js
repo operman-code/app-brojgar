@@ -1,50 +1,17 @@
 import React, { useState } from "react";
 import { createBottomTabNavigator } from "@react-navigation/bottom-tabs";
-import DashboardScreen from "../screens/Dashboard/DashboardScreen";
-import PartiesScreen from "../screens/Parties/PartiesScreen";
-import InventoryScreen from "../screens/Inventory/InventoryScreen";
-import ReportsScreen from "../screens/Reports/ReportsScreen";
-import SettingsScreen from "../screens/Settings/SettingsScreen";
-import InvoiceScreen from "../screens/Invoice/InvoiceScreen";
-import InvoiceTemplateScreen from "../screens/Invoice/InvoiceTemplateScreen";
+import DashboardScreen from "../screens/Dashboard/DashboardScreenMyBillBook";
+import PartiesScreen from "../screens/Parties/PartiesScreenMyBillBook";
+import InventoryScreen from "../screens/Inventory/InventoryScreenMyBillBook";
+import ReportsScreen from "../screens/Reports/ReportsScreenMyBillBook";
+import SettingsScreen from "../screens/Settings/SettingsScreenMyBillBook";
+import InvoiceScreen from "../screens/Invoice/InvoiceScreenMyBillBook";
+import InvoiceTemplateScreen from "../screens/Invoice/InvoiceTemplateScreenMyBillBook";
+import NotificationScreen from "../screens/Notifications/NotificationScreenMyBillBook";
+import GlobalSearchScreen from "../screens/Search/GlobalSearchScreenMyBillBook";
 import { View, Text, TouchableOpacity } from "react-native";
 
 const Tab = createBottomTabNavigator();
-
-const PlaceholderScreen = ({ name }) => (
-  <View style={{ 
-    flex: 1, 
-    justifyContent: "center", 
-    alignItems: "center", 
-    backgroundColor: "#f9fafb",
-    padding: 20
-  }}>
-    <Text style={{ 
-      fontSize: 24, 
-      fontWeight: "bold", 
-      color: "#374151",
-      marginBottom: 8
-    }}>
-      {name}
-    </Text>
-    <Text style={{ 
-      fontSize: 16, 
-      color: "#6b7280", 
-      textAlign: "center",
-      marginBottom: 20
-    }}>
-      Coming Soon...
-    </Text>
-    <Text style={{ 
-      fontSize: 14, 
-      color: "#9ca3af", 
-      textAlign: "center",
-      lineHeight: 20
-    }}>
-      This feature is under development and will be available in the next update.
-    </Text>
-  </View>
-);
 
 const BottomTabNavigator = () => {
   const [currentScreen, setCurrentScreen] = useState('main');
@@ -57,7 +24,19 @@ const BottomTabNavigator = () => {
       } else if (screen === "InvoiceTemplate") {
         setCurrentScreen('invoiceTemplate');
         setInvoiceData(params?.invoiceData);
+      } else if (screen === "Notifications") {
+        setCurrentScreen('notifications');
+      } else if (screen === "Search") {
+        setCurrentScreen('search');
       } else if (screen === "Dashboard") {
+        setCurrentScreen('main');
+      } else if (screen === "Parties") {
+        setCurrentScreen('main');
+      } else if (screen === "Inventory") {
+        setCurrentScreen('main');
+      } else if (screen === "Reports") {
+        setCurrentScreen('main');
+      } else if (screen === "Settings") {
         setCurrentScreen('main');
       }
     },
@@ -65,6 +44,8 @@ const BottomTabNavigator = () => {
       if (currentScreen === 'invoiceTemplate') {
         setCurrentScreen('invoice');
       } else if (currentScreen === 'invoice') {
+        setCurrentScreen('main');
+      } else if (currentScreen === 'notifications' || currentScreen === 'search') {
         setCurrentScreen('main');
       }
     }
@@ -78,39 +59,45 @@ const BottomTabNavigator = () => {
     return <InvoiceTemplateScreen navigation={navigation} route={{ params: { invoiceData } }} />;
   }
 
+  if (currentScreen === 'notifications') {
+    return <NotificationScreen navigation={navigation} />;
+  }
+
+  if (currentScreen === 'search') {
+    return <GlobalSearchScreen navigation={navigation} />;
+  }
+
   return (
     <Tab.Navigator
       screenOptions={({ route }) => ({
         headerShown: false,
         tabBarActiveTintColor: "#3b82f6",
-        tabBarInactiveTintColor: "#9ca3af",
+        tabBarInactiveTintColor: "#64748b",
         tabBarStyle: {
           backgroundColor: "#ffffff",
           borderTopWidth: 0,
-          paddingTop: 12,
-          paddingBottom: 12,
-          height: 75,
+          paddingTop: 8,
+          paddingBottom: 8,
+          height: 70,
           shadowColor: "#000",
           shadowOffset: {
             width: 0,
-            height: -4,
+            height: -2,
           },
-          shadowOpacity: 0.15,
-          shadowRadius: 8,
-          elevation: 10,
-          borderTopLeftRadius: 20,
-          borderTopRightRadius: 20,
+          shadowOpacity: 0.08,
+          shadowRadius: 12,
+          elevation: 8,
         },
         tabBarLabelStyle: {
-          fontSize: 11,
+          fontSize: 12,
           fontWeight: "600",
           marginTop: 4,
         },
         tabBarIconStyle: {
-          marginBottom: 2,
+          marginBottom: 0,
         },
         tabBarItemStyle: {
-          paddingVertical: 4,
+          paddingVertical: 8,
         },
         tabBarButton: (props) => (
           <TouchableOpacity
@@ -135,15 +122,14 @@ const BottomTabNavigator = () => {
             <View style={{
               alignItems: 'center',
               justifyContent: 'center',
-              width: 50,
-              height: 50,
-              borderRadius: 25,
+              width: 40,
+              height: 40,
+              borderRadius: 12,
               backgroundColor: focused ? '#eff6ff' : 'transparent',
             }}>
               <Text style={{ 
-                fontSize: focused ? 24 : 20, 
-                opacity: focused ? 1 : 0.6,
-                transform: [{ scale: focused ? 1.1 : 1 }]
+                fontSize: 20, 
+                opacity: focused ? 1 : 0.7,
               }}>
                 🏠
               </Text>
@@ -159,15 +145,14 @@ const BottomTabNavigator = () => {
             <View style={{
               alignItems: 'center',
               justifyContent: 'center',
-              width: 50,
-              height: 50,
-              borderRadius: 25,
+              width: 40,
+              height: 40,
+              borderRadius: 12,
               backgroundColor: focused ? '#eff6ff' : 'transparent',
             }}>
               <Text style={{ 
-                fontSize: focused ? 24 : 20, 
-                opacity: focused ? 1 : 0.6,
-                transform: [{ scale: focused ? 1.1 : 1 }]
+                fontSize: 20, 
+                opacity: focused ? 1 : 0.7,
               }}>
                 👥
               </Text>
@@ -183,15 +168,14 @@ const BottomTabNavigator = () => {
             <View style={{
               alignItems: 'center',
               justifyContent: 'center',
-              width: 50,
-              height: 50,
-              borderRadius: 25,
+              width: 40,
+              height: 40,
+              borderRadius: 12,
               backgroundColor: focused ? '#eff6ff' : 'transparent',
             }}>
               <Text style={{ 
-                fontSize: focused ? 24 : 20, 
-                opacity: focused ? 1 : 0.6,
-                transform: [{ scale: focused ? 1.1 : 1 }]
+                fontSize: 20, 
+                opacity: focused ? 1 : 0.7,
               }}>
                 📦
               </Text>
@@ -207,15 +191,14 @@ const BottomTabNavigator = () => {
             <View style={{
               alignItems: 'center',
               justifyContent: 'center',
-              width: 50,
-              height: 50,
-              borderRadius: 25,
+              width: 40,
+              height: 40,
+              borderRadius: 12,
               backgroundColor: focused ? '#eff6ff' : 'transparent',
             }}>
               <Text style={{ 
-                fontSize: focused ? 24 : 20, 
-                opacity: focused ? 1 : 0.6,
-                transform: [{ scale: focused ? 1.1 : 1 }]
+                fontSize: 20, 
+                opacity: focused ? 1 : 0.7,
               }}>
                 📊
               </Text>
@@ -231,15 +214,14 @@ const BottomTabNavigator = () => {
             <View style={{
               alignItems: 'center',
               justifyContent: 'center',
-              width: 50,
-              height: 50,
-              borderRadius: 25,
+              width: 40,
+              height: 40,
+              borderRadius: 12,
               backgroundColor: focused ? '#eff6ff' : 'transparent',
             }}>
               <Text style={{ 
-                fontSize: focused ? 24 : 20, 
-                opacity: focused ? 1 : 0.6,
-                transform: [{ scale: focused ? 1.1 : 1 }]
+                fontSize: 20, 
+                opacity: focused ? 1 : 0.7,
               }}>
                 ⚙️
               </Text>

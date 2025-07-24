@@ -1,567 +1,214 @@
-// screens/Settings/SettingsScreen.js
-import React, { useState, useEffect } from "react";
+import React, { useState, useEffect } from 'react';
 import {
   View,
   Text,
-  TouchableOpacity,
   StyleSheet,
   ScrollView,
   SafeAreaView,
+  TouchableOpacity,
   StatusBar,
-  Alert,
+  Animated,
   Switch,
-  TextInput,
-  Modal,
-} from "react-native";
+  Alert,
+} from 'react-native';
 
-// Import service
-import SettingsService from "./services/SettingsService";
-
-const SettingsScreen = () => {
-  const [settings, setSettings] = useState({});
-  const [loading, setLoading] = useState(true);
-  const [saving, setSaving] = useState(false);
-  const [backingUp, setBackingUp] = useState(false);
-  const [editModalVisible, setEditModalVisible] = useState(false);
-  const [editField, setEditField] = useState("");
-  const [editValue, setEditValue] = useState("");
-  const [editLabel, setEditLabel] = useState("");
+const SettingsScreen = ({ navigation }) => {
+  const [fadeAnim] = useState(new Animated.Value(0));
+  const [notificationsEnabled, setNotificationsEnabled] = useState(true);
+  const [darkModeEnabled, setDarkModeEnabled] = useState(false);
+  const [autoBackupEnabled, setAutoBackupEnabled] = useState(true);
+  const [biometricEnabled, setBiometricEnabled] = useState(false);
 
   useEffect(() => {
-    loadSettings();
+    Animated.timing(fadeAnim, {
+      toValue: 1,
+      duration: 600,
+      useNativeDriver: true,
+    }).start();
   }, []);
 
-  const loadSettings = async () => {
-    setLoading(true);
-    try {
-      const settingsData = await SettingsService.getSettings();
-      setSettings(settingsData);
-    } catch (error) {
-      console.error('❌ Error loading settings:', error);
-      Alert.alert("Error", "Failed to load settings");
-    } finally {
-      setLoading(false);
+  const settingsData = [
+    {
+      section: 'Account',
+      items: [
+        { title: 'Business Profile', subtitle: 'Update business information', icon: '🏢', action: () => {} },
+        { title: 'User Settings', subtitle: 'Manage user preferences', icon: '👤', action: () => {} },
+        { title: 'Subscription', subtitle: 'Manage your plan', icon: '💳', badge: 'Pro', action: () => {} },
+      ]
+    },
+    {
+      section: 'App Preferences',
+      items: [
+        { 
+          title: 'Notifications', 
+          subtitle: 'Push notifications', 
+          icon: '🔔', 
+          toggle: true,
+          value: notificationsEnabled,
+          onToggle: setNotificationsEnabled
+        },
+        { 
+          title: 'Dark Mode', 
+          subtitle: 'App appearance', 
+          icon: '🌙', 
+          toggle: true,
+          value: darkModeEnabled,
+          onToggle: setDarkModeEnabled
+        },
+        { 
+          title: 'Auto Backup', 
+          subtitle: 'Daily data backup', 
+          icon: '☁️', 
+          toggle: true,
+          value: autoBackupEnabled,
+          onToggle: setAutoBackupEnabled
+        },
+        { 
+          title: 'Biometric Lock', 
+          subtitle: 'Fingerprint/Face ID', 
+          icon: '🔐', 
+          toggle: true,
+          value: biometricEnabled,
+          onToggle: setBiometricEnabled
+        },
+      ]
+    },
+    {
+      section: 'Data & Privacy',
+      items: [
+        { title: 'Backup & Restore', subtitle: 'Manage your data', icon: '💾', action: () => navigation.navigate('Search') },
+        { title: 'Export Data', subtitle: 'Download reports', icon: '📤', action: () => {} },
+        { title: 'Privacy Policy', subtitle: 'Terms and conditions', icon: '🛡️', action: () => {} },
+        { title: 'Data Usage', subtitle: 'Storage and sync', icon: '📊', action: () => {} },
+      ]
+    },
+    {
+      section: 'Support',
+      items: [
+        { title: 'Help Center', subtitle: 'FAQs and guides', icon: '❓', action: () => {} },
+        { title: 'Contact Support', subtitle: 'Get help from our team', icon: '💬', action: () => {} },
+        { title: 'Feature Requests', subtitle: 'Suggest improvements', icon: '💡', action: () => {} },
+        { title: 'Rate App', subtitle: 'Share your feedback', icon: '⭐', action: () => {} },
+      ]
+    },
+    {
+      section: 'About',
+      items: [
+        { title: 'App Version', subtitle: 'v2.1.0 (Build 234)', icon: '📱', action: () => {} },
+        { title: 'Terms of Service', subtitle: 'Legal information', icon: '📄', action: () => {} },
+        { title: 'Licenses', subtitle: 'Open source libraries', icon: '📋', action: () => {} },
+      ]
     }
-  };
+  ];
 
-  const updateSetting = async (key, value) => {
-    try {
-      await SettingsService.updateSetting(key, value);
-      setSettings(prev => ({ ...prev, [key]: value }));
-    } catch (error) {
-      console.error('❌ Error updating setting:', error);
-      Alert.alert("Error", "Failed to update setting");
-    }
-  };
-
-  const openEditModal = (field, label, currentValue) => {
-    setEditField(field);
-    setEditLabel(label);
-    setEditValue(currentValue?.toString() || "");
-    setEditModalVisible(true);
-  };
-
-  const saveEditValue = async () => {
-    if (!editValue.trim()) {
-      Alert.alert("Error", "Value cannot be empty");
-      return;
-    }
-
-    try {
-      let value = editValue.trim();
-      
-      // Convert to appropriate type
-      if (['defaultCreditLimit', 'monthlySalesTarget', 'defaultTaxRate', 'defaultMinStockLevel', 'defaultMaxStockLevel'].includes(editField)) {
-        value = parseFloat(value) || 0;
-      }
-
-      await updateSetting(editField, value);
-      setEditModalVisible(false);
-      Alert.alert("Success", "Setting updated successfully");
-    } catch (error) {
-      console.error('❌ Error saving edit value:', error);
-      Alert.alert("Error", "Failed to save setting");
-    }
-  };
-
-  const handleBackupDatabase = async () => {
+  const handleLogout = () => {
     Alert.alert(
-      "Backup Database",
-      "This will create a backup of all your business data. The backup file will be shared so you can save it to Google Drive or other cloud storage.",
+      'Logout',
+      'Are you sure you want to logout?',
       [
-        { text: "Cancel", style: "cancel" },
-        {
-          text: "Create Backup",
-          onPress: async () => {
-            setBackingUp(true);
-            try {
-              const result = await SettingsService.backupDatabase();
-              if (result.success) {
-                Alert.alert("Success", "Database backup created and shared successfully!");
-              } else {
-                Alert.alert("Error", result.error || "Failed to create backup");
-              }
-            } catch (error) {
-              console.error('❌ Error creating backup:', error);
-              Alert.alert("Error", "Failed to create database backup");
-            } finally {
-              setBackingUp(false);
-            }
-          }
-        }
+        { text: 'Cancel', style: 'cancel' },
+        { text: 'Logout', style: 'destructive', onPress: () => {} }
       ]
     );
   };
 
-  const handleExportData = async () => {
-    Alert.alert(
-      "Export Data",
-      "This will export all your business data in JSON format for analysis or migration purposes.",
-      [
-        { text: "Cancel", style: "cancel" },
-        {
-          text: "Export",
-          onPress: async () => {
-            try {
-              const result = await SettingsService.exportAllData();
-              if (result.success) {
-                Alert.alert("Success", "Data exported successfully!");
-              } else {
-                Alert.alert("Error", result.error || "Failed to export data");
-              }
-            } catch (error) {
-              console.error('❌ Error exporting data:', error);
-              Alert.alert("Error", "Failed to export data");
-            }
-          }
-        }
-      ]
-    );
-  };
-
-  const handleClearAllData = () => {
-    Alert.alert(
-      "⚠️ Clear All Data",
-      "This will permanently delete ALL your business data including customers, inventory, invoices, and settings. This action cannot be undone!\n\nPlease create a backup first.",
-      [
-        { text: "Cancel", style: "cancel" },
-        {
-          text: "Clear All Data",
-          style: "destructive",
-          onPress: () => {
-            Alert.alert(
-              "Final Confirmation",
-              "Are you absolutely sure you want to delete all data? This cannot be undone!",
-              [
-                { text: "Cancel", style: "cancel" },
-                {
-                  text: "Yes, Delete All",
-                  style: "destructive",
-                  onPress: async () => {
-                    try {
-                      const result = await SettingsService.clearAllData();
-                      if (result.success) {
-                        Alert.alert("Success", "All data has been cleared");
-                        await loadSettings(); // Reload default settings
-                      } else {
-                        Alert.alert("Error", result.error || "Failed to clear data");
-                      }
-                    } catch (error) {
-                      console.error('❌ Error clearing data:', error);
-                      Alert.alert("Error", "Failed to clear data");
-                    }
-                  }
-                }
-              ]
-            );
-          }
-        }
-      ]
-    );
-  };
-
-  const renderSettingItem = ({ title, value, onPress, type = "text", icon = "" }) => (
-    <TouchableOpacity style={styles.settingItem} onPress={onPress}>
-      <View style={styles.settingContent}>
-        <Text style={styles.settingIcon}>{icon}</Text>
-        <View style={styles.settingTextContainer}>
-          <Text style={styles.settingTitle}>{title}</Text>
-          {type === "switch" ? null : (
-            <Text style={styles.settingValue}>{value}</Text>
-          )}
+  const renderSettingsItem = (item, index) => (
+    <TouchableOpacity
+      key={index}
+      style={styles.settingsItem}
+      onPress={item.action}
+      disabled={item.toggle}
+    >
+      <View style={styles.itemLeft}>
+        <View style={styles.itemIcon}>
+          <Text style={styles.itemIconText}>{item.icon}</Text>
+        </View>
+        <View style={styles.itemContent}>
+          <View style={styles.itemTitleRow}>
+            <Text style={styles.itemTitle}>{item.title}</Text>
+            {item.badge && (
+              <View style={styles.badge}>
+                <Text style={styles.badgeText}>{item.badge}</Text>
+              </View>
+            )}
+          </View>
+          <Text style={styles.itemSubtitle}>{item.subtitle}</Text>
         </View>
       </View>
-      {type === "switch" ? (
-        <Switch
-          value={value}
-          onValueChange={onPress}
-          trackColor={{ false: "#E2E8F0", true: "#3B82F6" }}
-          thumbColor={value ? "#FFFFFF" : "#64748B"}
-        />
-      ) : (
-        <Text style={styles.settingArrow}>→</Text>
-      )}
+      <View style={styles.itemRight}>
+        {item.toggle ? (
+          <Switch
+            value={item.value}
+            onValueChange={item.onToggle}
+            trackColor={{ false: '#e5e7eb', true: '#3b82f6' }}
+            thumbColor={item.value ? '#ffffff' : '#ffffff'}
+            style={styles.switch}
+          />
+        ) : (
+          <Text style={styles.chevron}>›</Text>
+        )}
+      </View>
     </TouchableOpacity>
   );
 
-  const renderActionButton = ({ title, onPress, color = "#3B82F6", icon = "", loading = false }) => (
-    <TouchableOpacity 
-      style={[styles.actionButton, { backgroundColor: color }]} 
-      onPress={onPress}
-      disabled={loading}
-    >
-      <Text style={styles.actionButtonIcon}>{icon}</Text>
-      <Text style={styles.actionButtonText}>
-        {loading ? "Processing..." : title}
-      </Text>
-    </TouchableOpacity>
+  const renderSection = (section, sectionIndex) => (
+    <View key={sectionIndex} style={styles.section}>
+      <Text style={styles.sectionTitle}>{section.section}</Text>
+      <View style={styles.sectionCard}>
+        {section.items.map((item, index) => renderSettingsItem(item, index))}
+      </View>
+    </View>
   );
-
-  if (loading) {
-    return (
-      <SafeAreaView style={styles.container}>
-        <StatusBar barStyle="dark-content" />
-        <View style={styles.loadingContainer}>
-          <Text style={styles.loadingText}>Loading Settings...</Text>
-        </View>
-      </SafeAreaView>
-    );
-  }
 
   return (
     <SafeAreaView style={styles.container}>
-      <StatusBar barStyle="dark-content" />
-
-      {/* Header */}
-      <View style={styles.header}>
-        <Text style={styles.headerTitle}>Settings</Text>
-        <TouchableOpacity
-          style={styles.saveButton}
-          onPress={() => Alert.alert("Info", "Settings are saved automatically")}
-        >
-          <Text style={styles.saveButtonText}>ℹ️ Auto-Save</Text>
-        </TouchableOpacity>
-      </View>
-
-      <ScrollView style={styles.content} showsVerticalScrollIndicator={false}>
-        {/* Business Configuration */}
-        <View style={styles.section}>
-          <Text style={styles.sectionTitle}>Business Configuration</Text>
-          
-          {renderSettingItem({
-            title: "Business Name",
-            value: settings.businessName || "Not Set",
-            onPress: () => openEditModal("businessName", "Business Name", settings.businessName),
-            icon: "🏢"
-          })}
-          
-          {renderSettingItem({
-            title: "Owner Name",
-            value: settings.ownerName || "Not Set",
-            onPress: () => openEditModal("ownerName", "Owner Name", settings.ownerName),
-            icon: "👤"
-          })}
-          
-          {renderSettingItem({
-            title: "Phone Number",
-            value: settings.phoneNumber || "Not Set",
-            onPress: () => openEditModal("phoneNumber", "Phone Number", settings.phoneNumber),
-            icon: "📞"
-          })}
-          
-          {renderSettingItem({
-            title: "Email Address",
-            value: settings.emailAddress || "Not Set",
-            onPress: () => openEditModal("emailAddress", "Email Address", settings.emailAddress),
-            icon: "📧"
-          })}
-          
-          {renderSettingItem({
-            title: "GST Number",
-            value: settings.gstNumber || "Not Set",
-            onPress: () => openEditModal("gstNumber", "GST Number", settings.gstNumber),
-            icon: "🏛️"
-          })}
-          
-          {renderSettingItem({
-            title: "Business Address",
-            value: settings.businessAddress || "Not Set",
-            onPress: () => openEditModal("businessAddress", "Business Address", settings.businessAddress),
-            icon: "📍"
-          })}
-        </View>
-
-        {/* Financial Settings */}
-        <View style={styles.section}>
-          <Text style={styles.sectionTitle}>Financial Settings</Text>
-          
-          {renderSettingItem({
-            title: "Default Credit Limit",
-            value: `₹${(settings.defaultCreditLimit || 0).toLocaleString('en-IN')}`,
-            onPress: () => openEditModal("defaultCreditLimit", "Default Credit Limit (₹)", settings.defaultCreditLimit),
-            icon: "💳"
-          })}
-          
-          {renderSettingItem({
-            title: "Monthly Sales Target",
-            value: `₹${(settings.monthlySalesTarget || 0).toLocaleString('en-IN')}`,
-            onPress: () => openEditModal("monthlySalesTarget", "Monthly Sales Target (₹)", settings.monthlySalesTarget),
-            icon: "🎯"
-          })}
-          
-          {renderSettingItem({
-            title: "Currency",
-            value: settings.currency || "₹ INR",
-            onPress: () => Alert.alert("Info", "Currency setting is currently fixed to INR"),
-            icon: "💰"
-          })}
-          
-          {renderSettingItem({
-            title: "Default Tax Rate",
-            value: `${settings.defaultTaxRate || 0}%`,
-            onPress: () => openEditModal("defaultTaxRate", "Default Tax Rate (%)", settings.defaultTaxRate),
-            icon: "📊"
-          })}
-        </View>
-
-        {/* Inventory Settings */}
-        <View style={styles.section}>
-          <Text style={styles.sectionTitle}>Inventory Settings</Text>
-          
-          {renderSettingItem({
-            title: "Low Stock Alerts",
-            value: settings.lowStockAlerts,
-            onPress: (value) => updateSetting("lowStockAlerts", value),
-            type: "switch",
-            icon: "⚠️"
-          })}
-          
-          {renderSettingItem({
-            title: "Auto Reorder Suggestions",
-            value: settings.autoReorderSuggestions,
-            onPress: (value) => updateSetting("autoReorderSuggestions", value),
-            type: "switch",
-            icon: "🔄"
-          })}
-          
-          {renderSettingItem({
-            title: "Default Min Stock Level",
-            value: settings.defaultMinStockLevel?.toString() || "10",
-            onPress: () => openEditModal("defaultMinStockLevel", "Default Min Stock Level", settings.defaultMinStockLevel),
-            icon: "📉"
-          })}
-          
-          {renderSettingItem({
-            title: "Default Max Stock Level",
-            value: settings.defaultMaxStockLevel?.toString() || "100",
-            onPress: () => openEditModal("defaultMaxStockLevel", "Default Max Stock Level", settings.defaultMaxStockLevel),
-            icon: "📈"
-          })}
-        </View>
-
-        {/* Notification Settings */}
-        <View style={styles.section}>
-          <Text style={styles.sectionTitle}>Notification Settings</Text>
-          
-          {renderSettingItem({
-            title: "Push Notifications",
-            value: settings.pushNotifications,
-            onPress: (value) => updateSetting("pushNotifications", value),
-            type: "switch",
-            icon: "🔔"
-          })}
-          
-          {renderSettingItem({
-            title: "Email Notifications",
-            value: settings.emailNotifications,
-            onPress: (value) => updateSetting("emailNotifications", value),
-            type: "switch",
-            icon: "📧"
-          })}
-          
-          {renderSettingItem({
-            title: "Payment Reminders",
-            value: settings.paymentReminders,
-            onPress: (value) => updateSetting("paymentReminders", value),
-            type: "switch",
-            icon: "💰"
-          })}
-          
-          {renderSettingItem({
-            title: "Daily Reports",
-            value: settings.dailyReports,
-            onPress: (value) => updateSetting("dailyReports", value),
-            type: "switch",
-            icon: "📊"
-          })}
-        </View>
-
-        {/* App Preferences */}
-        <View style={styles.section}>
-          <Text style={styles.sectionTitle}>App Preferences</Text>
-          
-          {renderSettingItem({
-            title: "Dark Mode",
-            value: settings.darkMode,
-            onPress: (value) => {
-              updateSetting("darkMode", value);
-              Alert.alert("Info", "Dark mode will be applied in the next app update");
-            },
-            type: "switch",
-            icon: "🌙"
-          })}
-          
-          {renderSettingItem({
-            title: "Biometric Lock",
-            value: settings.biometricLock,
-            onPress: (value) => {
-              updateSetting("biometricLock", value);
-              Alert.alert("Info", "Biometric authentication will be enabled in the next app update");
-            },
-            type: "switch",
-            icon: "🔒"
-          })}
-          
-          {renderSettingItem({
-            title: "Auto Backup",
-            value: settings.autoBackup,
-            onPress: (value) => updateSetting("autoBackup", value),
-            type: "switch",
-            icon: "☁️"
-          })}
-          
-          {renderSettingItem({
-            title: "Language",
-            value: settings.language || "English (India)",
-            onPress: () => Alert.alert("Info", "Language settings will be available in future updates"),
-            icon: "🌐"
-          })}
-        </View>
-
-        {/* Data Management */}
-        <View style={styles.section}>
-          <Text style={styles.sectionTitle}>Data Management</Text>
-          
-          <View style={styles.dataInfoContainer}>
-            <View style={styles.dataInfoItem}>
-              <Text style={styles.dataInfoLabel}>Last Backup:</Text>
-              <Text style={styles.dataInfoValue}>
-                {settings.lastBackup ? 
-                  new Date(settings.lastBackup).toLocaleDateString('en-IN') : 
-                  "Never"
-                }
-              </Text>
+      <StatusBar barStyle="dark-content" backgroundColor="#ffffff" />
+      
+      <Animated.View style={[styles.content, { opacity: fadeAnim }]}>
+        {/* Header */}
+        <View style={styles.header}>
+          <View style={styles.headerLeft}>
+            <Text style={styles.headerTitle}>Settings</Text>
+            <Text style={styles.headerSubtitle}>Manage your app preferences</Text>
+          </View>
+          <TouchableOpacity style={styles.notificationButton} onPress={() => navigation.navigate('Notifications')}>
+            <Text style={styles.notificationIcon}>🔔</Text>
+            <View style={styles.notificationBadge}>
+              <Text style={styles.notificationBadgeText}>3</Text>
             </View>
-            <View style={styles.dataInfoItem}>
-              <Text style={styles.dataInfoLabel}>Database Size:</Text>
-              <Text style={styles.dataInfoValue}>{settings.dataSize || "0 KB"}</Text>
+          </TouchableOpacity>
+        </View>
+
+        <ScrollView style={styles.scrollContent} showsVerticalScrollIndicator={false}>
+          {/* User Profile Card */}
+          <View style={styles.profileCard}>
+            <View style={styles.profileAvatar}>
+              <Text style={styles.profileAvatarText}>JD</Text>
             </View>
+            <View style={styles.profileInfo}>
+              <Text style={styles.profileName}>John Doe</Text>
+              <Text style={styles.profileEmail}>john.doe@example.com</Text>
+              <Text style={styles.profileBusiness}>Doe Electronics Store</Text>
+            </View>
+            <TouchableOpacity style={styles.editProfileButton}>
+              <Text style={styles.editProfileText}>Edit</Text>
+            </TouchableOpacity>
           </View>
 
-          {renderActionButton({
-            title: "Backup Database",
-            onPress: handleBackupDatabase,
-            color: "#10B981",
-            icon: "☁️",
-            loading: backingUp
-          })}
+          {/* Settings Sections */}
+          {settingsData.map(renderSection)}
 
-          {renderActionButton({
-            title: "Export Data",
-            onPress: handleExportData,
-            color: "#3B82F6",
-            icon: "📤"
-          })}
-
-          {renderActionButton({
-            title: "Clear All Data",
-            onPress: handleClearAllData,
-            color: "#EF4444",
-            icon: "🗑️"
-          })}
-        </View>
-
-        {/* System Information */}
-        <View style={styles.section}>
-          <Text style={styles.sectionTitle}>System Information</Text>
-          
-          {renderSettingItem({
-            title: "App Version",
-            value: settings.appVersion || "1.0.0",
-            onPress: () => Alert.alert("Version Info", `Brojgar Business Management App\nVersion: ${settings.appVersion || "1.0.0"}\nDeveloped by: operman.in`),
-            icon: "ℹ️"
-          })}
-          
-          {renderSettingItem({
-            title: "About Brojgar",
-            value: "Learn more",
-            onPress: () => Alert.alert(
-              "About Brojgar", 
-              "Brojgar is a comprehensive business management application designed for small and medium businesses.\n\nFeatures:\n• Customer & Supplier Management\n• Inventory Tracking\n• Invoice Generation\n• Reports & Analytics\n• Data Backup & Export\n\nDeveloped by: operman.in"
-            ),
-            icon: "📱"
-          })}
-        </View>
-
-        <View style={{ height: 50 }} />
-      </ScrollView>
-
-      {/* Edit Modal */}
-      <Modal
-        visible={editModalVisible}
-        animationType="slide"
-        transparent={true}
-      >
-        <View style={styles.modalOverlay}>
-          <View style={styles.modalContainer}>
-            <View style={styles.modalHeader}>
-              <Text style={styles.modalTitle}>Edit {editLabel}</Text>
-              <TouchableOpacity onPress={() => setEditModalVisible(false)}>
-                <Text style={styles.modalClose}>✕</Text>
-              </TouchableOpacity>
-            </View>
-
-            <View style={styles.modalContent}>
-              <Text style={styles.inputLabel}>{editLabel}</Text>
-              <TextInput
-                style={[
-                  styles.input,
-                  editField === "businessAddress" && styles.textArea
-                ]}
-                value={editValue}
-                onChangeText={setEditValue}
-                placeholder={`Enter ${editLabel.toLowerCase()}`}
-                multiline={editField === "businessAddress"}
-                numberOfLines={editField === "businessAddress" ? 4 : 1}
-                keyboardType={
-                  ['defaultCreditLimit', 'monthlySalesTarget', 'defaultTaxRate', 'defaultMinStockLevel', 'defaultMaxStockLevel'].includes(editField) 
-                    ? 'numeric' 
-                    : editField === 'emailAddress' 
-                      ? 'email-address'
-                      : editField === 'phoneNumber'
-                        ? 'phone-pad'
-                        : 'default'
-                }
-              />
-            </View>
-
-            <View style={styles.modalActions}>
-              <TouchableOpacity
-                style={styles.modalCancelButton}
-                onPress={() => setEditModalVisible(false)}
-              >
-                <Text style={styles.modalCancelText}>Cancel</Text>
-              </TouchableOpacity>
-              <TouchableOpacity
-                style={styles.modalSaveButton}
-                onPress={saveEditValue}
-              >
-                <Text style={styles.modalSaveText}>Save</Text>
-              </TouchableOpacity>
-            </View>
+          {/* Logout Button */}
+          <View style={styles.logoutContainer}>
+            <TouchableOpacity style={styles.logoutButton} onPress={handleLogout}>
+              <Text style={styles.logoutIcon}>🚪</Text>
+              <Text style={styles.logoutText}>Logout</Text>
+            </TouchableOpacity>
           </View>
-        </View>
-      </Modal>
+
+          <View style={styles.bottomSpacer} />
+        </ScrollView>
+      </Animated.View>
     </SafeAreaView>
   );
 };
@@ -569,230 +216,241 @@ const SettingsScreen = () => {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: '#F8FAFC',
+    backgroundColor: '#f8fafc',
   },
-  loadingContainer: {
+  content: {
     flex: 1,
-    justifyContent: 'center',
-    alignItems: 'center',
-  },
-  loadingText: {
-    fontSize: 18,
-    color: '#64748B',
   },
   header: {
     flexDirection: 'row',
     justifyContent: 'space-between',
     alignItems: 'center',
     paddingHorizontal: 20,
-    paddingVertical: 15,
-    backgroundColor: '#FFFFFF',
-    borderBottomWidth: 1,
-    borderBottomColor: '#E2E8F0',
+    paddingVertical: 20,
+    backgroundColor: '#ffffff',
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.04,
+    shadowRadius: 8,
+    elevation: 2,
+  },
+  headerLeft: {
+    flex: 1,
   },
   headerTitle: {
     fontSize: 24,
     fontWeight: 'bold',
-    color: '#1E293B',
+    color: '#0f172a',
   },
-  saveButton: {
-    backgroundColor: '#F1F5F9',
-    paddingHorizontal: 12,
-    paddingVertical: 8,
-    borderRadius: 8,
+  headerSubtitle: {
+    fontSize: 14,
+    color: '#64748b',
+    marginTop: 2,
   },
-  saveButtonText: {
-    color: '#64748B',
+  notificationButton: {
+    position: 'relative',
+    padding: 8,
+  },
+  notificationIcon: {
+    fontSize: 24,
+  },
+  notificationBadge: {
+    position: 'absolute',
+    top: 4,
+    right: 4,
+    backgroundColor: '#ef4444',
+    borderRadius: 10,
+    width: 20,
+    height: 20,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  notificationBadgeText: {
+    color: '#ffffff',
     fontSize: 12,
-    fontWeight: '600',
+    fontWeight: 'bold',
   },
-  content: {
+  scrollContent: {
     flex: 1,
-    paddingHorizontal: 20,
   },
-  section: {
-    backgroundColor: '#FFFFFF',
-    borderRadius: 12,
-    padding: 4,
+  profileCard: {
+    backgroundColor: '#ffffff',
+    marginHorizontal: 20,
     marginTop: 20,
+    marginBottom: 10,
+    borderRadius: 16,
+    padding: 20,
+    flexDirection: 'row',
+    alignItems: 'center',
     shadowColor: '#000',
     shadowOffset: { width: 0, height: 1 },
-    shadowOpacity: 0.1,
-    shadowRadius: 3,
+    shadowOpacity: 0.05,
+    shadowRadius: 8,
     elevation: 2,
   },
-  sectionTitle: {
+  profileAvatar: {
+    width: 60,
+    height: 60,
+    borderRadius: 30,
+    backgroundColor: '#3b82f6',
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginRight: 16,
+  },
+  profileAvatarText: {
+    color: '#ffffff',
+    fontSize: 24,
+    fontWeight: 'bold',
+  },
+  profileInfo: {
+    flex: 1,
+  },
+  profileName: {
     fontSize: 18,
     fontWeight: 'bold',
-    color: '#1E293B',
-    paddingHorizontal: 16,
-    paddingVertical: 16,
-    borderBottomWidth: 1,
-    borderBottomColor: '#F1F5F9',
+    color: '#0f172a',
+    marginBottom: 2,
   },
-  settingItem: {
+  profileEmail: {
+    fontSize: 14,
+    color: '#64748b',
+    marginBottom: 2,
+  },
+  profileBusiness: {
+    fontSize: 12,
+    color: '#3b82f6',
+    fontWeight: '600',
+  },
+  editProfileButton: {
+    backgroundColor: '#f8fafc',
+    paddingHorizontal: 16,
+    paddingVertical: 8,
+    borderRadius: 8,
+    borderWidth: 1,
+    borderColor: '#e2e8f0',
+  },
+  editProfileText: {
+    color: '#64748b',
+    fontSize: 14,
+    fontWeight: '600',
+  },
+  section: {
+    marginBottom: 24,
+  },
+  sectionTitle: {
+    fontSize: 16,
+    fontWeight: 'bold',
+    color: '#374151',
+    marginBottom: 12,
+    marginHorizontal: 20,
+  },
+  sectionCard: {
+    backgroundColor: '#ffffff',
+    marginHorizontal: 20,
+    borderRadius: 16,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 1 },
+    shadowOpacity: 0.05,
+    shadowRadius: 8,
+    elevation: 2,
+  },
+  settingsItem: {
     flexDirection: 'row',
-    justifyContent: 'space-between',
     alignItems: 'center',
+    justifyContent: 'space-between',
     paddingHorizontal: 16,
     paddingVertical: 16,
     borderBottomWidth: 1,
-    borderBottomColor: '#F8FAFC',
+    borderBottomColor: '#f1f5f9',
   },
-  settingContent: {
+  itemLeft: {
     flexDirection: 'row',
     alignItems: 'center',
     flex: 1,
   },
-  settingIcon: {
+  itemIcon: {
+    width: 40,
+    height: 40,
+    borderRadius: 12,
+    backgroundColor: '#f8fafc',
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginRight: 12,
+  },
+  itemIconText: {
+    fontSize: 18,
+  },
+  itemContent: {
+    flex: 1,
+  },
+  itemTitleRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    marginBottom: 2,
+  },
+  itemTitle: {
+    fontSize: 16,
+    fontWeight: '600',
+    color: '#0f172a',
+    marginRight: 8,
+  },
+  badge: {
+    backgroundColor: '#3b82f6',
+    paddingHorizontal: 8,
+    paddingVertical: 2,
+    borderRadius: 12,
+  },
+  badgeText: {
+    color: '#ffffff',
+    fontSize: 10,
+    fontWeight: 'bold',
+  },
+  itemSubtitle: {
+    fontSize: 14,
+    color: '#64748b',
+  },
+  itemRight: {
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  switch: {
+    transform: [{ scaleX: 0.9 }, { scaleY: 0.9 }],
+  },
+  chevron: {
+    fontSize: 24,
+    color: '#cbd5e1',
+    fontWeight: '300',
+  },
+  logoutContainer: {
+    marginHorizontal: 20,
+    marginTop: 20,
+  },
+  logoutButton: {
+    backgroundColor: '#ffffff',
+    borderRadius: 16,
+    padding: 16,
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    borderWidth: 1,
+    borderColor: '#fecaca',
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 1 },
+    shadowOpacity: 0.05,
+    shadowRadius: 8,
+    elevation: 2,
+  },
+  logoutIcon: {
     fontSize: 20,
     marginRight: 12,
   },
-  settingTextContainer: {
-    flex: 1,
-  },
-  settingTitle: {
-    fontSize: 16,
-    fontWeight: '500',
-    color: '#1E293B',
-  },
-  settingValue: {
-    fontSize: 14,
-    color: '#64748B',
-    marginTop: 2,
-  },
-  settingArrow: {
-    fontSize: 16,
-    color: '#94A3B8',
-  },
-  dataInfoContainer: {
-    backgroundColor: '#F8FAFC',
-    borderRadius: 8,
-    padding: 16,
-    marginHorizontal: 12,
-    marginBottom: 16,
-  },
-  dataInfoItem: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-    marginBottom: 8,
-  },
-  dataInfoLabel: {
-    fontSize: 14,
-    color: '#64748B',
-  },
-  dataInfoValue: {
-    fontSize: 14,
-    fontWeight: '600',
-    color: '#1E293B',
-  },
-  actionButton: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'center',
-    paddingVertical: 16,
-    marginHorizontal: 12,
-    marginBottom: 12,
-    borderRadius: 8,
-  },
-  actionButtonIcon: {
-    fontSize: 16,
-    marginRight: 8,
-  },
-  actionButtonText: {
-    color: '#FFFFFF',
+  logoutText: {
     fontSize: 16,
     fontWeight: '600',
+    color: '#ef4444',
   },
-  modalOverlay: {
-    flex: 1,
-    backgroundColor: 'rgba(0, 0, 0, 0.5)',
-    justifyContent: 'center',
-    alignItems: 'center',
-  },
-  modalContainer: {
-    backgroundColor: '#FFFFFF',
-    borderRadius: 16,
-    margin: 20,
-    maxWidth: 400,
-    width: '90%',
-  },
-  modalHeader: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-    paddingHorizontal: 20,
-    paddingVertical: 15,
-    borderBottomWidth: 1,
-    borderBottomColor: '#E2E8F0',
-  },
-  modalTitle: {
-    fontSize: 18,
-    fontWeight: 'bold',
-    color: '#1E293B',
-  },
-  modalClose: {
-    fontSize: 20,
-    color: '#64748B',
-  },
-  modalContent: {
-    padding: 20,
-  },
-  inputLabel: {
-    fontSize: 14,
-    fontWeight: '500',
-    color: '#374151',
-    marginBottom: 8,
-  },
-  input: {
-    backgroundColor: '#F8FAFC',
-    borderWidth: 1,
-    borderColor: '#D1D5DB',
-    borderRadius: 8,
-    paddingHorizontal: 12,
-    paddingVertical: 12,
-    fontSize: 16,
-    color: '#1E293B',
-  },
-  textArea: {
-    height: 100,
-    textAlignVertical: 'top',
-  },
-  modalActions: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    paddingHorizontal: 20,
-    paddingVertical: 15,
-    borderTopWidth: 1,
-    borderTopColor: '#E2E8F0',
-  },
-  modalCancelButton: {
-    flex: 1,
-    paddingVertical: 12,
-    marginRight: 8,
-    borderWidth: 1,
-    borderColor: '#D1D5DB',
-    borderRadius: 8,
-    alignItems: 'center',
-  },
-  modalCancelText: {
-    fontSize: 16,
-    color: '#64748B',
-    fontWeight: '500',
-  },
-  modalSaveButton: {
-    flex: 1,
-    paddingVertical: 12,
-    marginLeft: 8,
-    backgroundColor: '#3B82F6',
-    borderRadius: 8,
-    alignItems: 'center',
-  },
-  modalSaveText: {
-    fontSize: 16,
-    color: '#FFFFFF',
-    fontWeight: '600',
+  bottomSpacer: {
+    height: 40,
   },
 });
 

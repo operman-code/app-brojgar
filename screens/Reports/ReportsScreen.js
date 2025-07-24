@@ -1,505 +1,289 @@
-// screens/Reports/ReportsScreen.js
-import React, { useState, useEffect } from "react";
+import React, { useState, useEffect } from 'react';
 import {
   View,
   Text,
-  TouchableOpacity,
   StyleSheet,
   ScrollView,
   SafeAreaView,
+  TouchableOpacity,
   StatusBar,
-  RefreshControl,
-  Alert,
-  Dimensions,
+  Animated,
   FlatList,
-} from "react-native";
-
-// Import service
-import ReportsService from "./services/ReportsService";
+  Dimensions,
+} from 'react-native';
+import { LinearGradient } from 'expo-linear-gradient';
 
 const { width } = Dimensions.get('window');
 
-const ReportsScreen = () => {
-  const [reports, setReports] = useState({});
-  const [loading, setLoading] = useState(true);
-  const [refreshing, setRefreshing] = useState(false);
-  const [selectedReport, setSelectedReport] = useState("overview");
-  const [generatedAt, setGeneratedAt] = useState("");
+const ReportsScreen = ({ navigation }) => {
+  const [fadeAnim] = useState(new Animated.Value(0));
+  const [selectedPeriod, setSelectedPeriod] = useState('this_month');
+  const [selectedTab, setSelectedTab] = useState('overview');
+
+  const [reportData, setReportData] = useState({
+    overview: {
+      totalSales: 485000,
+      totalPurchases: 320000,
+      grossProfit: 165000,
+      netProfit: 125000,
+      salesCount: 42,
+      purchaseCount: 28,
+    },
+    topItems: [
+      { name: 'iPhone 15', sales: 85000, quantity: 8, profit: 15000 },
+      { name: 'Samsung S24', sales: 65000, quantity: 6, profit: 12000 },
+      { name: 'MacBook Air', sales: 120000, quantity: 3, profit: 18000 },
+    ],
+    recentTransactions: [
+      { id: 1, type: 'Sale', party: 'Rajesh Kumar', amount: 25000, date: '2024-01-15', status: 'Paid' },
+      { id: 2, type: 'Purchase', party: 'Tech Suppliers', amount: -15000, date: '2024-01-14', status: 'Pending' },
+      { id: 3, type: 'Sale', party: 'Priya Sharma', amount: 18000, date: '2024-01-13', status: 'Paid' },
+    ]
+  });
 
   useEffect(() => {
-    loadReports();
+    Animated.timing(fadeAnim, {
+      toValue: 1,
+      duration: 600,
+      useNativeDriver: true,
+    }).start();
   }, []);
 
-  const loadReports = async () => {
-    setLoading(true);
-    try {
-      const reportsData = await ReportsService.generateAllReports();
-      setReports(reportsData);
-      setGeneratedAt(reportsData.generatedAt);
-    } catch (error) {
-      console.error('❌ Error loading reports:', error);
-      Alert.alert("Error", "Failed to load reports");
-    } finally {
-      setLoading(false);
-    }
-  };
-
-  const handleRefresh = async () => {
-    setRefreshing(true);
-    await loadReports();
-    setRefreshing(false);
-  };
-
-  const exportReport = async (reportType) => {
-    try {
-      Alert.alert(
-        "Export Report",
-        "Choose export format:",
-        [
-          {
-            text: "PDF",
-            onPress: () => ReportsService.exportToPDF(reportType, reports[reportType])
-          },
-          {
-            text: "Excel", 
-            onPress: () => ReportsService.exportToExcel(reportType, reports[reportType])
-          },
-          {
-            text: "Cancel",
-            style: "cancel"
-          }
-        ]
-      );
-    } catch (error) {
-      Alert.alert("Error", "Failed to export report");
-    }
-  };
-
-  const reportTabs = [
-    { id: 'overview', title: 'Overview', icon: '📊' },
-    { id: 'sales', title: 'Sales', icon: '💰' },
-    { id: 'purchases', title: 'Purchases', icon: '🛒' },
-    { id: 'inventory', title: 'Inventory', icon: '📦' },
-    { id: 'customers', title: 'Customers', icon: '👥' },
-    { id: 'gst', title: 'GST', icon: '📋' }
+  const periods = [
+    { key: 'today', label: 'Today' },
+    { key: 'this_week', label: 'This Week' },
+    { key: 'this_month', label: 'This Month' },
+    { key: 'this_year', label: 'This Year' },
+    { key: 'custom', label: 'Custom' },
   ];
 
-  const renderTabBar = () => (
-    <ScrollView 
-      horizontal 
-      showsHorizontalScrollIndicator={false}
-      style={styles.tabBar}
-      contentContainerStyle={styles.tabBarContent}
+  const tabs = [
+    { key: 'overview', label: 'Overview', icon: '📊' },
+    { key: 'sales', label: 'Sales', icon: '💰' },
+    { key: 'purchases', label: 'Purchases', icon: '🛒' },
+    { key: 'profit', label: 'Profit & Loss', icon: '📈' },
+  ];
+
+  const kpiCards = [
+    {
+      title: 'Total Sales',
+      value: reportData.overview.totalSales,
+      change: '+12.5%',
+      positive: true,
+      icon: '💰',
+      color: '#10b981'
+    },
+    {
+      title: 'Total Purchases',
+      value: reportData.overview.totalPurchases,
+      change: '+8.2%',
+      positive: true,
+      icon: '🛒',
+      color: '#3b82f6'
+    },
+    {
+      title: 'Gross Profit',
+      value: reportData.overview.grossProfit,
+      change: '+18.7%',
+      positive: true,
+      icon: '📈',
+      color: '#8b5cf6'
+    },
+    {
+      title: 'Net Profit',
+      value: reportData.overview.netProfit,
+      change: '+22.1%',
+      positive: true,
+      icon: '🎯',
+      color: '#06b6d4'
+    },
+  ];
+
+  const renderPeriodButton = (period) => (
+    <TouchableOpacity
+      key={period.key}
+      style={[styles.periodButton, selectedPeriod === period.key && styles.activePeriodButton]}
+      onPress={() => setSelectedPeriod(period.key)}
     >
-      {reportTabs.map((tab) => (
-        <TouchableOpacity
-          key={tab.id}
-          style={[
-            styles.tab,
-            selectedReport === tab.id && styles.activeTab
-          ]}
-          onPress={() => setSelectedReport(tab.id)}
-        >
-          <Text style={styles.tabIcon}>{tab.icon}</Text>
-          <Text style={[
-            styles.tabText,
-            selectedReport === tab.id && styles.activeTabText
-          ]}>
-            {tab.title}
+      <Text style={[styles.periodButtonText, selectedPeriod === period.key && styles.activePeriodButtonText]}>
+        {period.label}
+      </Text>
+    </TouchableOpacity>
+  );
+
+  const renderTab = (tab) => (
+    <TouchableOpacity
+      key={tab.key}
+      style={[styles.tab, selectedTab === tab.key && styles.activeTab]}
+      onPress={() => setSelectedTab(tab.key)}
+    >
+      <Text style={styles.tabIcon}>{tab.icon}</Text>
+      <Text style={[styles.tabText, selectedTab === tab.key && styles.activeTabText]}>
+        {tab.label}
+      </Text>
+    </TouchableOpacity>
+  );
+
+  const renderKPICard = (kpi, index) => (
+    <View key={index} style={styles.kpiCard}>
+      <View style={styles.kpiHeader}>
+        <View style={[styles.kpiIcon, { backgroundColor: kpi.color + '20' }]}>
+          <Text style={styles.kpiIconText}>{kpi.icon}</Text>
+        </View>
+        <View style={[styles.changeIndicator, { backgroundColor: kpi.positive ? '#dcfce7' : '#fef2f2' }]}>
+          <Text style={[styles.changeText, { color: kpi.positive ? '#166534' : '#dc2626' }]}>
+            {kpi.change}
           </Text>
-        </TouchableOpacity>
-      ))}
-    </ScrollView>
+        </View>
+      </View>
+      <Text style={styles.kpiTitle}>{kpi.title}</Text>
+      <Text style={styles.kpiValue}>₹{kpi.value.toLocaleString()}</Text>
+    </View>
   );
 
-  const renderOverviewReport = () => (
-    <View style={styles.reportContainer}>
-      <View style={styles.reportHeader}>
-        <Text style={styles.reportTitle}>Business Overview</Text>
-        <TouchableOpacity 
-          style={styles.exportButton}
-          onPress={() => exportReport('overview')}
-        >
-          <Text style={styles.exportButtonText}>📤 Export</Text>
-        </TouchableOpacity>
+  const renderTopItem = ({ item, index }) => (
+    <View style={styles.topItemCard}>
+      <View style={styles.topItemRank}>
+        <Text style={styles.rankText}>{index + 1}</Text>
       </View>
-
-      {/* KPI Cards */}
-      <View style={styles.kpiGrid}>
-        <View style={styles.kpiCard}>
-          <Text style={styles.kpiValue}>₹{reports.overview?.totalSales?.toLocaleString('en-IN') || '0'}</Text>
-          <Text style={styles.kpiLabel}>Total Sales</Text>
-          <Text style={[styles.kpiTrend, { color: '#10b981' }]}>+12.5%</Text>
-        </View>
-        
-        <View style={styles.kpiCard}>
-          <Text style={styles.kpiValue}>₹{reports.overview?.totalPurchases?.toLocaleString('en-IN') || '0'}</Text>
-          <Text style={styles.kpiLabel}>Total Purchases</Text>
-          <Text style={[styles.kpiTrend, { color: '#ef4444' }]}>+8.2%</Text>
-        </View>
-        
-        <View style={styles.kpiCard}>
-          <Text style={styles.kpiValue}>₹{reports.overview?.netProfit?.toLocaleString('en-IN') || '0'}</Text>
-          <Text style={styles.kpiLabel}>Net Profit</Text>
-          <Text style={[styles.kpiTrend, { color: '#10b981' }]}>+15.3%</Text>
-        </View>
-        
-        <View style={styles.kpiCard}>
-          <Text style={styles.kpiValue}>{reports.overview?.totalCustomers || '0'}</Text>
-          <Text style={styles.kpiLabel}>Total Customers</Text>
-          <Text style={[styles.kpiTrend, { color: '#3b82f6' }]}>+5</Text>
-        </View>
+      <View style={styles.topItemInfo}>
+        <Text style={styles.topItemName}>{item.name}</Text>
+        <Text style={styles.topItemDetails}>Qty: {item.quantity} • Profit: ₹{item.profit.toLocaleString()}</Text>
       </View>
-
-      {/* Quick Stats */}
-      <View style={styles.statsSection}>
-        <Text style={styles.sectionTitle}>Quick Statistics</Text>
-        
-        <View style={styles.statRow}>
-          <Text style={styles.statLabel}>Outstanding Receivables:</Text>
-          <Text style={styles.statValue}>₹{reports.overview?.outstandingReceivables?.toLocaleString('en-IN') || '0'}</Text>
-        </View>
-        
-        <View style={styles.statRow}>
-          <Text style={styles.statLabel}>Outstanding Payables:</Text>
-          <Text style={styles.statValue}>₹{reports.overview?.outstandingPayables?.toLocaleString('en-IN') || '0'}</Text>
-        </View>
-        
-        <View style={styles.statRow}>
-          <Text style={styles.statLabel}>Inventory Value:</Text>
-          <Text style={styles.statValue}>₹{reports.overview?.inventoryValue?.toLocaleString('en-IN') || '0'}</Text>
-        </View>
-        
-        <View style={styles.statRow}>
-          <Text style={styles.statLabel}>Low Stock Items:</Text>
-          <Text style={[styles.statValue, { color: '#ef4444' }]}>{reports.overview?.lowStockCount || '0'} items</Text>
-        </View>
+      <View style={styles.topItemSales}>
+        <Text style={styles.topItemAmount}>₹{item.sales.toLocaleString()}</Text>
       </View>
     </View>
   );
 
-  const renderSalesReport = () => (
-    <View style={styles.reportContainer}>
-      <View style={styles.reportHeader}>
-        <Text style={styles.reportTitle}>Sales Report</Text>
-        <TouchableOpacity 
-          style={styles.exportButton}
-          onPress={() => exportReport('sales')}
-        >
-          <Text style={styles.exportButtonText}>📤 Export</Text>
-        </TouchableOpacity>
-      </View>
-
-      {/* Sales Summary */}
-      <View style={styles.summarySection}>
-        <Text style={styles.sectionTitle}>Sales Summary</Text>
-        
-        <View style={styles.summaryGrid}>
-          <View style={styles.summaryCard}>
-            <Text style={styles.summaryValue}>₹{reports.sales?.thisMonth?.toLocaleString('en-IN') || '0'}</Text>
-            <Text style={styles.summaryLabel}>This Month</Text>
-          </View>
-          
-          <View style={styles.summaryCard}>
-            <Text style={styles.summaryValue}>₹{reports.sales?.lastMonth?.toLocaleString('en-IN') || '0'}</Text>
-            <Text style={styles.summaryLabel}>Last Month</Text>
-          </View>
-          
-          <View style={styles.summaryCard}>
-            <Text style={styles.summaryValue}>{reports.sales?.totalInvoices || '0'}</Text>
-            <Text style={styles.summaryLabel}>Total Invoices</Text>
-          </View>
-          
-          <View style={styles.summaryCard}>
-            <Text style={styles.summaryValue}>₹{reports.sales?.averageOrderValue?.toLocaleString('en-IN') || '0'}</Text>
-            <Text style={styles.summaryLabel}>Avg. Order Value</Text>
-          </View>
+  const renderTransaction = ({ item }) => (
+    <View style={styles.transactionCard}>
+      <View style={styles.transactionLeft}>
+        <View style={[styles.transactionType, { backgroundColor: item.type === 'Sale' ? '#dcfce7' : '#fef3c7' }]}>
+          <Text style={[styles.transactionTypeText, { color: item.type === 'Sale' ? '#166534' : '#92400e' }]}>
+            {item.type === 'Sale' ? '📈' : '📉'}
+          </Text>
+        </View>
+        <View style={styles.transactionInfo}>
+          <Text style={styles.transactionParty}>{item.party}</Text>
+          <Text style={styles.transactionDate}>{item.date}</Text>
         </View>
       </View>
-
-      {/* Top Products */}
-      <View style={styles.section}>
-        <Text style={styles.sectionTitle}>Top Selling Products</Text>
-        {reports.sales?.topProducts?.length > 0 ? (
-          <FlatList
-            data={reports.sales.topProducts}
-            keyExtractor={(item) => item.id}
-            renderItem={({ item, index }) => (
-              <View style={styles.listItem}>
-                <View style={styles.listItemLeft}>
-                  <Text style={styles.listItemRank}>#{index + 1}</Text>
-                  <View style={styles.listItemContent}>
-                    <Text style={styles.listItemTitle}>{item.name}</Text>
-                    <Text style={styles.listItemSubtitle}>{item.quantity} units sold</Text>
-                  </View>
-                </View>
-                <Text style={styles.listItemValue}>₹{item.revenue?.toLocaleString('en-IN')}</Text>
-              </View>
-            )}
-            scrollEnabled={false}
-          />
-        ) : (
-          <Text style={styles.emptyText}>No sales data available</Text>
-        )}
-      </View>
-
-      {/* Top Customers */}
-      <View style={styles.section}>
-        <Text style={styles.sectionTitle}>Top Customers</Text>
-        {reports.sales?.topCustomers?.length > 0 ? (
-          <FlatList
-            data={reports.sales.topCustomers}
-            keyExtractor={(item) => item.id}
-            renderItem={({ item, index }) => (
-              <View style={styles.listItem}>
-                <View style={styles.listItemLeft}>
-                  <Text style={styles.listItemRank}>#{index + 1}</Text>
-                  <View style={styles.listItemContent}>
-                    <Text style={styles.listItemTitle}>{item.name}</Text>
-                    <Text style={styles.listItemSubtitle}>{item.invoiceCount} invoices</Text>
-                  </View>
-                </View>
-                <Text style={styles.listItemValue}>₹{item.totalPurchased?.toLocaleString('en-IN')}</Text>
-              </View>
-            )}
-            scrollEnabled={false}
-          />
-        ) : (
-          <Text style={styles.emptyText}>No customer data available</Text>
-        )}
+      <View style={styles.transactionRight}>
+        <Text style={[styles.transactionAmount, { color: item.amount > 0 ? '#10b981' : '#ef4444' }]}>
+          {item.amount > 0 ? '+' : ''}₹{Math.abs(item.amount).toLocaleString()}
+        </Text>
+        <View style={[styles.statusBadge, { backgroundColor: item.status === 'Paid' ? '#dcfce7' : '#fef3c7' }]}>
+          <Text style={[styles.statusText, { color: item.status === 'Paid' ? '#166534' : '#92400e' }]}>
+            {item.status}
+          </Text>
+        </View>
       </View>
     </View>
   );
-
-  const renderInventoryReport = () => (
-    <View style={styles.reportContainer}>
-      <View style={styles.reportHeader}>
-        <Text style={styles.reportTitle}>Inventory Report</Text>
-        <TouchableOpacity 
-          style={styles.exportButton}
-          onPress={() => exportReport('inventory')}
-        >
-          <Text style={styles.exportButtonText}>📤 Export</Text>
-        </TouchableOpacity>
-      </View>
-
-      {/* Inventory Summary */}
-      <View style={styles.summarySection}>
-        <Text style={styles.sectionTitle}>Inventory Summary</Text>
-        
-        <View style={styles.summaryGrid}>
-          <View style={styles.summaryCard}>
-            <Text style={styles.summaryValue}>{reports.inventory?.totalItems || '0'}</Text>
-            <Text style={styles.summaryLabel}>Total Items</Text>
-          </View>
-          
-          <View style={styles.summaryCard}>
-            <Text style={styles.summaryValue}>₹{reports.inventory?.totalValue?.toLocaleString('en-IN') || '0'}</Text>
-            <Text style={styles.summaryLabel}>Total Value</Text>
-          </View>
-          
-          <View style={styles.summaryCard}>
-            <Text style={[styles.summaryValue, { color: '#ef4444' }]}>{reports.inventory?.lowStockItems || '0'}</Text>
-            <Text style={styles.summaryLabel}>Low Stock</Text>
-          </View>
-          
-          <View style={styles.summaryCard}>
-            <Text style={[styles.summaryValue, { color: '#f59e0b' }]}>{reports.inventory?.outOfStockItems || '0'}</Text>
-            <Text style={styles.summaryLabel}>Out of Stock</Text>
-          </View>
-        </View>
-      </View>
-
-      {/* Low Stock Items */}
-      <View style={styles.section}>
-        <Text style={styles.sectionTitle}>⚠️ Low Stock Items</Text>
-        {reports.inventory?.lowStockList?.length > 0 ? (
-          <FlatList
-            data={reports.inventory.lowStockList}
-            keyExtractor={(item) => item.id}
-            renderItem={({ item }) => (
-              <View style={styles.inventoryItem}>
-                <View style={styles.inventoryItemLeft}>
-                  <Text style={styles.inventoryItemName}>{item.name}</Text>
-                  <Text style={styles.inventoryItemDetails}>
-                    Current: {item.currentStock} | Min: {item.minimumStock}
-                  </Text>
-                </View>
-                <View style={styles.inventoryItemRight}>
-                  <Text style={[styles.inventoryItemStock, { color: '#ef4444' }]}>
-                    {item.currentStock} {item.unit}
-                  </Text>
-                  <Text style={styles.inventoryItemValue}>₹{item.value?.toLocaleString('en-IN')}</Text>
-                </View>
-              </View>
-            )}
-            scrollEnabled={false}
-          />
-        ) : (
-          <Text style={styles.emptyText}>All items are adequately stocked</Text>
-        )}
-      </View>
-
-      {/* Category Wise Stock */}
-      <View style={styles.section}>
-        <Text style={styles.sectionTitle}>Category Wise Stock</Text>
-        {reports.inventory?.categoryWise?.length > 0 ? (
-          <FlatList
-            data={reports.inventory.categoryWise}
-            keyExtractor={(item) => item.category}
-            renderItem={({ item }) => (
-              <View style={styles.categoryItem}>
-                <View style={styles.categoryItemLeft}>
-                  <Text style={styles.categoryName}>{item.category}</Text>
-                  <Text style={styles.categoryDetails}>{item.itemCount} items</Text>
-                </View>
-                <Text style={styles.categoryValue}>₹{item.totalValue?.toLocaleString('en-IN')}</Text>
-              </View>
-            )}
-            scrollEnabled={false}
-          />
-        ) : (
-          <Text style={styles.emptyText}>No category data available</Text>
-        )}
-      </View>
-    </View>
-  );
-
-  const renderGSTReport = () => (
-    <View style={styles.reportContainer}>
-      <View style={styles.reportHeader}>
-        <Text style={styles.reportTitle}>GST Report</Text>
-        <TouchableOpacity 
-          style={styles.exportButton}
-          onPress={() => exportReport('gst')}
-        >
-          <Text style={styles.exportButtonText}>📤 Export</Text>
-        </TouchableOpacity>
-      </View>
-
-      {/* GST Summary */}
-      <View style={styles.summarySection}>
-        <Text style={styles.sectionTitle}>GST Summary</Text>
-        
-        <View style={styles.gstSummaryCard}>
-          <View style={styles.gstSummaryRow}>
-            <Text style={styles.gstLabel}>Total Sales (Taxable):</Text>
-            <Text style={styles.gstValue}>₹{reports.gst?.totalTaxableSales?.toLocaleString('en-IN') || '0'}</Text>
-          </View>
-          
-          <View style={styles.gstSummaryRow}>
-            <Text style={styles.gstLabel}>Output GST Collected:</Text>
-            <Text style={styles.gstValue}>₹{reports.gst?.outputGST?.toLocaleString('en-IN') || '0'}</Text>
-          </View>
-          
-          <View style={styles.gstSummaryRow}>
-            <Text style={styles.gstLabel}>Input GST Paid:</Text>
-            <Text style={styles.gstValue}>₹{reports.gst?.inputGST?.toLocaleString('en-IN') || '0'}</Text>
-          </View>
-          
-          <View style={[styles.gstSummaryRow, styles.gstTotalRow]}>
-            <Text style={styles.gstTotalLabel}>Net GST Payable:</Text>
-            <Text style={[styles.gstTotalValue, { 
-              color: (reports.gst?.netGST || 0) > 0 ? '#ef4444' : '#10b981' 
-            }]}>
-              ₹{reports.gst?.netGST?.toLocaleString('en-IN') || '0'}
-            </Text>
-          </View>
-        </View>
-      </View>
-
-      {/* Tax Rate Wise Breakdown */}
-      <View style={styles.section}>
-        <Text style={styles.sectionTitle}>Tax Rate Wise Breakdown</Text>
-        {reports.gst?.taxRateWise?.length > 0 ? (
-          <FlatList
-            data={reports.gst.taxRateWise}
-            keyExtractor={(item) => item.taxRate.toString()}
-            renderItem={({ item }) => (
-              <View style={styles.taxRateItem}>
-                <View style={styles.taxRateLeft}>
-                  <Text style={styles.taxRatePercent}>{item.taxRate}%</Text>
-                  <Text style={styles.taxRateDetails}>
-                    Taxable: ₹{item.taxableAmount?.toLocaleString('en-IN')}
-                  </Text>
-                </View>
-                <View style={styles.taxRateRight}>
-                  <Text style={styles.taxRateAmount}>₹{item.taxAmount?.toLocaleString('en-IN')}</Text>
-                  <Text style={styles.taxRateLabel}>GST Amount</Text>
-                </View>
-              </View>
-            )}
-            scrollEnabled={false}
-          />
-        ) : (
-          <Text style={styles.emptyText}>No GST data available</Text>
-        )}
-      </View>
-    </View>
-  );
-
-  const renderReportContent = () => {
-    switch (selectedReport) {
-      case 'overview':
-        return renderOverviewReport();
-      case 'sales':
-        return renderSalesReport();
-      case 'purchases':
-        return renderSalesReport(); // Similar structure
-      case 'inventory':
-        return renderInventoryReport();
-      case 'customers':
-        return renderSalesReport(); // Customer focused version
-      case 'gst':
-        return renderGSTReport();
-      default:
-        return renderOverviewReport();
-    }
-  };
-
-  if (loading) {
-    return (
-      <SafeAreaView style={styles.container}>
-        <StatusBar barStyle="dark-content" backgroundColor="#ffffff" />
-        <View style={styles.loadingContainer}>
-          <Text style={styles.loadingText}>Generating Reports...</Text>
-        </View>
-      </SafeAreaView>
-    );
-  }
 
   return (
     <SafeAreaView style={styles.container}>
       <StatusBar barStyle="dark-content" backgroundColor="#ffffff" />
       
-      {/* Header */}
-      <View style={styles.header}>
-        <Text style={styles.headerTitle}>Reports & Analytics</Text>
-        <TouchableOpacity onPress={handleRefresh} style={styles.refreshButton}>
-          <Text style={styles.refreshButtonText}>🔄</Text>
-        </TouchableOpacity>
-      </View>
+      <Animated.View style={[styles.content, { opacity: fadeAnim }]}>
+        {/* Header */}
+        <View style={styles.header}>
+          <View style={styles.headerLeft}>
+            <Text style={styles.headerTitle}>Reports</Text>
+            <Text style={styles.headerSubtitle}>Business insights and analytics</Text>
+          </View>
+          <TouchableOpacity style={styles.exportButton}>
+            <Text style={styles.exportButtonText}>📊 Export</Text>
+          </TouchableOpacity>
+        </View>
 
-      {/* Generated At */}
-      <View style={styles.timestampContainer}>
-        <Text style={styles.timestampText}>
-          Last updated: {new Date(generatedAt).toLocaleString('en-IN')}
-        </Text>
-      </View>
+        {/* Period Selection */}
+        <View style={styles.periodContainer}>
+          <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.periodScroll}>
+            {periods.map(renderPeriodButton)}
+          </ScrollView>
+        </View>
 
-      {/* Tab Bar */}
-      {renderTabBar()}
+        {/* Tabs */}
+        <View style={styles.tabsContainer}>
+          <ScrollView horizontal showsHorizontalScrollIndicator={false}>
+            <View style={styles.tabsRow}>
+              {tabs.map(renderTab)}
+            </View>
+          </ScrollView>
+        </View>
 
-      {/* Report Content */}
-      <ScrollView
-        style={styles.content}
-        showsVerticalScrollIndicator={false}
-        refreshControl={
-          <RefreshControl refreshing={refreshing} onRefresh={handleRefresh} />
-        }
-      >
-        {renderReportContent()}
-      </ScrollView>
+        <ScrollView style={styles.scrollContent} showsVerticalScrollIndicator={false}>
+          {selectedTab === 'overview' && (
+            <>
+              {/* KPI Cards */}
+              <View style={styles.kpiContainer}>
+                <View style={styles.kpiRow}>
+                  {kpiCards.slice(0, 2).map(renderKPICard)}
+                </View>
+                <View style={styles.kpiRow}>
+                  {kpiCards.slice(2, 4).map(renderKPICard)}
+                </View>
+              </View>
+
+              {/* Performance Chart Placeholder */}
+              <View style={styles.chartCard}>
+                <LinearGradient
+                  colors={['#3b82f6', '#1d4ed8']}
+                  style={styles.chartGradient}
+                >
+                  <Text style={styles.chartTitle}>Sales Performance</Text>
+                  <Text style={styles.chartSubtitle}>Last 30 days trend</Text>
+                  <View style={styles.chartPlaceholder}>
+                    <Text style={styles.chartPlaceholderText}>📈 Chart visualization would go here</Text>
+                  </View>
+                </LinearGradient>
+              </View>
+
+              {/* Top Selling Items */}
+              <View style={styles.sectionCard}>
+                <View style={styles.sectionHeader}>
+                  <Text style={styles.sectionTitle}>Top Selling Items</Text>
+                  <TouchableOpacity>
+                    <Text style={styles.sectionLink}>View All</Text>
+                  </TouchableOpacity>
+                </View>
+                <FlatList
+                  data={reportData.topItems}
+                  renderItem={renderTopItem}
+                  keyExtractor={(item, index) => index.toString()}
+                  scrollEnabled={false}
+                />
+              </View>
+
+              {/* Recent Transactions */}
+              <View style={styles.sectionCard}>
+                <View style={styles.sectionHeader}>
+                  <Text style={styles.sectionTitle}>Recent Transactions</Text>
+                  <TouchableOpacity>
+                    <Text style={styles.sectionLink}>View All</Text>
+                  </TouchableOpacity>
+                </View>
+                <FlatList
+                  data={reportData.recentTransactions}
+                  renderItem={renderTransaction}
+                  keyExtractor={(item) => item.id.toString()}
+                  scrollEnabled={false}
+                />
+              </View>
+            </>
+          )}
+
+          {selectedTab !== 'overview' && (
+            <View style={styles.comingSoonCard}>
+              <Text style={styles.comingSoonIcon}>🚧</Text>
+              <Text style={styles.comingSoonTitle}>{tabs.find(t => t.key === selectedTab)?.label} Report</Text>
+              <Text style={styles.comingSoonText}>Detailed {selectedTab} analytics coming soon</Text>
+            </View>
+          )}
+        </ScrollView>
+      </Animated.View>
     </SafeAreaView>
   );
 };
@@ -509,406 +293,351 @@ const styles = StyleSheet.create({
     flex: 1,
     backgroundColor: '#f8fafc',
   },
-  loadingContainer: {
+  content: {
     flex: 1,
-    justifyContent: 'center',
-    alignItems: 'center',
-  },
-  loadingText: {
-    fontSize: 16,
-    color: '#6b7280',
   },
   header: {
     flexDirection: 'row',
     justifyContent: 'space-between',
     alignItems: 'center',
     paddingHorizontal: 20,
-    paddingVertical: 16,
+    paddingVertical: 20,
     backgroundColor: '#ffffff',
-    borderBottomWidth: 1,
-    borderBottomColor: '#e5e7eb',
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.04,
+    shadowRadius: 8,
+    elevation: 2,
+  },
+  headerLeft: {
+    flex: 1,
   },
   headerTitle: {
-    fontSize: 20,
+    fontSize: 24,
     fontWeight: 'bold',
-    color: '#111827',
+    color: '#0f172a',
   },
-  refreshButton: {
-    padding: 8,
+  headerSubtitle: {
+    fontSize: 14,
+    color: '#64748b',
+    marginTop: 2,
   },
-  refreshButtonText: {
-    fontSize: 20,
-  },
-  timestampContainer: {
-    paddingHorizontal: 20,
-    paddingVertical: 8,
-    backgroundColor: '#ffffff',
-    borderBottomWidth: 1,
-    borderBottomColor: '#e5e7eb',
-  },
-  timestampText: {
-    fontSize: 12,
-    color: '#6b7280',
-    textAlign: 'center',
-  },
-  tabBar: {
-    backgroundColor: '#ffffff',
-    borderBottomWidth: 1,
-    borderBottomColor: '#e5e7eb',
-  },
-  tabBarContent: {
+  exportButton: {
+    backgroundColor: '#f8fafc',
     paddingHorizontal: 16,
+    paddingVertical: 10,
+    borderRadius: 8,
+    borderWidth: 1,
+    borderColor: '#e2e8f0',
+  },
+  exportButtonText: {
+    color: '#64748b',
+    fontSize: 14,
+    fontWeight: '600',
+  },
+  periodContainer: {
+    backgroundColor: '#ffffff',
+    paddingVertical: 16,
+  },
+  periodScroll: {
+    paddingHorizontal: 20,
+  },
+  periodButton: {
+    paddingHorizontal: 16,
+    paddingVertical: 8,
+    borderRadius: 20,
+    marginRight: 12,
+    backgroundColor: '#f8fafc',
+    borderWidth: 1,
+    borderColor: '#e2e8f0',
+  },
+  activePeriodButton: {
+    backgroundColor: '#3b82f6',
+    borderColor: '#3b82f6',
+  },
+  periodButtonText: {
+    fontSize: 14,
+    fontWeight: '600',
+    color: '#64748b',
+  },
+  activePeriodButtonText: {
+    color: '#ffffff',
+  },
+  tabsContainer: {
+    backgroundColor: '#ffffff',
+    paddingBottom: 16,
+  },
+  tabsRow: {
+    flexDirection: 'row',
+    paddingHorizontal: 20,
   },
   tab: {
     flexDirection: 'row',
     alignItems: 'center',
     paddingHorizontal: 16,
     paddingVertical: 12,
-    marginRight: 8,
-    borderRadius: 20,
+    borderRadius: 12,
+    marginRight: 12,
+    backgroundColor: '#f8fafc',
   },
   activeTab: {
     backgroundColor: '#eff6ff',
   },
   tabIcon: {
     fontSize: 16,
-    marginRight: 6,
+    marginRight: 8,
   },
   tabText: {
     fontSize: 14,
-    color: '#6b7280',
-    fontWeight: '500',
+    fontWeight: '600',
+    color: '#64748b',
   },
   activeTabText: {
     color: '#3b82f6',
-    fontWeight: '600',
   },
-  content: {
+  scrollContent: {
     flex: 1,
   },
-  reportContainer: {
-    padding: 16,
+  kpiContainer: {
+    padding: 20,
   },
-  reportHeader: {
+  kpiRow: {
     flexDirection: 'row',
     justifyContent: 'space-between',
-    alignItems: 'center',
-    marginBottom: 20,
-  },
-  reportTitle: {
-    fontSize: 24,
-    fontWeight: 'bold',
-    color: '#111827',
-  },
-  exportButton: {
-    backgroundColor: '#3b82f6',
-    paddingHorizontal: 12,
-    paddingVertical: 6,
-    borderRadius: 6,
-  },
-  exportButtonText: {
-    color: '#ffffff',
-    fontSize: 14,
-    fontWeight: '600',
-  },
-  kpiGrid: {
-    flexDirection: 'row',
-    flexWrap: 'wrap',
-    justifyContent: 'space-between',
-    marginBottom: 24,
+    marginBottom: 16,
   },
   kpiCard: {
-    width: (width - 48) / 2,
     backgroundColor: '#ffffff',
+    borderRadius: 16,
     padding: 16,
-    borderRadius: 12,
-    marginBottom: 12,
+    width: (width - 60) / 2,
     shadowColor: '#000',
-    shadowOffset: {
-      width: 0,
-      height: 2,
-    },
-    shadowOpacity: 0.1,
-    shadowRadius: 3.84,
-    elevation: 5,
+    shadowOffset: { width: 0, height: 1 },
+    shadowOpacity: 0.05,
+    shadowRadius: 8,
+    elevation: 2,
+  },
+  kpiHeader: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    marginBottom: 12,
+  },
+  kpiIcon: {
+    width: 40,
+    height: 40,
+    borderRadius: 12,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  kpiIconText: {
+    fontSize: 18,
+  },
+  changeIndicator: {
+    paddingHorizontal: 8,
+    paddingVertical: 4,
+    borderRadius: 12,
+  },
+  changeText: {
+    fontSize: 12,
+    fontWeight: '600',
+  },
+  kpiTitle: {
+    fontSize: 14,
+    color: '#64748b',
+    marginBottom: 4,
   },
   kpiValue: {
-    fontSize: 20,
+    fontSize: 18,
     fontWeight: 'bold',
-    color: '#111827',
-    marginBottom: 4,
+    color: '#0f172a',
   },
-  kpiLabel: {
-    fontSize: 12,
-    color: '#6b7280',
-    marginBottom: 4,
-  },
-  kpiTrend: {
-    fontSize: 12,
-    fontWeight: '600',
-  },
-  statsSection: {
-    backgroundColor: '#ffffff',
-    padding: 16,
-    borderRadius: 12,
-    marginBottom: 16,
+  chartCard: {
+    marginHorizontal: 20,
+    marginBottom: 20,
+    borderRadius: 16,
+    overflow: 'hidden',
     shadowColor: '#000',
-    shadowOffset: {
-      width: 0,
-      height: 2,
-    },
+    shadowOffset: { width: 0, height: 2 },
     shadowOpacity: 0.1,
-    shadowRadius: 3.84,
-    elevation: 5,
+    shadowRadius: 8,
+    elevation: 4,
+  },
+  chartGradient: {
+    padding: 20,
+    minHeight: 160,
+  },
+  chartTitle: {
+    fontSize: 18,
+    fontWeight: 'bold',
+    color: '#ffffff',
+    marginBottom: 4,
+  },
+  chartSubtitle: {
+    fontSize: 14,
+    color: 'rgba(255, 255, 255, 0.8)',
+    marginBottom: 20,
+  },
+  chartPlaceholder: {
+    flex: 1,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  chartPlaceholderText: {
+    color: 'rgba(255, 255, 255, 0.8)',
+    fontSize: 14,
+  },
+  sectionCard: {
+    backgroundColor: '#ffffff',
+    marginHorizontal: 20,
+    marginBottom: 20,
+    borderRadius: 16,
+    padding: 16,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 1 },
+    shadowOpacity: 0.05,
+    shadowRadius: 8,
+    elevation: 2,
+  },
+  sectionHeader: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    marginBottom: 16,
   },
   sectionTitle: {
-    fontSize: 18,
+    fontSize: 16,
     fontWeight: 'bold',
-    color: '#111827',
-    marginBottom: 16,
+    color: '#0f172a',
   },
-  statRow: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-    paddingVertical: 8,
-    borderBottomWidth: 1,
-    borderBottomColor: '#f3f4f6',
-  },
-  statLabel: {
+  sectionLink: {
     fontSize: 14,
-    color: '#6b7280',
-    flex: 1,
-  },
-  statValue: {
-    fontSize: 14,
+    color: '#3b82f6',
     fontWeight: '600',
-    color: '#111827',
   },
-  summarySection: {
-    backgroundColor: '#ffffff',
-    padding: 16,
-    borderRadius: 12,
-    marginBottom: 16,
-    shadowColor: '#000',
-    shadowOffset: {
-      width: 0,
-      height: 2,
-    },
-    shadowOpacity: 0.1,
-    shadowRadius: 3.84,
-    elevation: 5,
-  },
-  summaryGrid: {
+  topItemCard: {
     flexDirection: 'row',
-    flexWrap: 'wrap',
-    justifyContent: 'space-between',
-  },
-  summaryCard: {
-    width: (width - 64) / 2,
     alignItems: 'center',
     paddingVertical: 12,
-    marginBottom: 12,
+    borderBottomWidth: 1,
+    borderBottomColor: '#f1f5f9',
   },
-  summaryValue: {
-    fontSize: 18,
+  topItemRank: {
+    width: 32,
+    height: 32,
+    borderRadius: 16,
+    backgroundColor: '#3b82f6',
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginRight: 12,
+  },
+  rankText: {
+    color: '#ffffff',
+    fontSize: 14,
     fontWeight: 'bold',
-    color: '#111827',
+  },
+  topItemInfo: {
+    flex: 1,
+  },
+  topItemName: {
+    fontSize: 14,
+    fontWeight: '600',
+    color: '#0f172a',
+    marginBottom: 2,
+  },
+  topItemDetails: {
+    fontSize: 12,
+    color: '#64748b',
+  },
+  topItemSales: {
+    alignItems: 'flex-end',
+  },
+  topItemAmount: {
+    fontSize: 14,
+    fontWeight: 'bold',
+    color: '#10b981',
+  },
+  transactionCard: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    paddingVertical: 12,
+    borderBottomWidth: 1,
+    borderBottomColor: '#f1f5f9',
+  },
+  transactionLeft: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    flex: 1,
+  },
+  transactionType: {
+    width: 36,
+    height: 36,
+    borderRadius: 18,
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginRight: 12,
+  },
+  transactionTypeText: {
+    fontSize: 16,
+  },
+  transactionInfo: {
+    flex: 1,
+  },
+  transactionParty: {
+    fontSize: 14,
+    fontWeight: '600',
+    color: '#0f172a',
+    marginBottom: 2,
+  },
+  transactionDate: {
+    fontSize: 12,
+    color: '#64748b',
+  },
+  transactionRight: {
+    alignItems: 'flex-end',
+  },
+  transactionAmount: {
+    fontSize: 14,
+    fontWeight: 'bold',
     marginBottom: 4,
   },
-  summaryLabel: {
-    fontSize: 12,
-    color: '#6b7280',
-    textAlign: 'center',
-  },
-  section: {
-    backgroundColor: '#ffffff',
-    padding: 16,
+  statusBadge: {
+    paddingHorizontal: 8,
+    paddingVertical: 2,
     borderRadius: 12,
-    marginBottom: 16,
+  },
+  statusText: {
+    fontSize: 11,
+    fontWeight: '600',
+  },
+  comingSoonCard: {
+    backgroundColor: '#ffffff',
+    marginHorizontal: 20,
+    marginTop: 40,
+    borderRadius: 16,
+    padding: 40,
+    alignItems: 'center',
     shadowColor: '#000',
-    shadowOffset: {
-      width: 0,
-      height: 2,
-    },
-    shadowOpacity: 0.1,
-    shadowRadius: 3.84,
-    elevation: 5,
+    shadowOffset: { width: 0, height: 1 },
+    shadowOpacity: 0.05,
+    shadowRadius: 8,
+    elevation: 2,
   },
-  listItem: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-    paddingVertical: 12,
-    borderBottomWidth: 1,
-    borderBottomColor: '#f3f4f6',
+  comingSoonIcon: {
+    fontSize: 48,
+    marginBottom: 16,
   },
-  listItemLeft: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    flex: 1,
-  },
-  listItemRank: {
-    fontSize: 14,
-    fontWeight: 'bold',
-    color: '#3b82f6',
-    marginRight: 12,
-    minWidth: 24,
-  },
-  listItemContent: {
-    flex: 1,
-  },
-  listItemTitle: {
-    fontSize: 16,
-    fontWeight: '600',
-    color: '#111827',
-    marginBottom: 2,
-  },
-  listItemSubtitle: {
-    fontSize: 12,
-    color: '#6b7280',
-  },
-  listItemValue: {
-    fontSize: 14,
-    fontWeight: 'bold',
-    color: '#111827',
-  },
-  emptyText: {
-    textAlign: 'center',
-    color: '#6b7280',
-    fontSize: 14,
-    paddingVertical: 20,
-  },
-  inventoryItem: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-    paddingVertical: 12,
-    borderBottomWidth: 1,
-    borderBottomColor: '#f3f4f6',
-  },
-  inventoryItemLeft: {
-    flex: 1,
-  },
-  inventoryItemName: {
-    fontSize: 16,
-    fontWeight: '600',
-    color: '#111827',
-    marginBottom: 2,
-  },
-  inventoryItemDetails: {
-    fontSize: 12,
-    color: '#6b7280',
-  },
-  inventoryItemRight: {
-    alignItems: 'flex-end',
-  },
-  inventoryItemStock: {
-    fontSize: 14,
-    fontWeight: 'bold',
-    marginBottom: 2,
-  },
-  inventoryItemValue: {
-    fontSize: 12,
-    color: '#6b7280',
-  },
-  categoryItem: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-    paddingVertical: 12,
-    borderBottomWidth: 1,
-    borderBottomColor: '#f3f4f6',
-  },
-  categoryItemLeft: {
-    flex: 1,
-  },
-  categoryName: {
-    fontSize: 16,
-    fontWeight: '600',
-    color: '#111827',
-    marginBottom: 2,
-  },
-  categoryDetails: {
-    fontSize: 12,
-    color: '#6b7280',
-  },
-  categoryValue: {
-    fontSize: 14,
-    fontWeight: 'bold',
-    color: '#111827',
-  },
-  gstSummaryCard: {
-    backgroundColor: '#f8fafc',
-    padding: 16,
-    borderRadius: 8,
-    borderWidth: 1,
-    borderColor: '#e5e7eb',
-  },
-  gstSummaryRow: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-    paddingVertical: 8,
-  },
-  gstLabel: {
-    fontSize: 14,
-    color: '#6b7280',
-    flex: 1,
-  },
-  gstValue: {
-    fontSize: 14,
-    fontWeight: '600',
-    color: '#111827',
-  },
-  gstTotalRow: {
-    borderTopWidth: 2,
-    borderTopColor: '#e5e7eb',
-    paddingTop: 12,
-    marginTop: 8,
-  },
-  gstTotalLabel: {
-    fontSize: 16,
-    fontWeight: 'bold',
-    color: '#111827',
-  },
-  gstTotalValue: {
-    fontSize: 16,
-    fontWeight: 'bold',
-  },
-  taxRateItem: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-    paddingVertical: 12,
-    borderBottomWidth: 1,
-    borderBottomColor: '#f3f4f6',
-  },
-  taxRateLeft: {
-    flex: 1,
-  },
-  taxRatePercent: {
+  comingSoonTitle: {
     fontSize: 18,
     fontWeight: 'bold',
-    color: '#3b82f6',
-    marginBottom: 2,
+    color: '#0f172a',
+    marginBottom: 8,
   },
-  taxRateDetails: {
-    fontSize: 12,
-    color: '#6b7280',
-  },
-  taxRateRight: {
-    alignItems: 'flex-end',
-  },
-  taxRateAmount: {
-    fontSize: 16,
-    fontWeight: 'bold',
-    color: '#111827',
-    marginBottom: 2,
-  },
-  taxRateLabel: {
-    fontSize: 12,
-    color: '#6b7280',
+  comingSoonText: {
+    fontSize: 14,
+    color: '#64748b',
+    textAlign: 'center',
   },
 });
 
