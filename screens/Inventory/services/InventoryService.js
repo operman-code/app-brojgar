@@ -171,6 +171,71 @@ class InventoryService {
       return { success: false, error: error.message };
     }
   }
+
+  // ===== MISSING METHODS ADDED =====
+
+  // Get inventory summary
+  static async getInventorySummary() {
+    try {
+      await DatabaseService.init();
+      
+      const query = `
+        SELECT 
+          COUNT(*) as total_items,
+          COUNT(CASE WHEN current_stock <= min_stock THEN 1 END) as low_stock_items,
+          COUNT(CASE WHEN current_stock = 0 THEN 1 END) as out_of_stock_items,
+          COALESCE(SUM(current_stock * sale_price), 0) as total_value
+        FROM inventory_items 
+        WHERE (deleted_at IS NULL OR deleted_at = '')
+      `;
+      
+      const result = await DatabaseService.executeQuery(query);
+      return result.rows._array[0] || {
+        total_items: 0,
+        low_stock_items: 0,
+        out_of_stock_items: 0,
+        total_value: 0
+      };
+    } catch (error) {
+      console.error('Error getting inventory summary:', error);
+      return {
+        total_items: 0,
+        low_stock_items: 0,
+        out_of_stock_items: 0,
+        total_value: 0
+      };
+    }
+  }
+
+  // Validate item data
+  static validateItemData(itemData) {
+    const errors = [];
+    
+    if (!itemData.name || itemData.name.trim().length === 0) {
+      errors.push('Item name is required');
+    }
+    
+    if (itemData.sale_price < 0) {
+      errors.push('Sale price cannot be negative');
+    }
+    
+    if (itemData.purchase_price < 0) {
+      errors.push('Purchase price cannot be negative');
+    }
+    
+    if (itemData.current_stock < 0) {
+      errors.push('Current stock cannot be negative');
+    }
+    
+    if (itemData.min_stock < 0) {
+      errors.push('Minimum stock cannot be negative');
+    }
+    
+    return {
+      isValid: errors.length === 0,
+      errors
+    };
+  }
 }
 
 export default InventoryService;
