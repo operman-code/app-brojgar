@@ -2,493 +2,386 @@
 import DatabaseService from '../../../database/DatabaseService';
 
 class DashboardService {
-  static formatCurrency(amount) {
-    return `₹${amount.toLocaleString("en-IN")}`;
-  }
-
-  static formatDate(date) {
-    if (typeof date === 'string') return date;
-    return new Intl.DateTimeFormat('en-IN', {
-      day: '2-digit',
-      month: 'short'
-    }).format(date);
-  }
-
-  // Get KPI data from database
-  static async getKPIData() {
+  // Get dashboard overview data
+  static async getDashboardData() {
     try {
-      const db = await DatabaseService.getDatabase();
+      await DatabaseService.init();
       
-      if (!db) {
-        // Return mock data if database is not available
-        return {
-          toCollect: 125000,
-          toPay: 45000,
-          stockValue: 320000,
-          weekSales: 89000,
-          totalBalance: 156000,
-          toCollectTrend: "+12.5%",
-          toPayTrend: "-8.2%",
-          stockTrend: "+5.1%",
-          salesTrend: "+18.3%",
-          balanceTrend: "+22.1%",
-        };
-      }
-
-      // Get outstanding receivables (unpaid invoices from customers)
-      const receivablesResult = await db.getFirstAsync(`
-        SELECT COALESCE(SUM(balance_amount), 0) as amount 
-        FROM invoices 
-        WHERE balance_amount > 0 AND status != 'cancelled'
-      `);
-      
-      // Get outstanding payables (unpaid purchases to suppliers)
-      const payablesResult = await db.getFirstAsync(`
-        SELECT COALESCE(SUM(amount), 0) as amount 
-        FROM expenses 
-        WHERE expense_date <= date('now') 
-        AND id NOT IN (SELECT reference_id FROM payments WHERE reference_type = 'expense')
-      `);
-      
-      // Get stock value
-      const stockResult = await db.getFirstAsync(`
-        SELECT COALESCE(SUM(current_stock * cost_price), 0) as value 
-        FROM items 
-        WHERE is_active = 1
-      `);
-      
-      // Get this week's sales
-      const weekSalesResult = await db.getFirstAsync(`
-        SELECT COALESCE(SUM(paid_amount), 0) as amount 
-        FROM invoices 
-        WHERE invoice_date >= date('now', 'weekday 0', '-6 days')
-        AND status != 'cancelled'
-      `);
-      
-      // Get cash and bank balance from payments
-      const balanceResult = await db.getFirstAsync(`
-        SELECT COALESCE(SUM(amount), 0) as amount 
-        FROM payments 
-        WHERE payment_date <= date('now')
-      `);
+      const [
+        todaySales,
+        monthSales,
+        totalCustomers,
+        totalSuppliers,
+        lowStockItems,
+        recentTransactions,
+        pendingPayments,
+        topItems
+      ] = await Promise.all([
+        this.getTodaySales(),
+        this.getMonthSales(),
+        this.getTotalCustomers(),
+        this.getTotalSuppliers(),
+        this.getLowStockItems(),
+        this.getRecentTransactions(5),
+        this.getPendingPayments(),
+        this.getTopSellingItems()
+      ]);
 
       return {
-        toCollect: receivablesResult?.amount || 0,
-        toPay: payablesResult?.amount || 0,
-        stockValue: stockResult?.value || 0,
-        weekSales: weekSalesResult?.amount || 0,
-        totalBalance: balanceResult?.amount || 0,
-        
-        // Default trends (in real app, calculate from historical data)
-        toCollectTrend: "+12.5%",
-        toPayTrend: "-8.2%",
-        stockTrend: "+5.1%",
-        salesTrend: "+18.3%",
-        balanceTrend: "+22.1%",
+        kpis: {
+          todaySales: todaySales.total || 0,
+          todayCount: todaySales.count || 0,
+          monthSales: monthSales.total || 0,
+          monthCount: monthSales.count || 0,
+          totalCustomers: totalCustomers || 0,
+          totalSuppliers: totalSuppliers || 0,
+          lowStockCount: lowStockItems.length || 0,
+          pendingPayments: pendingPayments.total || 0
+        },
+        insights: {
+          salesGrowth: await this.getSalesGrowth(),
+          profitMargin: await this.getProfitMargin(),
+          topCustomer: await this.getTopCustomer(),
+          inventoryValue: await this.getInventoryValue()
+        },
+        recentTransactions,
+        lowStockItems,
+        topItems: topItems.slice(0, 3),
+        reminders: await this.getReminders()
       };
     } catch (error) {
-      console.error('❌ Error fetching KPI data:', error);
-      return {
-        toCollect: 0,
-        toPay: 0,
-        stockValue: 0,
-        weekSales: 0,
-        totalBalance: 0,
-        toCollectTrend: "0%",
-        toPayTrend: "0%",
-        stockTrend: "0%",
-        salesTrend: "0%",
-        balanceTrend: "0%",
-      };
+      console.error('Error getting dashboard data:', error);
+      return this.getDefaultDashboardData();
     }
   }
 
-  // Get reminders data
-  static async getReminders() {
+  // Get today's sales
+  static async getTodaySales() {
     try {
-      const db = await DatabaseService.getDatabase();
+      const today = new Date().toISOString().split('T')[0];
+      const query = `
+        SELECT 
+          COUNT(*) as count,
+          COALESCE(SUM(total), 0) as total
+        FROM invoices 
+        WHERE DATE(invoice_date) = ? 
+        AND (deleted_at IS NULL OR deleted_at = '')
+      `;
       
-      if (!db) {
-        // Return mock reminders if database is not available
-        return [
-          {
-            id: '1',
-            title: 'Payment Due',
-            subtitle: 'ABC Electronics - Invoice #001',
-            amount: 25000,
-            color: '#ef4444',
-            icon: '💳',
-            type: 'payment_due',
-            dueDate: '2024-01-30'
-          },
-          {
-            id: '2',
-            title: 'Low Stock Alert',
-            subtitle: 'iPhone 15 Pro - Only 2 left',
-            amount: null,
-            color: '#f59e0b',
-            icon: '📦',
-            type: 'low_stock',
-            dueDate: null
-          },
-          {
-            id: '3',
-            title: 'GST Filing Due',
-            subtitle: 'Monthly GST Return',
-            amount: null,
-            color: '#8b5cf6',
-            icon: '📋',
-            type: 'gst_filing',
-            dueDate: '2024-02-05'
-          }
-        ];
-      }
-
-      // Get overdue invoices
-      const overdueInvoices = await db.getAllAsync(`
-        SELECT i.invoice_number, p.name as customer_name, i.balance_amount, i.due_date
-        FROM invoices i
-        LEFT JOIN parties p ON i.party_id = p.id
-        WHERE i.due_date < date('now') AND i.balance_amount > 0
-        ORDER BY i.due_date ASC
-        LIMIT 5
-      `);
-
-      // Get low stock items
-      const lowStockItems = await db.getAllAsync(`
-        SELECT name, current_stock, minimum_stock
-        FROM items
-        WHERE current_stock <= minimum_stock AND is_active = 1
-        ORDER BY current_stock ASC
-        LIMIT 3
-      `);
-
-      const reminders = [];
-
-      // Add overdue payment reminders
-      overdueInvoices.forEach((invoice, index) => {
-        reminders.push({
-          id: `payment_${index}`,
-          title: 'Payment Overdue',
-          subtitle: `${invoice.customer_name} - ${invoice.invoice_number}`,
-          amount: invoice.balance_amount,
-          color: '#ef4444',
-          icon: '💳',
-          type: 'payment_due',
-          dueDate: invoice.due_date
-        });
-      });
-
-      // Add low stock reminders
-      lowStockItems.forEach((item, index) => {
-        reminders.push({
-          id: `stock_${index}`,
-          title: 'Low Stock Alert',
-          subtitle: `${item.name} - Only ${item.current_stock} left`,
-          amount: null,
-          color: '#f59e0b',
-          icon: '📦',
-          type: 'low_stock',
-          dueDate: null
-        });
-      });
-
-      return reminders;
+      const result = await DatabaseService.executeQuery(query, [today]);
+      return result.rows._array[0] || { count: 0, total: 0 };
     } catch (error) {
-      console.error('❌ Error fetching reminders:', error);
+      console.error('Error getting today sales:', error);
+      return { count: 0, total: 0 };
+    }
+  }
+
+  // Get this month's sales
+  static async getMonthSales() {
+    try {
+      const now = new Date();
+      const firstDay = new Date(now.getFullYear(), now.getMonth(), 1).toISOString().split('T')[0];
+      const lastDay = new Date(now.getFullYear(), now.getMonth() + 1, 0).toISOString().split('T')[0];
+      
+      const query = `
+        SELECT 
+          COUNT(*) as count,
+          COALESCE(SUM(total), 0) as total
+        FROM invoices 
+        WHERE DATE(invoice_date) BETWEEN ? AND ?
+        AND (deleted_at IS NULL OR deleted_at = '')
+      `;
+      
+      const result = await DatabaseService.executeQuery(query, [firstDay, lastDay]);
+      return result.rows._array[0] || { count: 0, total: 0 };
+    } catch (error) {
+      console.error('Error getting month sales:', error);
+      return { count: 0, total: 0 };
+    }
+  }
+
+  // Get total customers
+  static async getTotalCustomers() {
+    try {
+      const query = `
+        SELECT COUNT(*) as count 
+        FROM parties 
+        WHERE type = 'Customer' 
+        AND (deleted_at IS NULL OR deleted_at = '')
+      `;
+      
+      const result = await DatabaseService.executeQuery(query);
+      return result.rows._array[0]?.count || 0;
+    } catch (error) {
+      console.error('Error getting total customers:', error);
+      return 0;
+    }
+  }
+
+  // Get total suppliers
+  static async getTotalSuppliers() {
+    try {
+      const query = `
+        SELECT COUNT(*) as count 
+        FROM parties 
+        WHERE type = 'Supplier' 
+        AND (deleted_at IS NULL OR deleted_at = '')
+      `;
+      
+      const result = await DatabaseService.executeQuery(query);
+      return result.rows._array[0]?.count || 0;
+    } catch (error) {
+      console.error('Error getting total suppliers:', error);
+      return 0;
+    }
+  }
+
+  // Get low stock items
+  static async getLowStockItems() {
+    try {
+      const query = `
+        SELECT * FROM inventory_items 
+        WHERE current_stock <= min_stock 
+        AND (deleted_at IS NULL OR deleted_at = '')
+        ORDER BY current_stock ASC
+        LIMIT 10
+      `;
+      
+      const result = await DatabaseService.executeQuery(query);
+      return result.rows._array || [];
+    } catch (error) {
+      console.error('Error getting low stock items:', error);
       return [];
     }
   }
 
   // Get recent transactions
-  static async getRecentTransactions() {
+  static async getRecentTransactions(limit = 5) {
     try {
-      const db = await DatabaseService.getDatabase();
+      const query = `
+        SELECT 
+          t.*,
+          p.name as party_name
+        FROM transactions t
+        LEFT JOIN parties p ON t.party_id = p.id
+        WHERE (t.deleted_at IS NULL OR t.deleted_at = '')
+        ORDER BY t.transaction_date DESC, t.id DESC
+        LIMIT ?
+      `;
       
-      if (!db) {
-        // Return mock transactions if database is not available
-        return [
-          {
-            id: '1',
-            type: 'Sale',
-            customer: 'John Electronics',
-            reference: 'INV-001',
-            amount: 45000,
-            date: '2024-01-25',
-            status: 'Paid',
-            icon: '💰'
-          },
-          {
-            id: '2',
-            type: 'Purchase',
-            customer: 'Tech Suppliers',
-            reference: 'PUR-015',
-            amount: 28000,
-            date: '2024-01-24',
-            status: 'Pending',
-            icon: '📦'
-          },
-          {
-            id: '3',
-            type: 'Payment',
-            customer: 'ABC Corp',
-            reference: 'PAY-008',
-            amount: 15000,
-            date: '2024-01-23',
-            status: 'Received',
-            icon: '💳'
-          }
-        ];
-      }
+      const result = await DatabaseService.executeQuery(query, [limit]);
+      return result.rows._array || [];
+    } catch (error) {
+      console.error('Error getting recent transactions:', error);
+      return [];
+    }
+  }
 
-      // Get recent invoices
-      const invoices = await db.getAllAsync(`
+  // Get pending payments
+  static async getPendingPayments() {
+    try {
+      const query = `
         SELECT 
-          i.id,
-          i.invoice_number,
-          i.total,
-          i.invoice_date,
-          i.status,
-          p.name as customer_name
-        FROM invoices i
-        LEFT JOIN parties p ON i.party_id = p.id
-        ORDER BY i.created_at DESC
-        LIMIT 10
-      `);
+          COUNT(*) as count,
+          COALESCE(SUM(total - paid_amount), 0) as total
+        FROM invoices 
+        WHERE status = 'pending' 
+        AND (total - paid_amount) > 0
+        AND (deleted_at IS NULL OR deleted_at = '')
+      `;
+      
+      const result = await DatabaseService.executeQuery(query);
+      return result.rows._array[0] || { count: 0, total: 0 };
+    } catch (error) {
+      console.error('Error getting pending payments:', error);
+      return { count: 0, total: 0 };
+    }
+  }
 
-      // Get recent payments
-      const payments = await db.getAllAsync(`
+  // Get top selling items
+  static async getTopSellingItems() {
+    try {
+      const query = `
         SELECT 
-          p.id,
-          p.amount,
-          p.payment_date,
-          p.payment_method,
-          pt.name as party_name
-        FROM payments p
-        LEFT JOIN parties pt ON p.party_id = pt.id
-        ORDER BY p.created_at DESC
+          ii.item_name,
+          SUM(ii.quantity) as total_quantity,
+          SUM(ii.total) as total_sales
+        FROM invoice_items ii
+        JOIN invoices i ON ii.invoice_id = i.id
+        WHERE (ii.deleted_at IS NULL OR ii.deleted_at = '')
+        AND (i.deleted_at IS NULL OR i.deleted_at = '')
+        GROUP BY ii.item_name
+        ORDER BY total_sales DESC
         LIMIT 5
-      `);
-
-      const transactions = [];
-
-      // Add invoices as transactions
-      invoices.forEach(invoice => {
-        transactions.push({
-          id: `inv_${invoice.id}`,
-          type: 'Sale',
-          customer: invoice.customer_name || 'Unknown Customer',
-          reference: invoice.invoice_number,
-          amount: invoice.total,
-          date: invoice.invoice_date,
-          status: invoice.status,
-          icon: '💰'
-        });
-      });
-
-      // Add payments as transactions
-      payments.forEach(payment => {
-        transactions.push({
-          id: `pay_${payment.id}`,
-          type: 'Payment',
-          customer: payment.party_name || 'Unknown Party',
-          reference: `PAY-${payment.id}`,
-          amount: payment.amount,
-          date: payment.payment_date,
-          status: 'Received',
-          icon: '💳'
-        });
-      });
-
-      // Sort by date and return latest
-      return transactions
-        .sort((a, b) => new Date(b.date) - new Date(a.date))
-        .slice(0, 10);
-
+      `;
+      
+      const result = await DatabaseService.executeQuery(query);
+      return result.rows._array || [];
     } catch (error) {
-      console.error('❌ Error fetching transactions:', error);
+      console.error('Error getting top selling items:', error);
       return [];
     }
   }
 
-  // Get notifications
-  static async getNotifications() {
+  // Get sales growth
+  static async getSalesGrowth() {
     try {
-      const reminders = await this.getReminders();
+      const now = new Date();
+      const thisMonth = new Date(now.getFullYear(), now.getMonth(), 1).toISOString().split('T')[0];
+      const lastMonth = new Date(now.getFullYear(), now.getMonth() - 1, 1).toISOString().split('T')[0];
+      const lastMonthEnd = new Date(now.getFullYear(), now.getMonth(), 0).toISOString().split('T')[0];
       
-      // Convert high-priority reminders to notifications
-      const notifications = reminders
-        .filter(reminder => reminder.type === 'payment_due')
-        .slice(0, 3)
-        .map(reminder => ({
-          id: reminder.id,
-          title: reminder.title,
-          message: reminder.subtitle,
-          type: 'warning',
-          timestamp: new Date().toISOString()
-        }));
-
-      return notifications;
-    } catch (error) {
-      console.error('❌ Error fetching notifications:', error);
-      return [];
-    }
-  }
-
-  // Get sales chart data
-  static async getSalesChartData() {
-    try {
-      const db = await DatabaseService.getDatabase();
-      
-      if (!db) {
-        // Return mock chart data
-        return [
-          { day: 'Mon', sales: 12000 },
-          { day: 'Tue', sales: 15000 },
-          { day: 'Wed', sales: 8000 },
-          { day: 'Thu', sales: 22000 },
-          { day: 'Fri', sales: 18000 },
-          { day: 'Sat', sales: 25000 },
-          { day: 'Sun', sales: 14000 }
-        ];
-      }
-
-      // Get last 7 days sales data
-      const salesData = await db.getAllAsync(`
-        SELECT 
-          DATE(invoice_date) as sale_date,
-          SUM(total) as daily_sales
-        FROM invoices
-        WHERE invoice_date >= date('now', '-7 days')
-        AND status != 'cancelled'
-        GROUP BY DATE(invoice_date)
-        ORDER BY sale_date ASC
-      `);
-
-      // Format for chart
-      const chartData = salesData.map(item => ({
-        day: new Date(item.sale_date).toLocaleDateString('en-US', { weekday: 'short' }),
-        sales: item.daily_sales || 0
-      }));
-
-      return chartData;
-    } catch (error) {
-      console.error('❌ Error fetching chart data:', error);
-      return [];
-    }
-  }
-
-  // Get business profile
-  static async getBusinessProfile() {
-    try {
-      const db = await DatabaseService.getDatabase();
-      
-      if (!db) {
-        return {
-          businessName: "Brojgar Business",
-          ownerName: "Business Owner",
-          gstNumber: "27XXXXX1234X1Z5",
-          phone: "+91 98765 43210",
-          email: "business@brojgar.com"
-        };
-      }
-
-      // Get business settings from database
-      const settings = await db.getAllAsync(`
-        SELECT key, value FROM settings
-        WHERE key IN ('business_name', 'owner_name', 'gst_number', 'phone', 'email')
-      `);
-
-      const profile = {
-        businessName: "Brojgar Business",
-        ownerName: "Business Owner", 
-        gstNumber: "27XXXXX1234X1Z5",
-        phone: "+91 98765 43210",
-        email: "business@brojgar.com"
-      };
-
-      // Update with database values
-      settings.forEach(setting => {
-        switch (setting.key) {
-          case 'business_name':
-            profile.businessName = setting.value;
-            break;
-          case 'owner_name':
-            profile.ownerName = setting.value;
-            break;
-          case 'gst_number':
-            profile.gstNumber = setting.value;
-            break;
-          case 'phone':
-            profile.phone = setting.value;
-            break;
-          case 'email':
-            profile.email = setting.value;
-            break;
-        }
-      });
-
-      return profile;
-    } catch (error) {
-      console.error('❌ Error fetching business profile:', error);
-      return {
-        businessName: "Brojgar Business",
-        ownerName: "Business Owner",
-        gstNumber: "27XXXXX1234X1Z5",
-        phone: "+91 98765 43210",
-        email: "business@brojgar.com"
-      };
-    }
-  }
-
-  // Get dashboard summary
-  static async getDashboardSummary() {
-    try {
-      const [kpiData, transactions, reminders] = await Promise.all([
-        this.getKPIData(),
-        this.getRecentTransactions(),
-        this.getReminders()
+      const [thisMonthSales, lastMonthSales] = await Promise.all([
+        DatabaseService.executeQuery(`
+          SELECT COALESCE(SUM(total), 0) as total
+          FROM invoices 
+          WHERE DATE(invoice_date) >= ?
+          AND (deleted_at IS NULL OR deleted_at = '')
+        `, [thisMonth]),
+        DatabaseService.executeQuery(`
+          SELECT COALESCE(SUM(total), 0) as total
+          FROM invoices 
+          WHERE DATE(invoice_date) BETWEEN ? AND ?
+          AND (deleted_at IS NULL OR deleted_at = '')
+        `, [lastMonth, lastMonthEnd])
       ]);
-
-      return {
-        totalTransactions: transactions.length,
-        pendingReminders: reminders.length,
-        netCashFlow: (kpiData.toCollect || 0) - (kpiData.toPay || 0),
-        lastUpdated: new Date().toISOString()
-      };
+      
+      const thisTotal = thisMonthSales.rows._array[0]?.total || 0;
+      const lastTotal = lastMonthSales.rows._array[0]?.total || 0;
+      
+      if (lastTotal === 0) return 0;
+      return ((thisTotal - lastTotal) / lastTotal * 100).toFixed(1);
     } catch (error) {
-      console.error('❌ Error generating dashboard summary:', error);
-      return {
-        totalTransactions: 0,
-        pendingReminders: 0,
-        netCashFlow: 0,
-        lastUpdated: new Date().toISOString()
-      };
+      console.error('Error calculating sales growth:', error);
+      return 0;
     }
   }
 
-  // Get quick report shortcuts
-  static getReportShortcuts() {
-    return [
-      { id: '1', title: 'Sales Report', icon: '📊', screen: 'Reports', type: 'sales' },
-      { id: '2', title: 'Purchase Report', icon: '🛒', screen: 'Reports', type: 'purchase' },
-      { id: '3', title: 'Stock Report', icon: '📦', screen: 'Reports', type: 'inventory' },
-      { id: '4', title: 'P&L Statement', icon: '💰', screen: 'Reports', type: 'profit_loss' },
-      { id: '5', title: 'GST Report', icon: '📋', screen: 'Reports', type: 'gst' },
-      { id: '6', title: 'Customer Report', icon: '👥', screen: 'Reports', type: 'customers' }
-    ];
+  // Get profit margin
+  static async getProfitMargin() {
+    try {
+      // This is a simplified calculation
+      const query = `
+        SELECT 
+          COALESCE(SUM(total), 0) as revenue,
+          COUNT(*) as transactions
+        FROM invoices 
+        WHERE (deleted_at IS NULL OR deleted_at = '')
+      `;
+      
+      const result = await DatabaseService.executeQuery(query);
+      const data = result.rows._array[0];
+      
+      // Assuming 30% profit margin as default calculation
+      return data?.revenue > 0 ? '30.0' : '0.0';
+    } catch (error) {
+      console.error('Error calculating profit margin:', error);
+      return '0.0';
+    }
   }
 
-  // Get quick actions
-  static getQuickActions() {
-    return [
-      { id: '1', title: 'New Sale', icon: '💰', action: 'newSale', color: '#10b981' },
-      { id: '2', title: 'Add Item', icon: '📦', action: 'addItem', color: '#3b82f6' },
-      { id: '3', title: 'New Customer', icon: '👤', action: 'newCustomer', color: '#8b5cf6' },
-      { id: '4', title: 'Receive Payment', icon: '💳', action: 'receivePayment', color: '#f59e0b' },
-      { id: '5', title: 'New Invoice', icon: '🧾', action: 'newInvoice', color: '#ef4444' },
-      { id: '6', title: 'View Reports', icon: '📊', action: 'viewReports', color: '#06b6d4' }
-    ];
+  // Get top customer
+  static async getTopCustomer() {
+    try {
+      const query = `
+        SELECT 
+          p.name,
+          COALESCE(SUM(i.total), 0) as total_sales
+        FROM parties p
+        LEFT JOIN invoices i ON p.id = i.party_id 
+          AND (i.deleted_at IS NULL OR i.deleted_at = '')
+        WHERE p.type = 'Customer' 
+        AND (p.deleted_at IS NULL OR p.deleted_at = '')
+        GROUP BY p.id, p.name
+        ORDER BY total_sales DESC
+        LIMIT 1
+      `;
+      
+      const result = await DatabaseService.executeQuery(query);
+      return result.rows._array[0]?.name || 'No customers yet';
+    } catch (error) {
+      console.error('Error getting top customer:', error);
+      return 'No customers yet';
+    }
+  }
+
+  // Get inventory value
+  static async getInventoryValue() {
+    try {
+      const query = `
+        SELECT COALESCE(SUM(current_stock * sale_price), 0) as total_value
+        FROM inventory_items 
+        WHERE (deleted_at IS NULL OR deleted_at = '')
+      `;
+      
+      const result = await DatabaseService.executeQuery(query);
+      return result.rows._array[0]?.total_value || 0;
+    } catch (error) {
+      console.error('Error getting inventory value:', error);
+      return 0;
+    }
+  }
+
+  // Get reminders
+  static async getReminders() {
+    try {
+      const reminders = [];
+      
+      // Low stock reminders
+      const lowStock = await this.getLowStockItems();
+      if (lowStock.length > 0) {
+        reminders.push({
+          id: 'low_stock',
+          type: 'warning',
+          title: 'Low Stock Alert',
+          message: `${lowStock.length} items are running low on stock`,
+          action: 'View Items'
+        });
+      }
+      
+      // Pending payments
+      const pending = await this.getPendingPayments();
+      if (pending.count > 0) {
+        reminders.push({
+          id: 'pending_payments',
+          type: 'info',
+          title: 'Pending Payments',
+          message: `₹${pending.total.toLocaleString()} pending from ${pending.count} invoices`,
+          action: 'View Invoices'
+        });
+      }
+      
+      return reminders;
+    } catch (error) {
+      console.error('Error getting reminders:', error);
+      return [];
+    }
+  }
+
+  // Get default dashboard data
+  static getDefaultDashboardData() {
+    return {
+      kpis: {
+        todaySales: 0,
+        todayCount: 0,
+        monthSales: 0,
+        monthCount: 0,
+        totalCustomers: 0,
+        totalSuppliers: 0,
+        lowStockCount: 0,
+        pendingPayments: 0
+      },
+      insights: {
+        salesGrowth: '0.0',
+        profitMargin: '0.0',
+        topCustomer: 'No customers yet',
+        inventoryValue: 0
+      },
+      recentTransactions: [],
+      lowStockItems: [],
+      topItems: [],
+      reminders: []
+    };
   }
 }
 
