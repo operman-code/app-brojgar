@@ -1,383 +1,259 @@
 // database/DatabaseService.js
-import { Platform } from 'react-native';
-
-let SQLite;
-if (Platform.OS !== 'web') {
-  SQLite = require('expo-sqlite');
-}
+import * as SQLite from 'expo-sqlite';
 
 class DatabaseService {
-  constructor() {
-    this.db = null;
-    this.isInitialized = false;
-    this.DATABASE_NAME = 'brojgar_business.db';
-    this.DATABASE_VERSION = 1;
-  }
+  static db = null;
 
-  // Initialize database connection
-  async init() {
+  static async init() {
     try {
-      if (Platform.OS === 'web') {
-        console.log('⚠️  SQLite not available on web, using mock data');
-        this.isInitialized = true;
-        return null;
-      }
-
-      if (this.isInitialized) return this.db;
-
       console.log('🔌 Connecting to SQLite database...');
+      this.db = await SQLite.openDatabaseAsync('brojgar_business.db');
       
-      // SDK 53 API - Use openDatabaseAsync
-      this.db = await SQLite.openDatabaseAsync(this.DATABASE_NAME);
-      
-      console.log('🗄️  Creating database tables...');
+      console.log('🗄️ Creating database tables...');
       await this.createTables();
       
       console.log('✅ All tables created successfully');
-      await this.runMigrations();
       
+      await this.runMigrations();
+      console.log('✅ All migrations executed successfully');
       console.log('✅ Migrations completed');
+      
+      console.log('⚙️ Inserting initial configuration...');
       await this.insertInitialData();
       
-      this.isInitialized = true;
       console.log('✅ Database connected successfully');
-      
-      return this.db;
+      return true;
     } catch (error) {
-      console.error('❌ Database initialization error:', error);
+      console.error('❌ Database initialization failed:', error);
       throw error;
     }
   }
 
-  // Get database instance
-  async getDatabase() {
-    if (Platform.OS === 'web') {
-      console.log('⚠️  SQLite not available on web');
-      return null;
-    }
-
-    if (!this.isInitialized) {
-      await this.init();
-    }
-    return this.db;
-  }
-
-  // Create all database tables
-  async createTables() {
-    if (Platform.OS === 'web') return;
-
+  static async createTables() {
     const tables = [
-      // Business settings table
+      // Business Settings Table
       `CREATE TABLE IF NOT EXISTS business_settings (
         id INTEGER PRIMARY KEY AUTOINCREMENT,
-        setting_key TEXT UNIQUE NOT NULL,
-        setting_value TEXT,
+        key TEXT UNIQUE NOT NULL,
+        value TEXT,
         created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
         updated_at DATETIME DEFAULT CURRENT_TIMESTAMP,
-        deleted_at DATETIME
-      );`,
+        deleted_at DATETIME NULL
+      )`,
 
-      // Categories table
+      // Categories Table
       `CREATE TABLE IF NOT EXISTS categories (
         id INTEGER PRIMARY KEY AUTOINCREMENT,
-        name TEXT UNIQUE NOT NULL,
-        type TEXT NOT NULL DEFAULT 'item',
-        icon TEXT DEFAULT '📦',
-        color TEXT DEFAULT '#3b82f6',
+        name TEXT NOT NULL,
         description TEXT,
-        is_active INTEGER DEFAULT 1,
         created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
         updated_at DATETIME DEFAULT CURRENT_TIMESTAMP,
-        deleted_at DATETIME
-      );`,
+        deleted_at DATETIME NULL
+      )`,
 
-      // Parties table (customers and suppliers)
+      // Parties Table (Customers & Suppliers)
       `CREATE TABLE IF NOT EXISTS parties (
         id INTEGER PRIMARY KEY AUTOINCREMENT,
         name TEXT NOT NULL,
-        type TEXT NOT NULL DEFAULT 'Customer',
-        email TEXT,
         phone TEXT,
+        email TEXT,
+        address TEXT,
         gst_number TEXT,
         pan_number TEXT,
-        address TEXT,
-        city TEXT,
-        state TEXT,
-        pincode TEXT,
-        country TEXT DEFAULT 'India',
-        outstanding_balance REAL DEFAULT 0,
+        type TEXT NOT NULL DEFAULT 'customer',
         credit_limit REAL DEFAULT 0,
         credit_days INTEGER DEFAULT 30,
-        is_active INTEGER DEFAULT 1,
+        opening_balance REAL DEFAULT 0,
+        balance REAL DEFAULT 0,
         notes TEXT,
         created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
         updated_at DATETIME DEFAULT CURRENT_TIMESTAMP,
-        deleted_at DATETIME
-      );`,
+        deleted_at DATETIME NULL
+      )`,
 
-      // Inventory Items table
+      // Inventory Items Table
       `CREATE TABLE IF NOT EXISTS inventory_items (
         id INTEGER PRIMARY KEY AUTOINCREMENT,
-        name TEXT NOT NULL,
+        item_name TEXT NOT NULL,
+        item_code TEXT UNIQUE,
+        category TEXT,
         description TEXT,
-        category_id INTEGER,
-        sku TEXT UNIQUE,
-        barcode TEXT,
-        hsn_code TEXT,
-        brand TEXT,
-        unit TEXT DEFAULT 'pcs',
-        purchase_price REAL DEFAULT 0,
-        sale_price REAL DEFAULT 0,
-        mrp REAL DEFAULT 0,
-        current_stock REAL DEFAULT 0,
-        min_stock REAL DEFAULT 0,
-        max_stock REAL DEFAULT 1000,
-        location TEXT,
-        supplier_id INTEGER,
+        stock_quantity INTEGER DEFAULT 0,
+        min_stock_level INTEGER DEFAULT 5,
+        cost_price REAL DEFAULT 0,
+        selling_price REAL DEFAULT 0,
         tax_rate REAL DEFAULT 18,
-        is_active INTEGER DEFAULT 1,
+        unit TEXT DEFAULT 'pcs',
+        hsn_code TEXT,
         created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
         updated_at DATETIME DEFAULT CURRENT_TIMESTAMP,
-        deleted_at DATETIME,
-        FOREIGN KEY (category_id) REFERENCES categories(id),
-        FOREIGN KEY (supplier_id) REFERENCES parties(id)
-      );`,
+        deleted_at DATETIME NULL
+      )`,
 
-      // Invoices table
+      // Invoices Table
       `CREATE TABLE IF NOT EXISTS invoices (
         id INTEGER PRIMARY KEY AUTOINCREMENT,
         invoice_number TEXT UNIQUE NOT NULL,
-        party_id INTEGER NOT NULL,
-        invoice_date DATE NOT NULL,
-        due_date DATE,
+        party_id INTEGER,
+        date TEXT NOT NULL,
+        due_date TEXT,
         subtotal REAL DEFAULT 0,
-        discount_amount REAL DEFAULT 0,
         tax_amount REAL DEFAULT 0,
+        discount_amount REAL DEFAULT 0,
         total REAL DEFAULT 0,
         paid_amount REAL DEFAULT 0,
-        status TEXT DEFAULT 'pending',
+        status TEXT DEFAULT 'draft',
         notes TEXT,
         terms TEXT,
         created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
         updated_at DATETIME DEFAULT CURRENT_TIMESTAMP,
-        deleted_at DATETIME,
-        FOREIGN KEY (party_id) REFERENCES parties(id)
-      );`,
+        deleted_at DATETIME NULL,
+        FOREIGN KEY (party_id) REFERENCES parties (id)
+      )`,
 
-      // Invoice Items table
+      // Invoice Items Table
       `CREATE TABLE IF NOT EXISTS invoice_items (
         id INTEGER PRIMARY KEY AUTOINCREMENT,
         invoice_id INTEGER NOT NULL,
-        item_id INTEGER,
-        item_name TEXT NOT NULL,
-        quantity REAL NOT NULL,
-        unit_price REAL NOT NULL,
-        discount REAL DEFAULT 0,
+        item_id INTEGER NOT NULL,
+        item_name TEXT,
+        quantity REAL DEFAULT 1,
+        rate REAL DEFAULT 0,
         tax_rate REAL DEFAULT 18,
-        total REAL NOT NULL,
+        tax_amount REAL DEFAULT 0,
+        total REAL DEFAULT 0,
         created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
         updated_at DATETIME DEFAULT CURRENT_TIMESTAMP,
-        deleted_at DATETIME,
-        FOREIGN KEY (invoice_id) REFERENCES invoices(id),
-        FOREIGN KEY (item_id) REFERENCES inventory_items(id)
-      );`,
+        deleted_at DATETIME NULL,
+        FOREIGN KEY (invoice_id) REFERENCES invoices (id),
+        FOREIGN KEY (item_id) REFERENCES inventory_items (id)
+      )`,
 
-      // Transactions table
+      // Transactions Table (Income & Expenses)
       `CREATE TABLE IF NOT EXISTS transactions (
         id INTEGER PRIMARY KEY AUTOINCREMENT,
-        reference_number TEXT,
+        reference TEXT,
         party_id INTEGER,
-        type TEXT NOT NULL,
-        amount REAL NOT NULL,
-        payment_method TEXT DEFAULT 'cash',
-        transaction_date DATE NOT NULL,
+        type TEXT NOT NULL DEFAULT 'income',
+        amount REAL DEFAULT 0,
+        date TEXT NOT NULL,
         description TEXT,
-        invoice_id INTEGER,
-        created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
-        updated_at DATETIME DEFAULT CURRENT_TIMESTAMP,
-        deleted_at DATETIME,
-        FOREIGN KEY (party_id) REFERENCES parties(id),
-        FOREIGN KEY (invoice_id) REFERENCES invoices(id)
-      );`,
-
-      // Notifications table
-      `CREATE TABLE IF NOT EXISTS notifications (
-        id INTEGER PRIMARY KEY AUTOINCREMENT,
-        title TEXT NOT NULL,
-        message TEXT NOT NULL,
-        type TEXT DEFAULT 'info',
-        priority TEXT DEFAULT 'medium',
-        action_url TEXT,
-        related_id INTEGER,
-        related_type TEXT,
-        read_at DATETIME,
-        created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
-        updated_at DATETIME DEFAULT CURRENT_TIMESTAMP,
-        deleted_at DATETIME
-      );`,
-
-      // Recent searches table
-      `CREATE TABLE IF NOT EXISTS recent_searches (
-        id INTEGER PRIMARY KEY AUTOINCREMENT,
-        query TEXT NOT NULL,
-        created_at DATETIME DEFAULT CURRENT_TIMESTAMP
-      );`,
-
-      // Backups table
-      `CREATE TABLE IF NOT EXISTS backups (
-        id INTEGER PRIMARY KEY AUTOINCREMENT,
-        backup_name TEXT NOT NULL,
-        backup_size INTEGER DEFAULT 0,
-        record_count INTEGER DEFAULT 0,
-        include_images INTEGER DEFAULT 0,
-        backup_data TEXT,
+        category TEXT,
+        payment_method TEXT DEFAULT 'cash',
         status TEXT DEFAULT 'completed',
         created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
         updated_at DATETIME DEFAULT CURRENT_TIMESTAMP,
-        deleted_at DATETIME
-      );`
+        deleted_at DATETIME NULL,
+        FOREIGN KEY (party_id) REFERENCES parties (id)
+      )`,
+
+      // Notifications Table
+      `CREATE TABLE IF NOT EXISTS notifications (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        title TEXT NOT NULL,
+        message TEXT,
+        type TEXT DEFAULT 'info',
+        action_url TEXT,
+        related_id INTEGER,
+        related_type TEXT,
+        read_at DATETIME NULL,
+        created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+        updated_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+        deleted_at DATETIME NULL
+      )`,
+
+      // Recent Searches Table
+      `CREATE TABLE IF NOT EXISTS recent_searches (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        query TEXT NOT NULL,
+        type TEXT,
+        results_count INTEGER DEFAULT 0,
+        created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+        deleted_at DATETIME NULL
+      )`,
+
+      // Backups Table
+      `CREATE TABLE IF NOT EXISTS backups (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        filename TEXT NOT NULL,
+        file_path TEXT,
+        file_size INTEGER DEFAULT 0,
+        backup_type TEXT DEFAULT 'manual',
+        status TEXT DEFAULT 'completed',
+        created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+        deleted_at DATETIME NULL
+      )`
     ];
 
+    for (const table of tables) {
+      await this.db.execAsync(table);
+    }
+  }
+
+  static async runMigrations() {
+    // Add any schema updates here
     try {
-      for (const tableQuery of tables) {
-        await this.db.execAsync(tableQuery);
+      // Migration 1: Ensure all required columns exist
+      const migrations = [
+        // Add missing columns to existing tables if they don't exist
+        `ALTER TABLE invoices ADD COLUMN paid_amount REAL DEFAULT 0`,
+        `ALTER TABLE notifications ADD COLUMN action_url TEXT`,
+        `ALTER TABLE notifications ADD COLUMN read_at DATETIME NULL`,
+        `ALTER TABLE business_settings ADD COLUMN deleted_at DATETIME NULL`,
+        `ALTER TABLE transactions ADD COLUMN status TEXT DEFAULT 'completed'`,
+        `ALTER TABLE inventory_items ADD COLUMN stock_quantity INTEGER DEFAULT 0`
+      ];
+
+      for (const migration of migrations) {
+        try {
+          await this.db.execAsync(migration);
+        } catch (error) {
+          // Column might already exist, ignore error
+          if (!error.message.includes('duplicate column name')) {
+            console.log('Migration note:', error.message);
+          }
+        }
       }
     } catch (error) {
-      console.error('❌ Error creating tables:', error);
-      throw error;
+      console.log('Migration completed with notes:', error.message);
     }
   }
 
-  // Run database migrations
-  async runMigrations() {
-    if (Platform.OS === 'web') return;
-
+  static async insertInitialData() {
     try {
-      // Add any future migrations here
-      console.log('✅ All migrations executed successfully');
-    } catch (error) {
-      console.error('❌ Migration error:', error);
-      throw error;
-    }
-  }
-
-  // Insert minimal sample data for first-time users
-  async insertSampleData() {
-    if (Platform.OS === 'web') return;
-
-    try {
-      console.log('📝 Inserting minimal sample data...');
-      
-      // Check if sample data already exists
-      const existingParties = await this.db.getFirstAsync('SELECT COUNT(*) as count FROM parties');
-      if (existingParties.count > 0) {
-        console.log('ℹ️  Sample data already exists');
-        return;
-      }
-
-      // 1. Insert one sample category
-      await this.db.runAsync(`
-        INSERT INTO categories (name, icon, color, description, created_at, updated_at)
-        VALUES (?, ?, ?, ?, datetime('now'), datetime('now'))
-      `, ['Electronics', '📱', '#3b82f6', 'Mobile phones and accessories']);
-
-      // 2. Insert one sample customer
-      const customerResult = await this.db.runAsync(`
-        INSERT INTO parties (name, type, phone, email, address, outstanding_balance, created_at, updated_at)
-        VALUES (?, ?, ?, ?, ?, ?, datetime('now'), datetime('now'))
-      `, ['John Doe', 'Customer', '+91 98765 43210', 'john@example.com', 'Sample Address, City', 5000]);
-
-      const customerId = customerResult.lastInsertRowId;
-
-      // 3. Insert one sample item
-      const itemResult = await this.db.runAsync(`
-        INSERT INTO inventory_items (name, description, category_id, sku, unit, purchase_price, sale_price, current_stock, min_stock, created_at, updated_at)
-        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, datetime('now'), datetime('now'))
-      `, ['Sample Product', 'Demo product for testing', 1, 'DEMO-001', 'pcs', 100, 150, 10, 5]);
-
-      const itemId = itemResult.lastInsertRowId;
-
-      // 4. Insert one sample invoice
-      const invoiceResult = await this.db.runAsync(`
-        INSERT INTO invoices (invoice_number, party_id, invoice_date, due_date, subtotal, tax_amount, total, status, created_at, updated_at)
-        VALUES (?, ?, ?, ?, ?, ?, ?, ?, datetime('now'), datetime('now'))
-      `, ['INV-2024-001', customerId, new Date().toISOString().split('T')[0], new Date(Date.now() + 30 * 24 * 60 * 60 * 1000).toISOString().split('T')[0], 150, 27, 177, 'pending']);
-
-      const invoiceId = invoiceResult.lastInsertRowId;
-
-      // 5. Insert one invoice item
-      await this.db.runAsync(`
-        INSERT INTO invoice_items (invoice_id, item_id, item_name, quantity, unit_price, tax_rate, total, created_at, updated_at)
-        VALUES (?, ?, ?, ?, ?, ?, ?, datetime('now'), datetime('now'))
-      `, [invoiceId, itemId, 'Sample Product', 1, 150, 18, 150]);
-
-      // 6. Insert one sample transaction
-      await this.db.runAsync(`
-        INSERT INTO transactions (reference_number, party_id, type, amount, payment_method, transaction_date, description, invoice_id, created_at, updated_at)
-        VALUES (?, ?, ?, ?, ?, ?, ?, ?, datetime('now'), datetime('now'))
-      `, ['TXN-001', customerId, 'sale', 177, 'cash', new Date().toISOString().split('T')[0], 'Sample transaction', invoiceId]);
-
-      // 7. Insert one welcome notification
-      await this.db.runAsync(`
-        INSERT INTO notifications (title, message, type, priority, created_at, updated_at)
-        VALUES (?, ?, ?, ?, datetime('now'), datetime('now'))
-      `, ['Welcome to Brojgar Business!', 'Your business app is ready. Start by exploring the dashboard.', 'info', 'low']);
-
-      // 8. Update business name
-      await this.db.runAsync(`
-        INSERT OR REPLACE INTO business_settings (setting_key, setting_value, created_at, updated_at)
-        VALUES (?, ?, datetime('now'), datetime('now'))
-      `, ['business_name', 'Sample Business']);
-
-      console.log('✅ Minimal sample data created: 1 customer, 1 product, 1 invoice, 1 transaction');
-      
-    } catch (error) {
-      console.error('❌ Error inserting sample data:', error);
-      throw error;
-    }
-  }
-
-  // Insert initial data
-  async insertInitialData() {
-    if (Platform.OS === 'web') return;
-
-    try {
-      console.log('⚙️  Inserting initial configuration...');
-      
-      // Check if settings already exist
-      const existingSettings = await this.db.getFirstAsync(
-        'SELECT COUNT(*) as count FROM business_settings'
+      // Check if business settings already exist
+      const existingSettings = await this.executeQuery(
+        'SELECT COUNT(*) as count FROM business_settings WHERE deleted_at IS NULL'
       );
-      
-      if (existingSettings.count > 0) {
-        console.log('ℹ️  Initial data already exists');
+
+      if (existingSettings[0]?.count > 0) {
+        console.log('ℹ️ Initial data already exists');
+        await this.insertSampleData();
         return;
       }
 
-      // Insert default settings first
+      // Insert default business settings
       const defaultSettings = [
-        { setting_key: 'business_name', setting_value: 'Your Business Name' },
-        { setting_key: 'owner_name', setting_value: 'Business Owner' },
-        { setting_key: 'gst_number', setting_value: '27XXXXX1234X1Z5' },
-        { setting_key: 'phone', setting_value: '+91 98765 43210' },
-        { setting_key: 'email', setting_value: 'business@example.com' },
-        { setting_key: 'address', setting_value: 'Business Address, City, State' },
-        { setting_key: 'currency', setting_value: 'INR' },
-        { setting_key: 'tax_rate', setting_value: '18' },
-        { setting_key: 'invoice_prefix', setting_value: 'INV' },
-        { setting_key: 'last_invoice_number', setting_value: '1' }
+        { key: 'business_name', value: 'Brojgar Business' },
+        { key: 'business_email', value: '' },
+        { key: 'business_phone', value: '' },
+        { key: 'business_address', value: '' },
+        { key: 'tax_rate', value: '18' },
+        { key: 'currency', value: 'INR' },
+        { key: 'invoice_prefix', value: 'INV' },
+        { key: 'last_invoice_number', value: '0' },
+        { key: 'theme', value: 'light' },
+        { key: 'auto_backup', value: 'true' }
       ];
 
       for (const setting of defaultSettings) {
-        await this.db.runAsync(
-          'INSERT OR IGNORE INTO business_settings (setting_key, setting_value) VALUES (?, ?)',
-          [setting.setting_key, setting.setting_value]
+        await this.executeQuery(
+          'INSERT INTO business_settings (key, value) VALUES (?, ?)',
+          [setting.key, setting.value]
         );
       }
 
-      // Insert sample data for better user experience
       await this.insertSampleData();
-
       console.log('✅ Initial data inserted successfully');
     } catch (error) {
       console.error('❌ Error inserting initial data:', error);
@@ -385,113 +261,158 @@ class DatabaseService {
     }
   }
 
-  // Execute query with error handling
-  async executeQuery(query, params = []) {
+  static async insertSampleData() {
     try {
-      if (Platform.OS === 'web') {
-        console.log('⚠️  Database query skipped on web');
-        return { rows: { _array: [] } };
+      // Check if sample data already exists
+      const existingCustomers = await this.executeQuery(
+        'SELECT COUNT(*) as count FROM parties WHERE deleted_at IS NULL'
+      );
+
+      if (existingCustomers[0]?.count > 0) {
+        return; // Sample data already exists
       }
 
-      const db = await this.getDatabase();
-      if (!db) {
-        throw new Error('Database not available');
+      // Insert sample customer
+      await this.executeQuery(
+        `INSERT INTO parties (name, phone, email, type, credit_limit, balance) 
+         VALUES (?, ?, ?, ?, ?, ?)`,
+        ['Sample Customer', '+91 9876543210', 'customer@example.com', 'customer', 50000, 0]
+      );
+
+      // Insert sample category
+      await this.executeQuery(
+        'INSERT INTO categories (name, description) VALUES (?, ?)',
+        ['General', 'General category for items']
+      );
+
+      // Insert sample product
+      await this.executeQuery(
+        `INSERT INTO inventory_items (item_name, item_code, category, stock_quantity, min_stock_level, cost_price, selling_price) 
+         VALUES (?, ?, ?, ?, ?, ?, ?)`,
+        ['Sample Product', 'SP001', 'General', 100, 10, 50, 75]
+      );
+
+      // Insert sample invoice
+      const invoiceResult = await this.executeQuery(
+        `INSERT INTO invoices (invoice_number, party_id, date, due_date, subtotal, tax_amount, total, status) 
+         VALUES (?, ?, ?, ?, ?, ?, ?, ?)`,
+        ['INV001', 1, new Date().toISOString().split('T')[0], 
+         new Date(Date.now() + 30*24*60*60*1000).toISOString().split('T')[0], 
+         100, 18, 118, 'sent']
+      );
+
+      // Insert sample invoice item
+      await this.executeQuery(
+        `INSERT INTO invoice_items (invoice_id, item_id, item_name, quantity, rate, tax_rate, tax_amount, total) 
+         VALUES (?, ?, ?, ?, ?, ?, ?, ?)`,
+        [1, 1, 'Sample Product', 2, 50, 18, 18, 118]
+      );
+
+      // Insert sample transaction
+      await this.executeQuery(
+        `INSERT INTO transactions (reference, party_id, type, amount, date, description, status) 
+         VALUES (?, ?, ?, ?, ?, ?, ?)`,
+        ['TXN001', 1, 'income', 118, new Date().toISOString().split('T')[0], 'Sample sale', 'completed']
+      );
+
+      // Insert sample notification
+      await this.executeQuery(
+        `INSERT INTO notifications (title, message, type, related_id, related_type) 
+         VALUES (?, ?, ?, ?, ?)`,
+        ['Welcome!', 'Welcome to Brojgar Business App', 'info', null, null]
+      );
+
+      console.log('✅ Sample data inserted successfully');
+    } catch (error) {
+      console.error('❌ Error inserting sample data:', error);
+    }
+  }
+
+  static async executeQuery(sql, params = []) {
+    try {
+      if (!this.db) {
+        throw new Error('Database not initialized');
       }
 
-      let result;
-      if (query.trim().toUpperCase().startsWith('SELECT')) {
-        // For SELECT queries, use getAllAsync
-        const rows = await db.getAllAsync(query, params);
-        result = { rows: { _array: rows } };
+      // Determine if this is a SELECT query or a modification query
+      const isSelect = sql.trim().toUpperCase().startsWith('SELECT');
+      
+      if (isSelect) {
+        return await this.db.getAllAsync(sql, params);
       } else {
-        // For INSERT, UPDATE, DELETE, use runAsync
-        const runResult = await db.runAsync(query, params);
-        result = { 
-          insertId: runResult.lastInsertRowId,
-          changes: runResult.changes,
-          rows: { _array: [] }
-        };
+        return await this.db.runAsync(sql, params);
       }
-
-      return result;
     } catch (error) {
       console.error('❌ Query execution error:', error);
       throw error;
     }
   }
 
-  // Get setting value
-  async getSetting(key, defaultValue = null) {
+  static async getSetting(key) {
     try {
-      const db = await this.getDatabase();
-      const result = await db.getFirstAsync(
-        'SELECT setting_value FROM business_settings WHERE setting_key = ?',
+      const result = await this.executeQuery(
+        'SELECT value FROM business_settings WHERE key = ? AND deleted_at IS NULL',
         [key]
       );
-      return result ? result.setting_value : defaultValue;
+      return result[0]?.value || null;
     } catch (error) {
-      console.error(`❌ Error getting setting ${key}:`, error);
-      return defaultValue;
+      console.error('❌ Error getting setting:', error);
+      return null;
     }
   }
 
-  // Set setting value
-  async setSetting(key, value, type = 'string') {
+  static async setSetting(key, value) {
     try {
-      const db = await this.getDatabase();
-      await db.runAsync(
-        'INSERT OR REPLACE INTO business_settings (setting_key, setting_value, updated_at) VALUES (?, ?, CURRENT_TIMESTAMP)',
-        [key, value]
+      const existing = await this.executeQuery(
+        'SELECT id FROM business_settings WHERE key = ? AND deleted_at IS NULL',
+        [key]
       );
+
+      if (existing.length > 0) {
+        await this.executeQuery(
+          'UPDATE business_settings SET value = ?, updated_at = CURRENT_TIMESTAMP WHERE key = ? AND deleted_at IS NULL',
+          [value, key]
+        );
+      } else {
+        await this.executeQuery(
+          'INSERT INTO business_settings (key, value) VALUES (?, ?)',
+          [key, value]
+        );
+      }
+
       console.log(`✅ Setting ${key} updated`);
       return true;
     } catch (error) {
-      console.error(`❌ Error setting ${key}:`, error);
+      console.error('❌ Error setting value:', error);
       return false;
     }
   }
 
-  // Get next invoice number
-  async getNextInvoiceNumber() {
+  static async getNextInvoiceNumber() {
     try {
-      const prefix = await this.getSetting('invoice_prefix', 'INV');
-      const lastNumber = await this.getSetting('last_invoice_number', '0');
-      const nextNumber = parseInt(lastNumber) + 1;
+      const lastNumber = await this.getSetting('last_invoice_number');
+      const nextNumber = parseInt(lastNumber || '0') + 1;
       
       await this.setSetting('last_invoice_number', nextNumber.toString());
       
-      return `${prefix}-${String(nextNumber).padStart(4, '0')}`;
+      const prefix = await this.getSetting('invoice_prefix') || 'INV';
+      return `${prefix}${nextNumber.toString().padStart(4, '0')}`;
     } catch (error) {
-      console.error('❌ Error generating invoice number:', error);
-      return `INV-${String(Date.now()).slice(-4)}`;
+      console.error('❌ Error getting next invoice number:', error);
+      return `INV${Date.now()}`;
     }
   }
 
-  // Close database connection
-  async close() {
+  static async clearAllData() {
     try {
-      if (this.db && Platform.OS !== 'web') {
-        await this.db.closeAsync();
-        this.isInitialized = false;
-        console.log('✅ Database connection closed');
-      }
-    } catch (error) {
-      console.error('❌ Error closing database:', error);
-    }
-  }
-
-  // Clear all data (for testing/reset)
-  async clearAllData() {
-    try {
-      if (Platform.OS === 'web') return;
-
       const tables = [
-        'parties', 'inventory_items', 'categories', 'invoices', 
-        'invoice_items', 'transactions', 'notifications'
+        'notifications', 'recent_searches', 'backups', 'invoice_items', 
+        'invoices', 'transactions', 'inventory_items', 'parties', 
+        'categories', 'business_settings'
       ];
 
       for (const table of tables) {
-        await this.db.runAsync(`DELETE FROM ${table}`);
+        await this.db.execAsync(`DELETE FROM ${table}`);
       }
 
       console.log('✅ All data cleared');
@@ -501,8 +422,77 @@ class DatabaseService {
       return false;
     }
   }
+
+  static async close() {
+    try {
+      if (this.db) {
+        await this.db.closeAsync();
+        this.db = null;
+        console.log('✅ Database connection closed');
+      }
+    } catch (error) {
+      console.error('❌ Error closing database:', error);
+    }
+  }
+
+  // Add backup method for file operations
+  static async backup() {
+    try {
+      // For SQLite, we can export the data as JSON
+      const tables = [
+        'business_settings', 'categories', 'parties', 'inventory_items',
+        'invoices', 'invoice_items', 'transactions', 'notifications'
+      ];
+
+      const backup = {};
+      
+      for (const table of tables) {
+        backup[table] = await this.executeQuery(`SELECT * FROM ${table} WHERE deleted_at IS NULL`);
+      }
+
+      return {
+        timestamp: new Date().toISOString(),
+        version: '1.0',
+        data: backup
+      };
+    } catch (error) {
+      console.error('❌ Error creating backup:', error);
+      throw error;
+    }
+  }
+
+  static async restore(backupData) {
+    try {
+      if (!backupData || !backupData.data) {
+        throw new Error('Invalid backup data');
+      }
+
+      // Clear existing data
+      await this.clearAllData();
+
+      // Restore data
+      for (const [tableName, tableData] of Object.entries(backupData.data)) {
+        if (Array.isArray(tableData) && tableData.length > 0) {
+          const columns = Object.keys(tableData[0]).filter(col => col !== 'id');
+          const placeholders = columns.map(() => '?').join(',');
+          
+          for (const row of tableData) {
+            const values = columns.map(col => row[col]);
+            await this.executeQuery(
+              `INSERT INTO ${tableName} (${columns.join(',')}) VALUES (${placeholders})`,
+              values
+            );
+          }
+        }
+      }
+
+      console.log('✅ Database restored from backup');
+      return true;
+    } catch (error) {
+      console.error('❌ Error restoring backup:', error);
+      throw error;
+    }
+  }
 }
 
-// Export singleton instance
-const databaseService = new DatabaseService();
-export default databaseService;
+export default DatabaseService;
