@@ -520,6 +520,55 @@ class SettingsService {
       console.error('Error initializing settings tables:', error);
     }
   }
+
+  // Get all settings (alias for getAppSettings)
+  static async getAllSettings() {
+    try {
+      const [businessProfile, appSettings, securitySettings] = await Promise.all([
+        this.getBusinessProfile(),
+        this.getAppSettings(),
+        this.getSecuritySettings()
+      ]);
+      
+      return {
+        business: businessProfile,
+        app: appSettings,
+        security: securitySettings
+      };
+    } catch (error) {
+      console.error('Error getting all settings:', error);
+      return {
+        business: this.getDefaultBusinessProfile(),
+        app: this.getDefaultAppSettings(),
+        security: {
+          pin_enabled: false,
+          fingerprint_enabled: false,
+          auto_lock_time: 5,
+          failed_attempts_limit: 3,
+          data_encryption: false,
+          backup_encryption: false
+        }
+      };
+    }
+  }
+
+  // Update single setting (generic method)
+  static async updateSetting(key, value) {
+    try {
+      await DatabaseService.init();
+      
+      const query = `
+        INSERT OR REPLACE INTO business_settings (setting_key, setting_value, updated_at)
+        VALUES (?, ?, datetime('now'))
+      `;
+      
+      await DatabaseService.executeQuery(query, [key, value.toString()]);
+      return { success: true };
+    } catch (error) {
+      console.error('Error updating setting:', error);
+      return { success: false, error: error.message };
+    }
+  }
 }
 
 export default SettingsService;
