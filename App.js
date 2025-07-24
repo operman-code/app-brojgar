@@ -1,14 +1,17 @@
-// App.js
-import React, { useState, useEffect } from 'react';
-import { View, Text, StyleSheet, ActivityIndicator, StatusBar, SafeAreaView } from 'react-native';
+import React, { useEffect, useState } from 'react';
+import { StatusBar } from 'expo-status-bar';
 import { NavigationContainer } from '@react-navigation/native';
-
-// Import working tab navigation
+import { View, Text, StyleSheet, ActivityIndicator } from 'react-native';
 import BottomTabNavigator from './navigation/BottomTabNavigator';
+import DatabaseService from './database/DatabaseService';
+import NotificationService from './screens/Notifications/services/NotificationService';
+import GlobalSearchService from './screens/Search/services/GlobalSearchService';
+import BackupService from './screens/Backup/services/BackupService';
+import SettingsService from './screens/Settings/services/SettingsService';
 
 export default function App() {
   const [isLoading, setIsLoading] = useState(true);
-  const [loadingMessage, setLoadingMessage] = useState('Initializing...');
+  const [error, setError] = useState(null);
 
   useEffect(() => {
     initializeApp();
@@ -16,58 +19,57 @@ export default function App() {
 
   const initializeApp = async () => {
     try {
-      setLoadingMessage('Setting up app...');
+      console.log('🚀 Initializing Brojgar Business App...');
       
-      // Simple delay to show loading
-      await new Promise(resolve => setTimeout(resolve, 1500));
+      // Initialize database first
+      await DatabaseService.init();
+      console.log('✅ Database initialized');
       
-      setLoadingMessage('Ready!');
+      // Initialize all services
+      await Promise.all([
+        NotificationService.checkAndCreateAutomaticNotifications(),
+        GlobalSearchService.initializeSearch(),
+        BackupService.initializeBackupSystem(),
+        SettingsService.initializeSettings()
+      ]);
       
-      // Another small delay before showing the main app
-      await new Promise(resolve => setTimeout(resolve, 500));
+      console.log('✅ All services initialized');
+      
+      // Schedule automatic backup check
+      await BackupService.scheduleAutomaticBackup();
+      console.log('✅ Automatic backup check completed');
       
       setIsLoading(false);
     } catch (error) {
-      console.error('App initialization failed:', error);
-      setLoadingMessage('Initialization failed');
-      // Still show the app even if init fails
+      console.error('❌ App initialization failed:', error);
+      setError(error.message);
       setIsLoading(false);
     }
   };
 
   if (isLoading) {
     return (
-      <SafeAreaView style={styles.loadingContainer}>
-        <StatusBar barStyle="light-content" backgroundColor="#1e40af" />
-        
-        <View style={styles.brandContainer}>
-          <Text style={styles.logoIcon}>📊</Text>
-          <Text style={styles.brandName}>Brojgar</Text>
-          <Text style={styles.brandTagline}>Complete Business Solution</Text>
-        </View>
+      <View style={styles.loadingContainer}>
+        <ActivityIndicator size="large" color="#3b82f6" />
+        <Text style={styles.loadingText}>Initializing Brojgar Business...</Text>
+        <Text style={styles.loadingSubtext}>Setting up your workspace</Text>
+      </View>
+    );
+  }
 
-        <View style={styles.loadingSection}>
-          <ActivityIndicator size="large" color="#ffffff" />
-          <Text style={styles.loadingText}>{loadingMessage}</Text>
-          
-          <View style={styles.featuresContainer}>
-            <Text style={styles.featuresTitle}>Getting Ready:</Text>
-            <Text style={styles.featureItem}>📦 Inventory System</Text>
-            <Text style={styles.featureItem}>👥 Customer Management</Text>
-            <Text style={styles.featureItem}>🧾 Invoice Templates</Text>
-            <Text style={styles.featureItem}>📊 Analytics Dashboard</Text>
-          </View>
-        </View>
-
-        <View style={styles.footer}>
-          <Text style={styles.footerText}>Brojgar Business Management v1.0.0</Text>
-        </View>
-      </SafeAreaView>
+  if (error) {
+    return (
+      <View style={styles.errorContainer}>
+        <Text style={styles.errorTitle}>Initialization Failed</Text>
+        <Text style={styles.errorText}>{error}</Text>
+        <Text style={styles.errorSubtext}>Please restart the app</Text>
+      </View>
     );
   }
 
   return (
     <NavigationContainer>
+      <StatusBar style="auto" backgroundColor="#ffffff" />
       <BottomTabNavigator />
     </NavigationContainer>
   );
@@ -76,70 +78,43 @@ export default function App() {
 const styles = StyleSheet.create({
   loadingContainer: {
     flex: 1,
-    backgroundColor: "#1e40af",
-    justifyContent: "space-between",
-    alignItems: "center",
-    paddingVertical: 60,
-  },
-  brandContainer: {
-    alignItems: "center",
-    marginTop: 80,
-  },
-  logoIcon: {
-    fontSize: 80,
-    marginBottom: 20,
-  },
-  brandName: {
-    fontSize: 32,
-    fontWeight: "bold",
-    color: "#ffffff",
-    marginBottom: 8,
-    letterSpacing: 2,
-  },
-  brandTagline: {
-    fontSize: 16,
-    color: "#bfdbfe",
-    textAlign: "center",
-    fontWeight: "300",
-  },
-  loadingSection: {
-    alignItems: "center",
-    paddingHorizontal: 40,
+    justifyContent: 'center',
+    alignItems: 'center',
+    backgroundColor: '#ffffff',
   },
   loadingText: {
     fontSize: 18,
-    color: "#ffffff",
-    marginTop: 20,
-    marginBottom: 40,
-    textAlign: "center",
-    fontWeight: "500",
+    fontWeight: '600',
+    color: '#1f2937',
+    marginTop: 16,
   },
-  featuresContainer: {
-    alignItems: "center",
-    backgroundColor: "rgba(255, 255, 255, 0.1)",
-    borderRadius: 15,
+  loadingSubtext: {
+    fontSize: 14,
+    color: '#6b7280',
+    marginTop: 8,
+  },
+  errorContainer: {
+    flex: 1,
+    justifyContent: 'center',
+    alignItems: 'center',
+    backgroundColor: '#ffffff',
     padding: 20,
-    width: "100%",
   },
-  featuresTitle: {
+  errorTitle: {
+    fontSize: 20,
+    fontWeight: '700',
+    color: '#ef4444',
+    marginBottom: 12,
+  },
+  errorText: {
     fontSize: 16,
-    color: "#ffffff",
-    fontWeight: "600",
-    marginBottom: 15,
-  },
-  featureItem: {
-    fontSize: 14,
-    color: "#bfdbfe",
+    color: '#6b7280',
+    textAlign: 'center',
     marginBottom: 8,
-    textAlign: "center",
   },
-  footer: {
-    alignItems: "center",
-  },
-  footerText: {
+  errorSubtext: {
     fontSize: 14,
-    color: "#bfdbfe",
-    textAlign: "center",
-    fontWeight: "500",
+    color: '#9ca3af',
+    textAlign: 'center',
   },
 });
