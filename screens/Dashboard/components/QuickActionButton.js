@@ -1,46 +1,36 @@
 // screens/Dashboard/components/QuickActionButton.js
 import React from 'react';
-import { TouchableOpacity, Text, StyleSheet, Dimensions } from 'react-native';
+import { TouchableOpacity, Text, StyleSheet } from 'react-native';
 
-const { width } = Dimensions.get('window');
-const buttonWidth = (width - 64) / 3; // 3 buttons per row with margins
-
-const QuickActionButton = ({ title, icon, color = '#3b82f6', onPress }) => {
+const QuickActionButton = ({ title, icon, color, onPress }) => {
   return (
     <TouchableOpacity 
-      style={[styles.button, { backgroundColor: color }]} 
+      style={[styles.container, { backgroundColor: color + '10', borderColor: color + '30' }]} 
       onPress={onPress}
-      activeOpacity={0.8}
     >
       <Text style={styles.icon}>{icon}</Text>
-      <Text style={styles.title}>{title}</Text>
+      <Text style={[styles.title, { color }]}>{title}</Text>
     </TouchableOpacity>
   );
 };
 
 const styles = StyleSheet.create({
-  button: {
-    width: buttonWidth,
-    height: 80,
+  container: {
+    width: '31%',
+    aspectRatio: 1,
     borderRadius: 12,
-    justifyContent: 'center',
     alignItems: 'center',
-    marginBottom: 12,
-    shadowColor: '#000',
-    shadowOffset: {
-      width: 0,
-      height: 2,
-    },
-    shadowOpacity: 0.1,
-    shadowRadius: 3.84,
-    elevation: 5,
+    justifyContent: 'center',
+    marginBottom: 8,
+    borderWidth: 1,
+    paddingVertical: 12,
+    paddingHorizontal: 8,
   },
   icon: {
-    fontSize: 20,
-    marginBottom: 4,
+    fontSize: 24,
+    marginBottom: 6,
   },
   title: {
-    color: '#ffffff',
     fontSize: 12,
     fontWeight: '600',
     textAlign: 'center',
