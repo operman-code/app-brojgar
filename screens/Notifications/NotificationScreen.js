@@ -11,73 +11,47 @@ import {
   FlatList,
   Alert,
   Modal,
+  RefreshControl,
 } from 'react-native';
+import NotificationService from './services/NotificationService';
 
 const NotificationScreen = ({ navigation }) => {
   const [fadeAnim] = useState(new Animated.Value(0));
   const [selectedTab, setSelectedTab] = useState('all');
   const [modalVisible, setModalVisible] = useState(false);
   const [selectedNotification, setSelectedNotification] = useState(null);
-  const [notifications, setNotifications] = useState([
-    {
-      id: 1,
-      title: 'Payment Reminder',
-      message: 'Payment of ₹25,000 from Rajesh Kumar is due today',
-      type: 'reminder',
-      time: '2 hours ago',
-      read: false,
-      priority: 'high',
-      details: 'Invoice #INV-2024-001 payment is overdue. Please follow up with the customer.',
-    },
-    {
-      id: 2,
-      title: 'Low Stock Alert',
-      message: 'OnePlus 12 is running low on stock (2 units remaining)',
-      type: 'alert',
-      time: '4 hours ago',
-      read: false,
-      priority: 'medium',
-      details: 'Current stock: 2 units. Minimum stock level: 5 units. Consider reordering soon.',
-    },
-    {
-      id: 3,
-      title: 'New Sale',
-      message: 'New sale of ₹18,000 recorded for Priya Sharma',
-      type: 'sale',
-      time: '6 hours ago',
-      read: true,
-      priority: 'low',
-      details: 'Sale completed successfully. Invoice generated and sent to customer.',
-    },
-    {
-      id: 4,
-      title: 'GST Filing Reminder',
-      message: 'GST filing due in 3 days (January 20, 2024)',
-      type: 'reminder',
-      time: '1 day ago',
-      read: false,
-      priority: 'high',
-      details: 'Monthly GST return filing deadline is approaching. Ensure all documents are ready.',
-    },
-    {
-      id: 5,
-      title: 'Backup Completed',
-      message: 'Daily backup completed successfully',
-      type: 'system',
-      time: '1 day ago',
-      read: true,
-      priority: 'low',
-      details: 'All data has been backed up to cloud storage. Last backup: Jan 15, 2024 at 2:00 AM',
-    },
-  ]);
+  const [notifications, setNotifications] = useState([]);
+  const [loading, setLoading] = useState(true);
+  const [refreshing, setRefreshing] = useState(false);
 
   useEffect(() => {
+    loadNotifications();
+    
     Animated.timing(fadeAnim, {
       toValue: 1,
       duration: 600,
       useNativeDriver: true,
     }).start();
   }, []);
+
+  const loadNotifications = async () => {
+    try {
+      setLoading(true);
+      const data = await NotificationService.getAllNotifications();
+      setNotifications(data);
+    } catch (error) {
+      console.error('Error loading notifications:', error);
+      Alert.alert('Error', 'Failed to load notifications');
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const onRefresh = async () => {
+    setRefreshing(true);
+    await loadNotifications();
+    setRefreshing(false);
+  };
 
   const tabs = [
     { key: 'all', label: 'All', count: notifications.length },
@@ -105,6 +79,8 @@ const NotificationScreen = ({ navigation }) => {
       case 'alert': return '⚠️';
       case 'sale': return '💰';
       case 'system': return '⚙️';
+      case 'info': return 'ℹ️';
+      case 'warning': return '⚠️';
       default: return '📱';
     }
   };
@@ -118,27 +94,44 @@ const NotificationScreen = ({ navigation }) => {
     }
   };
 
-  const markAsRead = (notificationId) => {
-    setNotifications(prevNotifications =>
-      prevNotifications.map(notification =>
-        notification.id === notificationId
-          ? { ...notification, read: true }
-          : notification
-      )
-    );
+  const markAsRead = async (notificationId) => {
+    try {
+      await NotificationService.markAsRead(notificationId);
+      setNotifications(prevNotifications =>
+        prevNotifications.map(notification =>
+          notification.id === notificationId
+            ? { ...notification, read: true }
+            : notification
+        )
+      );
+    } catch (error) {
+      console.error('Error marking as read:', error);
+    }
   };
 
-  const markAllAsRead = () => {
-    setNotifications(prevNotifications =>
-      prevNotifications.map(notification => ({ ...notification, read: true }))
-    );
-    Alert.alert('Success', 'All notifications marked as read');
+  const markAllAsRead = async () => {
+    try {
+      await NotificationService.markAllAsRead();
+      setNotifications(prevNotifications =>
+        prevNotifications.map(notification => ({ ...notification, read: true }))
+      );
+      Alert.alert('Success', 'All notifications marked as read');
+    } catch (error) {
+      console.error('Error marking all as read:', error);
+      Alert.alert('Error', 'Failed to mark all as read');
+    }
   };
 
-  const deleteNotification = (notificationId) => {
-    setNotifications(prevNotifications =>
-      prevNotifications.filter(notification => notification.id !== notificationId)
-    );
+  const deleteNotification = async (notificationId) => {
+    try {
+      await NotificationService.deleteNotification(notificationId);
+      setNotifications(prevNotifications =>
+        prevNotifications.filter(notification => notification.id !== notificationId)
+      );
+    } catch (error) {
+      console.error('Error deleting notification:', error);
+      Alert.alert('Error', 'Failed to delete notification');
+    }
   };
 
   const clearAllNotifications = () => {
@@ -150,7 +143,16 @@ const NotificationScreen = ({ navigation }) => {
         {
           text: 'Clear All',
           style: 'destructive',
-          onPress: () => setNotifications([])
+          onPress: async () => {
+            try {
+              await NotificationService.clearAllNotifications();
+              setNotifications([]);
+              Alert.alert('Success', 'All notifications cleared');
+            } catch (error) {
+              console.error('Error clearing notifications:', error);
+              Alert.alert('Error', 'Failed to clear notifications');
+            }
+          }
         }
       ]
     );
@@ -207,6 +209,16 @@ const NotificationScreen = ({ navigation }) => {
     </TouchableOpacity>
   );
 
+  if (loading) {
+    return (
+      <SafeAreaView style={styles.container}>
+        <View style={styles.loadingContainer}>
+          <Text style={styles.loadingText}>Loading notifications...</Text>
+        </View>
+      </SafeAreaView>
+    );
+  }
+
   return (
     <SafeAreaView style={styles.container}>
       <StatusBar barStyle="dark-content" backgroundColor="#ffffff" />
@@ -252,6 +264,9 @@ const NotificationScreen = ({ navigation }) => {
           style={styles.notificationsList}
           contentContainerStyle={styles.notificationsListContent}
           showsVerticalScrollIndicator={false}
+          refreshControl={
+            <RefreshControl refreshing={refreshing} onRefresh={onRefresh} />
+          }
           ListEmptyComponent={
             <View style={styles.emptyContainer}>
               <Text style={styles.emptyIcon}>📭</Text>
@@ -265,70 +280,70 @@ const NotificationScreen = ({ navigation }) => {
             </View>
           }
         />
-      </Animated.View>
 
-      {/* Notification Detail Modal */}
-      <Modal visible={modalVisible} animationType="slide" presentationStyle="pageSheet">
-        <SafeAreaView style={styles.modalContainer}>
-          <View style={styles.modalHeader}>
-            <TouchableOpacity onPress={() => setModalVisible(false)}>
-              <Text style={styles.modalCloseText}>Close</Text>
-            </TouchableOpacity>
-            <Text style={styles.modalTitle}>Notification Details</Text>
-            <TouchableOpacity onPress={() => {
-              deleteNotification(selectedNotification?.id);
-              setModalVisible(false);
-            }}>
-              <Text style={styles.modalDeleteText}>Delete</Text>
-            </TouchableOpacity>
-          </View>
-          
-          {selectedNotification && (
-            <ScrollView style={styles.modalContent}>
-              <View style={styles.modalNotificationCard}>
-                <View style={styles.modalNotificationHeader}>
-                  <View style={[styles.modalNotificationIcon, { backgroundColor: getPriorityColor(selectedNotification.priority) + '20' }]}>
-                    <Text style={styles.modalNotificationIconText}>
-                      {getNotificationIcon(selectedNotification.type)}
-                    </Text>
-                  </View>
-                  <View style={styles.modalNotificationInfo}>
-                    <Text style={styles.modalNotificationTitle}>{selectedNotification.title}</Text>
-                    <Text style={styles.modalNotificationTime}>{selectedNotification.time}</Text>
-                    <View style={styles.modalNotificationMeta}>
-                      <View style={[styles.modalTypeBadge, { backgroundColor: getPriorityColor(selectedNotification.priority) }]}>
-                        <Text style={styles.modalTypeBadgeText}>{selectedNotification.priority.toUpperCase()}</Text>
+        {/* Notification Detail Modal */}
+        <Modal visible={modalVisible} animationType="slide" presentationStyle="pageSheet">
+          <SafeAreaView style={styles.modalContainer}>
+            <View style={styles.modalHeader}>
+              <TouchableOpacity onPress={() => setModalVisible(false)}>
+                <Text style={styles.modalCloseText}>Close</Text>
+              </TouchableOpacity>
+              <Text style={styles.modalTitle}>Notification Details</Text>
+              <TouchableOpacity onPress={() => {
+                deleteNotification(selectedNotification?.id);
+                setModalVisible(false);
+              }}>
+                <Text style={styles.modalDeleteText}>Delete</Text>
+              </TouchableOpacity>
+            </View>
+            
+            {selectedNotification && (
+              <ScrollView style={styles.modalContent}>
+                <View style={styles.modalNotificationCard}>
+                  <View style={styles.modalNotificationHeader}>
+                    <View style={[styles.modalNotificationIcon, { backgroundColor: getPriorityColor(selectedNotification.priority) + '20' }]}>
+                      <Text style={styles.modalNotificationIconText}>
+                        {getNotificationIcon(selectedNotification.type)}
+                      </Text>
+                    </View>
+                    <View style={styles.modalNotificationInfo}>
+                      <Text style={styles.modalNotificationTitle}>{selectedNotification.title}</Text>
+                      <Text style={styles.modalNotificationTime}>{selectedNotification.time}</Text>
+                      <View style={styles.modalNotificationMeta}>
+                        <View style={[styles.modalTypeBadge, { backgroundColor: getPriorityColor(selectedNotification.priority) }]}>
+                          <Text style={styles.modalTypeBadgeText}>{selectedNotification.priority.toUpperCase()}</Text>
+                        </View>
+                        <Text style={styles.modalNotificationType}>{selectedNotification.type}</Text>
                       </View>
-                      <Text style={styles.modalNotificationType}>{selectedNotification.type}</Text>
                     </View>
                   </View>
+                  
+                  <View style={styles.modalNotificationBody}>
+                    <Text style={styles.modalNotificationMessage}>{selectedNotification.message}</Text>
+                    <Text style={styles.modalNotificationDetails}>{selectedNotification.details}</Text>
+                  </View>
                 </View>
-                
-                <View style={styles.modalNotificationBody}>
-                  <Text style={styles.modalNotificationMessage}>{selectedNotification.message}</Text>
-                  <Text style={styles.modalNotificationDetails}>{selectedNotification.details}</Text>
-                </View>
-              </View>
 
-              {/* Action Buttons */}
-              <View style={styles.modalActions}>
-                {selectedNotification.type === 'reminder' && (
-                  <TouchableOpacity style={[styles.modalActionButton, styles.primaryActionButton]}>
-                    <Text style={[styles.modalActionText, styles.primaryActionText]}>Take Action</Text>
+                {/* Action Buttons */}
+                <View style={styles.modalActions}>
+                  {selectedNotification.type === 'reminder' && (
+                    <TouchableOpacity style={[styles.modalActionButton, styles.primaryActionButton]}>
+                      <Text style={[styles.modalActionText, styles.primaryActionText]}>Take Action</Text>
+                    </TouchableOpacity>
+                  )}
+                  <TouchableOpacity style={styles.modalActionButton}>
+                    <Text style={styles.modalActionText}>Snooze</Text>
                   </TouchableOpacity>
-                )}
-                <TouchableOpacity style={styles.modalActionButton}>
-                  <Text style={styles.modalActionText}>Snooze</Text>
-                </TouchableOpacity>
-                <TouchableOpacity style={styles.modalActionButton}>
-                  <Text style={styles.modalActionText}>Share</Text>
-                </TouchableOpacity>
-              </View>
-            </ScrollView>
-          )}
-        </SafeAreaView>
-      </Modal>
-    </Animated.View>
+                  <TouchableOpacity style={styles.modalActionButton}>
+                    <Text style={styles.modalActionText}>Share</Text>
+                  </TouchableOpacity>
+                </View>
+              </ScrollView>
+            )}
+          </SafeAreaView>
+        </Modal>
+      </Animated.View>
+    </SafeAreaView>
   );
 };
 
@@ -339,6 +354,15 @@ const styles = StyleSheet.create({
   },
   content: {
     flex: 1,
+  },
+  loadingContainer: {
+    flex: 1,
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  loadingText: {
+    fontSize: 16,
+    color: '#64748b',
   },
   header: {
     flexDirection: 'row',
