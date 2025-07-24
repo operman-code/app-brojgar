@@ -1,859 +1,528 @@
 // screens/Inventory/services/InventoryService.js
-import InventoryRepository from '../../../database/repositories/InventoryRepository';
 import DatabaseService from '../../../database/DatabaseService';
 
 class InventoryService {
-  // Legacy mock data (keeping for fallback)
-  static mockItems = [
-    {
-      id: "1",
-      name: "iPhone 15 Pro",
-      description: "Latest iPhone with A17 Pro chip, titanium design",
-      category: "Mobile Accessories",
-      sku: "APPL-IP15P-256",
-      barcode: "1234567890123",
-      price: "134900",
-      costPrice: "125000",
-      stock: 25,
-      minStock: 5,
-      maxStock: 50,
-      unit: "pcs",
-      supplier: "Apple Distributors",
-      brand: "Apple",
-      notes: "High-demand product, fast-moving",
-      createdAt: "2024-01-01T10:00:00Z",
-      updatedAt: "2024-01-25T14:30:00Z",
-    },
-    {
-      id: "2",
-      name: "Samsung Galaxy S24 Ultra",
-      description: "Premium Samsung smartphone with S Pen",
-      category: "Mobile Accessories",
-      sku: "SAMS-GS24U-512",
-      barcode: "2345678901234",
-      price: "129999",
-      costPrice: "120000",
-      stock: 15,
-      minStock: 3,
-      maxStock: 30,
-      unit: "pcs",
-      supplier: "Samsung India",
-      brand: "Samsung",
-      notes: "Premium segment, good margins",
-      createdAt: "2024-01-05T11:00:00Z",
-      updatedAt: "2024-01-24T16:20:00Z",
-    },
-    {
-      id: "3",
-      name: "MacBook Air M3",
-      description: "13-inch MacBook Air with M3 chip",
-      category: "Computers",
-      sku: "APPL-MBA-M3-13",
-      barcode: "3456789012345",
-      price: "114900",
-      costPrice: "108000",
-      stock: 8,
-      minStock: 2,
-      maxStock: 20,
-      unit: "pcs",
-      supplier: "Apple Distributors",
-      brand: "Apple",
-      notes: "Popular among students and professionals",
-      createdAt: "2023-12-20T09:30:00Z",
-      updatedAt: "2024-01-23T10:15:00Z",
-    },
-    {
-      id: "4",
-      name: "Sony WH-1000XM5",
-      description: "Wireless noise-canceling headphones",
-      category: "Audio",
-      sku: "SONY-WH1000XM5-BK",
-      barcode: "4567890123456",
-      price: "29990",
-      costPrice: "25000",
-      stock: 35,
-      minStock: 10,
-      maxStock: 60,
-      unit: "pcs",
-      supplier: "Sony Electronics",
-      brand: "Sony",
-      notes: "Best-selling audio product",
-      createdAt: "2024-01-10T12:00:00Z",
-      updatedAt: "2024-01-25T09:45:00Z",
-    },
-    {
-      id: "5",
-      name: "Dell XPS 13",
-      description: "13-inch ultrabook with Intel Core i7",
-      category: "Computers",
-      sku: "DELL-XPS13-I7-16",
-      barcode: "5678901234567",
-      price: "89999",
-      costPrice: "82000",
-      stock: 12,
-      minStock: 3,
-      maxStock: 25,
-      unit: "pcs",
-      supplier: "Dell India",
-      brand: "Dell",
-      notes: "Corporate favorite",
-      createdAt: "2024-01-08T14:20:00Z",
-      updatedAt: "2024-01-22T11:30:00Z",
-    },
-    {
-      id: "6",
-      name: "iPad Pro 12.9\"",
-      description: "12.9-inch iPad Pro with M2 chip",
-      category: "Electronics",
-      sku: "APPL-IPADP-129-M2",
-      barcode: "6789012345678",
-      price: "112900",
-      costPrice: "105000",
-      stock: 18,
-      minStock: 4,
-      maxStock: 35,
-      unit: "pcs",
-      supplier: "Apple Distributors",
-      brand: "Apple",
-      notes: "Professional tablet for creatives",
-      createdAt: "2024-01-12T08:45:00Z",
-      updatedAt: "2024-01-24T13:10:00Z",
-    },
-    {
-      id: "7",
-      name: "Nintendo Switch OLED",
-      description: "Gaming console with OLED screen",
-      category: "Gaming",
-      sku: "NINT-SW-OLED-WH",
-      barcode: "7890123456789",
-      price: "37980",
-      costPrice: "33000",
-      stock: 22,
-      minStock: 5,
-      maxStock: 40,
-      unit: "pcs",
-      supplier: "Nintendo India",
-      brand: "Nintendo",
-      notes: "Popular gaming console",
-      createdAt: "2024-01-03T15:30:00Z",
-      updatedAt: "2024-01-21T17:20:00Z",
-    },
-    {
-      id: "8",
-      name: "USB-C to Lightning Cable",
-      description: "Official Apple USB-C to Lightning cable",
-      category: "Cables",
-      sku: "APPL-USBC-LIGHT-1M",
-      barcode: "8901234567890",
-      price: "1900",
-      costPrice: "1500",
-      stock: 150,
-      minStock: 50,
-      maxStock: 300,
-      unit: "pcs",
-      supplier: "Apple Distributors",
-      brand: "Apple",
-      notes: "Essential accessory",
-      createdAt: "2024-01-02T10:15:00Z",
-      updatedAt: "2024-01-25T08:30:00Z",
-    },
-    {
-      id: "9",
-      name: "Logitech MX Master 3S",
-      description: "Advanced wireless mouse for productivity",
-      category: "Electronics",
-      sku: "LOGI-MXM3S-BK",
-      barcode: "9012345678901",
-      price: "8995",
-      costPrice: "7500",
-      stock: 0,
-      minStock: 10,
-      maxStock: 50,
-      unit: "pcs",
-      supplier: "Logitech India",
-      brand: "Logitech",
-      notes: "Out of stock - reorder needed",
-      createdAt: "2024-01-15T11:45:00Z",
-      updatedAt: "2024-01-20T14:00:00Z",
-    },
-    {
-      id: "10",
-      name: "Samsung 32\" 4K Monitor",
-      description: "32-inch 4K UHD monitor with USB-C",
-      category: "Electronics",
-      sku: "SAMS-M32-4K-USBC",
-      barcode: "0123456789012",
-      price: "32999",
-      costPrice: "28000",
-      stock: 6,
-      minStock: 8,
-      maxStock: 25,
-      unit: "pcs",
-      supplier: "Samsung India",
-      brand: "Samsung",
-      notes: "Low stock alert",
-      createdAt: "2024-01-18T13:20:00Z",
-      updatedAt: "2024-01-24T15:45:00Z",
-    },
-    {
-      id: "11",
-      name: "Anker PowerBank 20000mAh",
-      description: "High-capacity portable charger",
-      category: "Mobile Accessories",
-      sku: "ANKR-PB20K-BK",
-      barcode: "1122334455667",
-      price: "3999",
-      costPrice: "3200",
-      stock: 85,
-      minStock: 30,
-      maxStock: 150,
-      unit: "pcs",
-      supplier: "Anker India",
-      brand: "Anker",
-      notes: "Fast-moving accessory",
-      createdAt: "2024-01-07T09:30:00Z",
-      updatedAt: "2024-01-23T12:15:00Z",
-    },
-    {
-      id: "12",
-      name: "JBL Flip 6",
-      description: "Portable Bluetooth speaker",
-      category: "Audio",
-      sku: "JBL-FLIP6-BL",
-      barcode: "2233445566778",
-      price: "12999",
-      costPrice: "10500",
-      stock: 28,
-      minStock: 12,
-      maxStock: 60,
-      unit: "pcs",
-      supplier: "Harman India",
-      brand: "JBL",
-      notes: "Popular speaker model",
-      createdAt: "2024-01-09T14:00:00Z",
-      updatedAt: "2024-01-22T16:30:00Z",
-    },
-  ];
-
-  // Get all items from database
-  static async getAllItems() {
+  // Get all items with optional filtering
+  static async getAllItems(categoryId = null, searchQuery = '', status = 'all') {
     try {
-      const items = await InventoryRepository.getAllItemsWithCategory();
+      await DatabaseService.init();
+      
+      let conditions = 'WHERE i.deleted_at IS NULL';
+      let params = [];
+      
+      if (categoryId) {
+        conditions += ' AND i.category_id = ?';
+        params.push(categoryId);
+      }
+      
+      if (searchQuery) {
+        conditions += ' AND (i.name LIKE ? OR i.description LIKE ? OR i.sku LIKE ?)';
+        const searchPattern = `%${searchQuery}%`;
+        params.push(searchPattern, searchPattern, searchPattern);
+      }
+      
+      if (status === 'low_stock') {
+        conditions += ' AND i.current_stock <= i.minimum_stock';
+      } else if (status === 'out_of_stock') {
+        conditions += ' AND i.current_stock = 0';
+      } else if (status === 'active') {
+        conditions += ' AND i.is_active = 1';
+      }
+      
+      conditions += ' ORDER BY i.name ASC';
+      
+      const items = await DatabaseService.executeQuery(`
+        SELECT 
+          i.*,
+          c.name as category_name,
+          c.icon as category_icon,
+          p.name as supplier_name
+        FROM items i
+        LEFT JOIN categories c ON i.category_id = c.id
+        LEFT JOIN parties p ON i.supplier_id = p.id
+        ${conditions}
+      `, params);
+      
       return items.map(item => ({
-        ...item,
-        id: item.id.toString(),
+        id: item.id,
+        name: item.name,
+        description: item.description,
         category: item.category_name || 'Uncategorized',
-        stock: item.current_stock,
-        price: item.selling_price,
+        categoryIcon: item.category_icon || '📦',
+        sku: item.sku,
+        barcode: item.barcode,
+        brand: item.brand,
+        unit: item.unit,
         costPrice: item.cost_price,
-        minStock: item.min_stock,
-        maxStock: item.max_stock
+        sellingPrice: item.selling_price,
+        mrp: item.mrp,
+        currentStock: item.current_stock,
+        minimumStock: item.minimum_stock,
+        supplier: item.supplier_name,
+        taxRate: item.tax_rate,
+        status: this.getStockStatus(item.current_stock, item.minimum_stock),
+        profitMargin: this.calculateProfitMargin(item.cost_price, item.selling_price),
+        stockValue: item.current_stock * item.cost_price,
+        created_at: item.created_at
       }));
     } catch (error) {
-      console.error('Error fetching items from database:', error);
-      // Fallback to mock data if database fails
-      return [...this.mockItems];
+      console.error('❌ Error fetching items:', error);
+      return [];
     }
   }
 
   // Get item by ID
   static async getItemById(id) {
-    return new Promise((resolve, reject) => {
-      setTimeout(() => {
-        const item = this.items.find(i => i.id === id);
-        if (item) {
-          resolve({ ...item });
-        } else {
-          reject(new Error("Item not found"));
-        }
-      }, 200);
-    });
+    try {
+      const result = await DatabaseService.executeQuery(`
+        SELECT 
+          i.*,
+          c.name as category_name,
+          p.name as supplier_name
+        FROM items i
+        LEFT JOIN categories c ON i.category_id = c.id
+        LEFT JOIN parties p ON i.supplier_id = p.id
+        WHERE i.id = ? AND i.deleted_at IS NULL
+      `, [id]);
+      
+      if (result.length === 0) return null;
+      
+      const item = result[0];
+      return {
+        id: item.id,
+        name: item.name,
+        description: item.description,
+        category_id: item.category_id,
+        category: item.category_name,
+        sku: item.sku,
+        barcode: item.barcode,
+        hsn_code: item.hsn_code,
+        brand: item.brand,
+        unit: item.unit,
+        cost_price: item.cost_price,
+        selling_price: item.selling_price,
+        mrp: item.mrp,
+        current_stock: item.current_stock,
+        minimum_stock: item.minimum_stock,
+        reorder_level: item.reorder_level,
+        location: item.location,
+        supplier_id: item.supplier_id,
+        supplier_name: item.supplier_name,
+        tax_rate: item.tax_rate,
+        is_active: item.is_active,
+        created_at: item.created_at
+      };
+    } catch (error) {
+      console.error('❌ Error fetching item by ID:', error);
+      return null;
+    }
   }
 
-  // Add new item
-  static async addItem(itemData) {
-    return new Promise((resolve, reject) => {
-      setTimeout(() => {
-        try {
-          // Generate SKU if not provided
-          if (!itemData.sku) {
-            itemData.sku = this.generateSKU(itemData.name, itemData.category);
-          }
-
-          const newItem = {
-            ...itemData,
-            id: (this.items.length + 1).toString(),
-            stock: Number(itemData.stock) || 0,
-            minStock: Number(itemData.minStock) || 0,
-            maxStock: Number(itemData.maxStock) || 100,
-            price: Number(itemData.price) || 0,
-            costPrice: Number(itemData.costPrice) || 0,
-            createdAt: new Date().toISOString(),
-            updatedAt: new Date().toISOString(),
-          };
-          this.items.push(newItem);
-          resolve(newItem);
-        } catch (error) {
-          reject(error);
-        }
-      }, 500);
-    });
+  // Create new item
+  static async createItem(itemData) {
+    try {
+      await DatabaseService.init();
+      
+      // Generate SKU if not provided
+      const sku = itemData.sku || await this.generateSKU(itemData.name);
+      
+      const data = {
+        name: itemData.name,
+        description: itemData.description || null,
+        category_id: itemData.category_id || null,
+        sku: sku,
+        barcode: itemData.barcode || null,
+        hsn_code: itemData.hsn_code || null,
+        brand: itemData.brand || null,
+        unit: itemData.unit || 'pcs',
+        cost_price: itemData.cost_price || 0,
+        selling_price: itemData.selling_price || 0,
+        mrp: itemData.mrp || 0,
+        current_stock: itemData.current_stock || 0,
+        minimum_stock: itemData.minimum_stock || 0,
+        reorder_level: itemData.reorder_level || 5,
+        location: itemData.location || null,
+        supplier_id: itemData.supplier_id || null,
+        tax_rate: itemData.tax_rate || 18,
+        is_active: 1
+      };
+      
+      const itemId = await DatabaseService.create('items', data);
+      
+      // Create stock movement record
+      if (data.current_stock > 0) {
+        await this.createStockMovement(itemId, 'opening_stock', data.current_stock, 'Opening Stock');
+      }
+      
+      // Create notification
+      await this.createNotification('Item Added', `${data.name} has been added to inventory`, 'info');
+      
+      return itemId;
+    } catch (error) {
+      console.error('❌ Error creating item:', error);
+      throw error;
+    }
   }
 
-  // Update existing item
+  // Update item
   static async updateItem(id, itemData) {
-    return new Promise((resolve, reject) => {
-      setTimeout(() => {
-        try {
-          const index = this.items.findIndex(i => i.id === id);
-          if (index !== -1) {
-            this.items[index] = {
-              ...this.items[index],
-              ...itemData,
-              id, // Ensure ID doesn't change
-              stock: Number(itemData.stock) || this.items[index].stock,
-              minStock: Number(itemData.minStock) || this.items[index].minStock,
-              maxStock: Number(itemData.maxStock) || this.items[index].maxStock,
-              price: Number(itemData.price) || this.items[index].price,
-              costPrice: Number(itemData.costPrice) || this.items[index].costPrice,
-              updatedAt: new Date().toISOString(),
-            };
-            resolve(this.items[index]);
-          } else {
-            reject(new Error("Item not found"));
-          }
-        } catch (error) {
-          reject(error);
-        }
-      }, 500);
-    });
+    try {
+      const currentItem = await this.getItemById(id);
+      if (!currentItem) throw new Error('Item not found');
+      
+      const updateData = {
+        name: itemData.name,
+        description: itemData.description || null,
+        category_id: itemData.category_id || null,
+        sku: itemData.sku,
+        barcode: itemData.barcode || null,
+        hsn_code: itemData.hsn_code || null,
+        brand: itemData.brand || null,
+        unit: itemData.unit || 'pcs',
+        cost_price: itemData.cost_price || 0,
+        selling_price: itemData.selling_price || 0,
+        mrp: itemData.mrp || 0,
+        minimum_stock: itemData.minimum_stock || 0,
+        reorder_level: itemData.reorder_level || 5,
+        location: itemData.location || null,
+        supplier_id: itemData.supplier_id || null,
+        tax_rate: itemData.tax_rate || 18
+      };
+      
+      const result = await DatabaseService.update('items', id, updateData);
+      
+      // Handle stock adjustment if stock changed
+      if (itemData.current_stock !== undefined && itemData.current_stock !== currentItem.current_stock) {
+        const stockDifference = itemData.current_stock - currentItem.current_stock;
+        await this.adjustStock(id, stockDifference, 'stock_adjustment', 'Manual stock adjustment');
+      }
+      
+      if (result > 0) {
+        await this.createNotification('Item Updated', `${itemData.name} information has been updated`, 'info');
+      }
+      
+      return result;
+    } catch (error) {
+      console.error('❌ Error updating item:', error);
+      throw error;
+    }
   }
 
-  // Delete item
+  // Delete item (soft delete)
   static async deleteItem(id) {
-    return new Promise((resolve, reject) => {
-      setTimeout(() => {
-        try {
-          const index = this.items.findIndex(i => i.id === id);
-          if (index !== -1) {
-            const deletedItem = this.items.splice(index, 1)[0];
-            resolve(deletedItem);
-          } else {
-            reject(new Error("Item not found"));
-          }
-        } catch (error) {
-          reject(error);
-        }
-      }, 300);
-    });
+    try {
+      const item = await this.getItemById(id);
+      if (!item) throw new Error('Item not found');
+      
+      const result = await DatabaseService.softDelete('items', id);
+      
+      if (result > 0) {
+        await this.createNotification('Item Removed', `${item.name} has been removed from inventory`, 'warning');
+      }
+      
+      return result;
+    } catch (error) {
+      console.error('❌ Error deleting item:', error);
+      throw error;
+    }
   }
 
-  // Update stock
-  static async updateStock(id, quantity, operation = 'add') {
-    return new Promise((resolve, reject) => {
-      setTimeout(() => {
-        try {
-          const item = this.items.find(i => i.id === id);
-          if (item) {
-            if (operation === 'add') {
-              item.stock += quantity;
-            } else if (operation === 'remove') {
-              item.stock = Math.max(0, item.stock - quantity);
-            } else if (operation === 'set') {
-              item.stock = Math.max(0, quantity);
-            }
-            item.updatedAt = new Date().toISOString();
-            resolve(item);
-          } else {
-            reject(new Error("Item not found"));
-          }
-        } catch (error) {
-          reject(error);
-        }
-      }, 200);
-    });
-  }
-
-  // Search items
-  static async searchItems(query) {
-    return new Promise((resolve) => {
-      setTimeout(() => {
-        if (!query || query.trim() === '') {
-          resolve([...this.items]);
-          return;
-        }
-
-        const searchTerm = query.toLowerCase();
-        const filtered = this.items.filter(item =>
-          item.name.toLowerCase().includes(searchTerm) ||
-          item.sku.toLowerCase().includes(searchTerm) ||
-          item.barcode.includes(searchTerm) ||
-          item.category.toLowerCase().includes(searchTerm) ||
-          item.brand.toLowerCase().includes(searchTerm) ||
-          item.description.toLowerCase().includes(searchTerm)
+  // Adjust stock
+  static async adjustStock(itemId, quantity, movementType = 'adjustment', notes = '') {
+    try {
+      const item = await this.getItemById(itemId);
+      if (!item) throw new Error('Item not found');
+      
+      const newStock = Math.max(0, item.current_stock + quantity);
+      
+      // Update item stock
+      await DatabaseService.update('items', itemId, {
+        current_stock: newStock
+      });
+      
+      // Create stock movement record
+      await this.createStockMovement(itemId, movementType, quantity, notes);
+      
+      // Check for low stock alert
+      if (newStock <= item.minimum_stock) {
+        await this.createNotification(
+          'Low Stock Alert',
+          `${item.name} is running low on stock (${newStock} remaining)`,
+          'alert',
+          'medium'
         );
-        resolve(filtered);
-      }, 300);
-    });
+      }
+      
+      return newStock;
+    } catch (error) {
+      console.error('❌ Error adjusting stock:', error);
+      throw error;
+    }
   }
 
-  // Get items by category
-  static async getItemsByCategory(category) {
-    return new Promise((resolve) => {
-      setTimeout(() => {
-        const filtered = this.items.filter(i => i.category === category);
-        resolve(filtered);
-      }, 200);
-    });
+  // Create stock movement record
+  static async createStockMovement(itemId, movementType, quantity, notes = '', referenceType = null, referenceId = null) {
+    try {
+      await DatabaseService.create('stock_movements', {
+        item_id: itemId,
+        movement_type: movementType,
+        quantity: quantity,
+        reference_type: referenceType,
+        reference_id: referenceId,
+        notes: notes
+      });
+    } catch (error) {
+      console.error('❌ Error creating stock movement:', error);
+    }
+  }
+
+  // Get stock movements for an item
+  static async getStockMovements(itemId, limit = 20) {
+    try {
+      const movements = await DatabaseService.executeQuery(`
+        SELECT * FROM stock_movements 
+        WHERE item_id = ? 
+        ORDER BY created_at DESC 
+        LIMIT ?
+      `, [itemId, limit]);
+      
+      return movements.map(movement => ({
+        id: movement.id,
+        type: movement.movement_type,
+        quantity: movement.quantity,
+        notes: movement.notes,
+        date: movement.created_at,
+        reference: movement.reference_type ? `${movement.reference_type}-${movement.reference_id}` : null
+      }));
+    } catch (error) {
+      console.error('❌ Error fetching stock movements:', error);
+      return [];
+    }
   }
 
   // Get low stock items
-  static getLowStockItems() {
-    return this.items.filter(item => item.stock <= item.minStock && item.stock > 0);
+  static async getLowStockItems() {
+    try {
+      const items = await DatabaseService.executeQuery(`
+        SELECT 
+          i.id,
+          i.name,
+          i.current_stock,
+          i.minimum_stock,
+          i.selling_price,
+          c.name as category_name
+        FROM items i
+        LEFT JOIN categories c ON i.category_id = c.id
+        WHERE i.current_stock <= i.minimum_stock 
+          AND i.deleted_at IS NULL 
+          AND i.is_active = 1
+        ORDER BY i.current_stock ASC
+      `);
+      
+      return items.map(item => ({
+        id: item.id,
+        name: item.name,
+        category: item.category_name || 'Uncategorized',
+        currentStock: item.current_stock,
+        minimumStock: item.minimum_stock,
+        price: item.selling_price,
+        status: item.current_stock === 0 ? 'out_of_stock' : 'low_stock'
+      }));
+    } catch (error) {
+      console.error('❌ Error fetching low stock items:', error);
+      return [];
+    }
   }
 
-  // Get out of stock items
-  static getOutOfStockItems() {
-    return this.items.filter(item => item.stock === 0);
+  // Get inventory summary
+  static async getInventorySummary() {
+    try {
+      const [totalItems, totalValue, lowStock, categories] = await Promise.all([
+        this.getTotalItemsCount(),
+        this.getTotalInventoryValue(),
+        this.getLowStockCount(),
+        this.getCategoriesCount()
+      ]);
+      
+      return {
+        totalItems,
+        totalValue,
+        lowStockCount: lowStock,
+        categoriesCount: categories,
+        averageValue: totalItems > 0 ? totalValue / totalItems : 0
+      };
+    } catch (error) {
+      console.error('❌ Error getting inventory summary:', error);
+      return {
+        totalItems: 0,
+        totalValue: 0,
+        lowStockCount: 0,
+        categoriesCount: 0,
+        averageValue: 0
+      };
+    }
   }
 
-  // Get overstock items
-  static getOverstockItems() {
-    return this.items.filter(item => item.stock >= item.maxStock);
+  // Get total items count
+  static async getTotalItemsCount() {
+    try {
+      const result = await DatabaseService.executeQuery(`
+        SELECT COUNT(*) as count 
+        FROM items 
+        WHERE deleted_at IS NULL AND is_active = 1
+      `);
+      return result[0]?.count || 0;
+    } catch (error) {
+      console.error('❌ Error getting total items count:', error);
+      return 0;
+    }
   }
 
-  // Get inventory statistics
-  static getInventoryStatistics() {
-    const totalItems = this.items.length;
-    const totalStockValue = this.items.reduce((sum, item) => {
-      return sum + (item.stock * item.costPrice);
-    }, 0);
-    
-    const totalRetailValue = this.items.reduce((sum, item) => {
-      return sum + (item.stock * item.price);
-    }, 0);
-
-    const lowStockItems = this.getLowStockItems();
-    const outOfStockItems = this.getOutOfStockItems();
-    const overstockItems = this.getOverstockItems();
-
-    const categoryStats = {};
-    this.items.forEach(item => {
-      if (!categoryStats[item.category]) {
-        categoryStats[item.category] = {
-          count: 0,
-          totalValue: 0,
-          totalStock: 0
-        };
-      }
-      categoryStats[item.category].count++;
-      categoryStats[item.category].totalValue += (item.stock * item.costPrice);
-      categoryStats[item.category].totalStock += item.stock;
-    });
-
-    return {
-      totalItems,
-      totalStockValue,
-      totalRetailValue,
-      potentialProfit: totalRetailValue - totalStockValue,
-      lowStockCount: lowStockItems.length,
-      outOfStockCount: outOfStockItems.length,
-      overstockCount: overstockItems.length,
-      categoryStats,
-      averageItemValue: totalItems > 0 ? totalStockValue / totalItems : 0,
-    };
+  // Get total inventory value
+  static async getTotalInventoryValue() {
+    try {
+      const result = await DatabaseService.executeQuery(`
+        SELECT COALESCE(SUM(current_stock * cost_price), 0) as total_value
+        FROM items 
+        WHERE deleted_at IS NULL AND is_active = 1
+      `);
+      return result[0]?.total_value || 0;
+    } catch (error) {
+      console.error('❌ Error getting inventory value:', error);
+      return 0;
+    }
   }
 
-  // Get top selling items (mock data based on stock turnover)
-  static getTopSellingItems(limit = 5) {
-    return this.items
-      .filter(item => item.stock > 0)
-      .sort((a, b) => {
-        // Sort by a combination of price and current stock level (higher price, lower stock = more sales)
-        const scoreA = a.price * (1 / Math.max(a.stock, 1));
-        const scoreB = b.price * (1 / Math.max(b.stock, 1));
-        return scoreB - scoreA;
-      })
-      .slice(0, limit);
+  // Get low stock count
+  static async getLowStockCount() {
+    try {
+      const result = await DatabaseService.executeQuery(`
+        SELECT COUNT(*) as count 
+        FROM items 
+        WHERE current_stock <= minimum_stock 
+          AND deleted_at IS NULL 
+          AND is_active = 1
+      `);
+      return result[0]?.count || 0;
+    } catch (error) {
+      console.error('❌ Error getting low stock count:', error);
+      return 0;
+    }
   }
 
-  // Get items needing reorder
-  static getItemsNeedingReorder() {
-    return this.items.filter(item => 
-      item.stock <= item.minStock || item.stock === 0
-    ).sort((a, b) => a.stock - b.stock);
+  // Get categories count
+  static async getCategoriesCount() {
+    try {
+      const result = await DatabaseService.executeQuery(`
+        SELECT COUNT(*) as count 
+        FROM categories 
+        WHERE is_active = 1
+      `);
+      return result[0]?.count || 0;
+    } catch (error) {
+      console.error('❌ Error getting categories count:', error);
+      return 0;
+    }
+  }
+
+  // Get categories
+  static async getCategories() {
+    try {
+      const categories = await DatabaseService.findAll('categories', 'WHERE is_active = 1 ORDER BY name ASC');
+      return categories.map(cat => ({
+        id: cat.id,
+        name: cat.name,
+        icon: cat.icon,
+        color: cat.color,
+        description: cat.description
+      }));
+    } catch (error) {
+      console.error('❌ Error fetching categories:', error);
+      return [];
+    }
   }
 
   // Generate SKU
-  static generateSKU(name, category) {
-    const namePrefix = name.split(' ').slice(0, 2).map(word => 
-      word.substring(0, 3).toUpperCase()
-    ).join('');
-    
-    const categoryPrefix = category.substring(0, 3).toUpperCase();
-    const timestamp = Date.now().toString().slice(-4);
-    
-    return `${categoryPrefix}-${namePrefix}-${timestamp}`;
+  static async generateSKU(itemName) {
+    try {
+      const prefix = itemName.substring(0, 3).toUpperCase();
+      const timestamp = Date.now().toString().slice(-6);
+      return `${prefix}${timestamp}`;
+    } catch (error) {
+      return 'ITM' + Date.now().toString().slice(-6);
+    }
+  }
+
+  // Get stock status
+  static getStockStatus(currentStock, minimumStock) {
+    if (currentStock === 0) {
+      return { status: 'out_of_stock', color: '#ef4444', text: 'Out of Stock' };
+    } else if (currentStock <= minimumStock) {
+      return { status: 'low_stock', color: '#f59e0b', text: 'Low Stock' };
+    } else {
+      return { status: 'in_stock', color: '#10b981', text: 'In Stock' };
+    }
+  }
+
+  // Calculate profit margin
+  static calculateProfitMargin(costPrice, sellingPrice) {
+    if (sellingPrice === 0) return 0;
+    const profit = sellingPrice - costPrice;
+    return Math.round((profit / sellingPrice) * 100 * 10) / 10;
+  }
+
+  // Create notification
+  static async createNotification(title, message, type = 'info', priority = 'medium') {
+    try {
+      await DatabaseService.create('notifications', {
+        title,
+        message,
+        type,
+        priority,
+        read: 0
+      });
+    } catch (error) {
+      console.error('❌ Error creating notification:', error);
+    }
   }
 
   // Validate item data
-  static validateItemData(itemData) {
-    const errors = [];
-
-    if (!itemData.name || itemData.name.trim() === '') {
-      errors.push('Item name is required');
+  static validateItemData(data) {
+    const errors = {};
+    
+    if (!data.name || data.name.trim().length < 2) {
+      errors.name = 'Item name must be at least 2 characters long';
     }
-
-    if (!itemData.sku || itemData.sku.trim() === '') {
-      errors.push('SKU is required');
+    
+    if (data.cost_price < 0) {
+      errors.cost_price = 'Cost price cannot be negative';
     }
-
-    if (itemData.price && isNaN(Number(itemData.price))) {
-      errors.push('Price must be a valid number');
+    
+    if (data.selling_price < 0) {
+      errors.selling_price = 'Selling price cannot be negative';
     }
-
-    if (itemData.costPrice && isNaN(Number(itemData.costPrice))) {
-      errors.push('Cost price must be a valid number');
+    
+    if (data.current_stock < 0) {
+      errors.current_stock = 'Stock cannot be negative';
     }
-
-    if (itemData.stock && isNaN(Number(itemData.stock))) {
-      errors.push('Stock must be a valid number');
+    
+    if (data.minimum_stock < 0) {
+      errors.minimum_stock = 'Minimum stock cannot be negative';
     }
-
-    if (itemData.minStock && isNaN(Number(itemData.minStock))) {
-      errors.push('Minimum stock must be a valid number');
-    }
-
-    if (itemData.maxStock && isNaN(Number(itemData.maxStock))) {
-      errors.push('Maximum stock must be a valid number');
-    }
-
-    // Check for duplicate SKU
-    const existingSku = this.items.find(item => 
-      item.sku.toLowerCase() === itemData.sku.toLowerCase() && 
-      item.id !== itemData.id
-    );
-    if (existingSku) {
-      errors.push('SKU already exists');
-    }
-
+    
     return {
-      isValid: errors.length === 0,
+      isValid: Object.keys(errors).length === 0,
       errors
     };
   }
 
-  // Get stock alerts
-  static getStockAlerts() {
-    const alerts = [];
-    
-    this.getOutOfStockItems().forEach(item => {
-      alerts.push({
-        type: 'critical',
-        message: `${item.name} is out of stock`,
-        item: item,
-        priority: 1
-      });
-    });
-
-    this.getLowStockItems().forEach(item => {
-      alerts.push({
-        type: 'warning',
-        message: `${item.name} stock is low (${item.stock} remaining)`,
-        item: item,
-        priority: 2
-      });
-    });
-
-    this.getOverstockItems().forEach(item => {
-      alerts.push({
-        type: 'info',
-        message: `${item.name} is overstocked (${item.stock} units)`,
-        item: item,
-        priority: 3
-      });
-    });
-
-    return alerts.sort((a, b) => a.priority - b.priority);
-  }
-
-  // Export inventory data
-  static exportInventory(format = 'json') {
-    if (format === 'json') {
-      return JSON.stringify(this.items, null, 2);
-    } else if (format === 'csv') {
-      const headers = ['ID', 'Name', 'SKU', 'Category', 'Brand', 'Stock', 'Min Stock', 'Max Stock', 'Cost Price', 'Selling Price', 'Stock Value'];
-      const csvData = this.items.map(item => [
-        item.id,
-        item.name,
-        item.sku,
-        item.category,
-        item.brand,
-        item.stock,
-        item.minStock,
-        item.maxStock,
-        item.costPrice,
-        item.price,
-        (item.stock * item.costPrice)
-      ]);
-      
-      return [headers, ...csvData]
-        .map(row => row.map(field => `"${field}"`).join(','))
-        .join('\n');
-    }
-    return '';
-  }
-
-  // Bulk stock update
-  static async bulkUpdateStock(updates) {
-    return new Promise((resolve, reject) => {
-      setTimeout(() => {
-        try {
-          const results = [];
-          updates.forEach(update => {
-            const item = this.items.find(i => i.id === update.id);
-            if (item) {
-              if (update.operation === 'add') {
-                item.stock += update.quantity;
-              } else if (update.operation === 'remove') {
-                item.stock = Math.max(0, item.stock - update.quantity);
-              } else if (update.operation === 'set') {
-                item.stock = Math.max(0, update.quantity);
-              }
-              item.updatedAt = new Date().toISOString();
-              results.push({ success: true, item });
-            } else {
-              results.push({ success: false, error: 'Item not found', id: update.id });
-            }
-          });
-          resolve(results);
-        } catch (error) {
-          reject(error);
-        }
-      }, 500);
-    });
-  }
-
-  // Get inventory by value range
-  static getItemsByValueRange(minValue, maxValue) {
-    return this.items.filter(item => {
-      const itemValue = item.stock * item.costPrice;
-      return itemValue >= minValue && itemValue <= maxValue;
-    });
-  }
-
-  // Get items by supplier
-  static getItemsBySupplier(supplier) {
-    return this.items.filter(item => 
-      item.supplier.toLowerCase().includes(supplier.toLowerCase())
-    );
-  }
-
-  // Format currency
+  // Utility functions
   static formatCurrency(amount) {
-    return `₹${Math.abs(amount).toLocaleString("en-IN")}`;
-  }
-
-  // Get inventory summary for dashboard from database
-  static async getInventorySummary() {
-    try {
-      const stats = await InventoryRepository.getInventoryStats();
-      const lowStockItems = await InventoryRepository.getLowStockItems();
-      const outOfStockItems = await InventoryRepository.getOutOfStockItems();
-      const categories = await InventoryRepository.getCategoryStockSummary();
-
-      // Calculate growth trends (mock data for now)
-      const itemsGrowth = Math.floor(Math.random() * 20) - 10; // -10% to +10%
-      const valueGrowth = Math.floor(Math.random() * 30) - 15; // -15% to +15%
-
-    return {
-        totalItems: stats.totalItems,
-        totalStockValue: stats.totalStockValue,
-        totalRetailValue: stats.totalRetailValue,
-        potentialProfit: stats.potentialProfit,
-        lowStockCount: stats.lowStockCount,
-        outOfStockCount: stats.outOfStockCount,
-        categories: categories.length,
-        itemsGrowth,
-        valueGrowth,
-      };
-    } catch (error) {
-      console.error('Error fetching inventory summary from database:', error);
-      // Fallback to mock data calculation
-      const stats = this.getInventoryStatistics();
-      return {
-        totalItems: stats.totalItems,
-        totalStockValue: stats.totalStockValue,
-        lowStockCount: stats.lowStockCount,
-        outOfStockCount: stats.outOfStockCount,
-        categories: Object.keys(stats.categoryStats).length,
-        itemsGrowth: 0,
-        valueGrowth: 0,
-      };
-    }
-  }
-
-  // Get low stock items for dashboard
-  static async getLowStockItems() {
-    return new Promise((resolve) => {
-      setTimeout(() => {
-        const lowStockItems = this.items.filter(item => 
-          item.stock <= item.minStock && item.stock > 0
-        );
-        resolve(lowStockItems);
-      }, 200);
-    });
-  }
-
-  // Get category breakdown for dashboard
-  static async getCategoryBreakdown() {
-    return new Promise((resolve) => {
-      setTimeout(() => {
-        const categories = {};
-        const categoryColors = {
-          'Electronics': '#3b82f6',
-          'Mobile Accessories': '#10b981',
-          'Computers': '#8b5cf6',
-          'Audio': '#f59e0b',
-          'Gaming': '#ef4444',
-          'Cables': '#6b7280',
-          'Others': '#ec4899'
-        };
-        const categoryIcons = {
-          'Electronics': '⚡',
-          'Mobile Accessories': '📱',
-          'Computers': '💻',
-          'Audio': '🎵',
-          'Gaming': '🎮',
-          'Cables': '🔌',
-          'Others': '📦'
-        };
-
-        this.items.forEach(item => {
-          if (!categories[item.category]) {
-            categories[item.category] = {
-              name: item.category,
-              itemCount: 0,
-              totalValue: 0,
-              color: categoryColors[item.category] || '#6b7280',
-              icon: categoryIcons[item.category] || '📦'
-            };
-          }
-          categories[item.category].itemCount++;
-          categories[item.category].totalValue += item.stock * item.costPrice;
-        });
-
-        resolve(Object.values(categories));
-      }, 250);
-    });
-  }
-
-  // Get recent activity for dashboard
-  static async getRecentActivity() {
-    return new Promise((resolve) => {
-      setTimeout(() => {
-        const activities = [
-          {
-            id: '1',
-            action: 'Stock Added',
-            itemName: 'iPhone 15 Pro',
-            quantity: 50,
-            type: 'in',
-            timestamp: '2 hours ago'
-          },
-          {
-            id: '2',
-            action: 'Stock Removed',
-            itemName: 'Samsung Galaxy S24',
-            quantity: 15,
-            type: 'out',
-            timestamp: '4 hours ago'
-          },
-          {
-            id: '3',
-            action: 'New Item Added',
-            itemName: 'MacBook Air M3',
-            quantity: 25,
-            type: 'in',
-            timestamp: '6 hours ago'
-          },
-          {
-            id: '4',
-            action: 'Stock Sold',
-            itemName: 'AirPods Pro',
-            quantity: 8,
-            type: 'out',
-            timestamp: '8 hours ago'
-          },
-          {
-            id: '5',
-            action: 'Stock Adjusted',
-            itemName: 'iPad Pro',
-            quantity: 5,
-            type: 'in',
-            timestamp: '1 day ago'
-          },
-          {
-            id: '6',
-            action: 'Stock Removed',
-            itemName: 'Apple Watch',
-            quantity: 12,
-            type: 'out',
-            timestamp: '1 day ago'
-          },
-          {
-            id: '7',
-            action: 'Reorder Alert',
-            itemName: 'Lightning Cable',
-            quantity: 10,
-            type: 'in',
-            timestamp: '2 days ago'
-          },
-          {
-            id: '8',
-            action: 'Stock Added',
-            itemName: 'Wireless Charger',
-            quantity: 30,
-            type: 'in',
-            timestamp: '2 days ago'
-          }
-        ];
-
-        resolve(activities);
-      }, 200);
-    });
-  }
-  // Calculate profit margin for item
-  static calculateProfitMargin(item) {
-    if (item.costPrice === 0) return 0;
-    return ((item.price - item.costPrice) / item.costPrice) * 100;
-  }
-
-  // Get profit analysis
-  static getProfitAnalysis() {
-    const itemsWithMargins = this.items.map(item => ({
-      ...item,
-      profitMargin: this.calculateProfitMargin(item),
-      profitAmount: item.price - item.costPrice,
-      stockValue: item.stock * item.costPrice,
-      retailValue: item.stock * item.price,
-    }));
-
-    const totalProfit = itemsWithMargins.reduce((sum, item) => {
-      return sum + (item.profitAmount * item.stock);
-    }, 0);
-
-    const averageMargin = itemsWithMargins.reduce((sum, item) => {
-      return sum + item.profitMargin;
-    }, 0) / itemsWithMargins.length;
-
-    return {
-      totalProfit: this.formatCurrency(totalProfit),
-      averageMargin: Math.round(averageMargin * 100) / 100,
-      highMarginItems: itemsWithMargins.filter(item => item.profitMargin > 30),
-      lowMarginItems: itemsWithMargins.filter(item => item.profitMargin < 10),
-      itemsWithMargins,
-    };
+    return new Intl.NumberFormat('en-IN', {
+      style: 'currency',
+      currency: 'INR',
+      maximumFractionDigits: 0
+    }).format(amount);
   }
 }
 

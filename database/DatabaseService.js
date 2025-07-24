@@ -1,5 +1,10 @@
 // database/DatabaseService.js
-import * as SQLite from 'expo-sqlite';
+import { Platform } from 'react-native';
+
+let SQLite;
+if (Platform.OS !== 'web') {
+  SQLite = require('expo-sqlite');
+}
 
 class DatabaseService {
   constructor() {
@@ -12,6 +17,12 @@ class DatabaseService {
   // Initialize database connection
   async init() {
     try {
+      if (Platform.OS === 'web') {
+        console.log('⚠️  SQLite not available on web, using mock data');
+        this.isInitialized = true;
+        return null;
+      }
+
       if (this.isInitialized) return this.db;
 
       console.log('🔌 Connecting to SQLite database...');
@@ -28,6 +39,9 @@ class DatabaseService {
       // Run migrations if needed
       await this.runMigrations();
       
+      // Insert initial data if needed
+      await this.insertInitialData();
+      
       this.isInitialized = true;
       console.log('✅ Database connected successfully');
       
@@ -40,6 +54,11 @@ class DatabaseService {
 
   // Get database instance
   async getDatabase() {
+    if (Platform.OS === 'web') {
+      console.log('⚠️  SQLite not available on web');
+      return null;
+    }
+
     if (!this.isInitialized) {
       await this.init();
     }
@@ -48,6 +67,8 @@ class DatabaseService {
 
   // Create all database tables
   async createTables() {
+    if (Platform.OS === 'web') return;
+
     const tables = [
       // Settings table
       `CREATE TABLE IF NOT EXISTS settings (
@@ -201,6 +222,19 @@ class DatabaseService {
         updated_at DATETIME DEFAULT CURRENT_TIMESTAMP
       );`,
 
+      // Notifications table
+      `CREATE TABLE IF NOT EXISTS notifications (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        title TEXT NOT NULL,
+        message TEXT NOT NULL,
+        type TEXT NOT NULL DEFAULT 'info',
+        priority TEXT DEFAULT 'medium',
+        read INTEGER DEFAULT 0,
+        data TEXT,
+        created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+        updated_at DATETIME DEFAULT CURRENT_TIMESTAMP
+      );`,
+
       // Audit log table
       `CREATE TABLE IF NOT EXISTS audit_log (
         id INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -223,11 +257,14 @@ class DatabaseService {
 
   // Run database migrations
   async runMigrations() {
+    if (Platform.OS === 'web') return;
     console.log('✅ Migrations completed');
   }
 
   // Insert initial configuration data
   async insertInitialData() {
+    if (Platform.OS === 'web') return;
+
     try {
       console.log('⚙️  Inserting initial configuration...');
       
@@ -243,11 +280,11 @@ class DatabaseService {
 
       // Insert default settings
       const defaultSettings = [
-        { key: 'business_name', value: 'Brojgar Business', type: 'string' },
+        { key: 'business_name', value: 'Your Business Name', type: 'string' },
         { key: 'owner_name', value: 'Business Owner', type: 'string' },
         { key: 'gst_number', value: '27XXXXX1234X1Z5', type: 'string' },
         { key: 'phone', value: '+91 98765 43210', type: 'string' },
-        { key: 'email', value: 'business@brojgar.com', type: 'string' },
+        { key: 'email', value: 'business@example.com', type: 'string' },
         { key: 'address', value: 'Business Address, City, State', type: 'string' },
         { key: 'currency', value: 'INR', type: 'string' },
         { key: 'tax_rate', value: '18', type: 'number' },
@@ -257,8 +294,24 @@ class DatabaseService {
 
       for (const setting of defaultSettings) {
         await this.db.runAsync(
-          'INSERT INTO settings (key, value, type) VALUES (?, ?, ?)',
+          'INSERT OR IGNORE INTO settings (key, value, type) VALUES (?, ?, ?)',
           [setting.key, setting.value, setting.type]
+        );
+      }
+
+      // Insert default categories
+      const defaultCategories = [
+        { name: 'Electronics', type: 'item', icon: '📱', color: '#3b82f6' },
+        { name: 'Clothing', type: 'item', icon: '👕', color: '#10b981' },
+        { name: 'Food & Beverages', type: 'item', icon: '🍽️', color: '#f59e0b' },
+        { name: 'Books & Stationery', type: 'item', icon: '📚', color: '#8b5cf6' },
+        { name: 'Office Supplies', type: 'item', icon: '🏢', color: '#ef4444' }
+      ];
+
+      for (const category of defaultCategories) {
+        await this.db.runAsync(
+          'INSERT OR IGNORE INTO categories (name, type, icon, color) VALUES (?, ?, ?, ?)',
+          [category.name, category.type, category.icon, category.color]
         );
       }
 
@@ -269,8 +322,118 @@ class DatabaseService {
     }
   }
 
+  // Generic CRUD Operations
+  async create(table, data) {
+    if (Platform.OS === 'web') return null;
+    try {
+      const db = await this.getDatabase();
+      const keys = Object.keys(data);
+      const values = Object.values(data);
+      const placeholders = keys.map(() => '?').join(', ');
+      
+      const result = await db.runAsync(
+        `INSERT INTO ${table} (${keys.join(', ')}) VALUES (${placeholders})`,
+        values
+      );
+      
+      console.log(`✅ Created ${table} record with ID: ${result.lastInsertRowId}`);
+      return result.lastInsertRowId;
+    } catch (error) {
+      console.error(`❌ Error creating ${table}:`, error);
+      throw error;
+    }
+  }
+
+  async findAll(table, conditions = '', params = []) {
+    if (Platform.OS === 'web') return [];
+    try {
+      const db = await this.getDatabase();
+      const sql = `SELECT * FROM ${table} ${conditions}`;
+      const results = await db.getAllAsync(sql, params);
+      return results || [];
+    } catch (error) {
+      console.error(`❌ Error fetching ${table}:`, error);
+      throw error;
+    }
+  }
+
+  async findById(table, id) {
+    if (Platform.OS === 'web') return null;
+    try {
+      const db = await this.getDatabase();
+      const result = await db.getFirstAsync(
+        `SELECT * FROM ${table} WHERE id = ?`,
+        [id]
+      );
+      return result || null;
+    } catch (error) {
+      console.error(`❌ Error finding ${table} by ID:`, error);
+      throw error;
+    }
+  }
+
+  async update(table, id, data) {
+    if (Platform.OS === 'web') return null;
+    try {
+      const db = await this.getDatabase();
+      const keys = Object.keys(data);
+      const values = Object.values(data);
+      const setClause = keys.map(key => `${key} = ?`).join(', ');
+      
+      const result = await db.runAsync(
+        `UPDATE ${table} SET ${setClause}, updated_at = CURRENT_TIMESTAMP WHERE id = ?`,
+        [...values, id]
+      );
+      
+      console.log(`✅ Updated ${table} record ID: ${id}`);
+      return result.changes;
+    } catch (error) {
+      console.error(`❌ Error updating ${table}:`, error);
+      throw error;
+    }
+  }
+
+  async delete(table, id) {
+    if (Platform.OS === 'web') return null;
+    try {
+      const db = await this.getDatabase();
+      const result = await db.runAsync(
+        `DELETE FROM ${table} WHERE id = ?`,
+        [id]
+      );
+      
+      console.log(`✅ Deleted ${table} record ID: ${id}`);
+      return result.changes;
+    } catch (error) {
+      console.error(`❌ Error deleting ${table}:`, error);
+      throw error;
+    }
+  }
+
+  async softDelete(table, id) {
+    if (Platform.OS === 'web') return null;
+    try {
+      const db = await this.getDatabase();
+      const result = await db.runAsync(
+        `UPDATE ${table} SET deleted_at = CURRENT_TIMESTAMP WHERE id = ?`,
+        [id]
+      );
+      
+      console.log(`✅ Soft deleted ${table} record ID: ${id}`);
+      return result.changes;
+    } catch (error) {
+      console.error(`❌ Error soft deleting ${table}:`, error);
+      throw error;
+    }
+  }
+
   // Utility method to execute raw SQL
   async executeQuery(sql, params = []) {
+    if (Platform.OS === 'web') {
+      console.log('⚠️  Database query skipped on web:', sql);
+      return [];
+    }
+
     try {
       const db = await this.getDatabase();
       return await db.getAllAsync(sql, params);
@@ -280,8 +443,83 @@ class DatabaseService {
     }
   }
 
+  async executeRun(sql, params = []) {
+    if (Platform.OS === 'web') {
+      console.log('⚠️  Database run skipped on web:', sql);
+      return null;
+    }
+
+    try {
+      const db = await this.getDatabase();
+      return await db.runAsync(sql, params);
+    } catch (error) {
+      console.error('❌ Run execution error:', error);
+      throw error;
+    }
+  }
+
+  // Get next invoice number
+  async getNextInvoiceNumber() {
+    if (Platform.OS === 'web') return 'INV-2024-001';
+    
+    try {
+      const prefix = await this.getSetting('invoice_prefix', 'INV');
+      const lastInvoice = await this.executeQuery(
+        'SELECT invoice_number FROM invoices ORDER BY id DESC LIMIT 1'
+      );
+      
+      if (lastInvoice.length > 0) {
+        const lastNumber = lastInvoice[0].invoice_number;
+        const numberPart = lastNumber.split('-').pop();
+        const nextNumber = parseInt(numberPart) + 1;
+        return `${prefix}-${new Date().getFullYear()}-${String(nextNumber).padStart(3, '0')}`;
+      } else {
+        const startingNumber = await this.getSetting('invoice_starting_number', '1');
+        return `${prefix}-${new Date().getFullYear()}-${String(startingNumber).padStart(3, '0')}`;
+      }
+    } catch (error) {
+      console.error('❌ Error getting next invoice number:', error);
+      return `INV-${new Date().getFullYear()}-001`;
+    }
+  }
+
+  // Settings helpers
+  async getSetting(key, defaultValue = null) {
+    if (Platform.OS === 'web') return defaultValue;
+    
+    try {
+      const db = await this.getDatabase();
+      const result = await db.getFirstAsync(
+        'SELECT value FROM settings WHERE key = ?',
+        [key]
+      );
+      return result ? result.value : defaultValue;
+    } catch (error) {
+      console.error(`❌ Error getting setting ${key}:`, error);
+      return defaultValue;
+    }
+  }
+
+  async setSetting(key, value, type = 'string') {
+    if (Platform.OS === 'web') return;
+    
+    try {
+      const db = await this.getDatabase();
+      await db.runAsync(
+        'INSERT OR REPLACE INTO settings (key, value, type, updated_at) VALUES (?, ?, ?, CURRENT_TIMESTAMP)',
+        [key, value, type]
+      );
+      console.log(`✅ Setting ${key} updated`);
+    } catch (error) {
+      console.error(`❌ Error setting ${key}:`, error);
+      throw error;
+    }
+  }
+
   // Close database connection
   async close() {
+    if (Platform.OS === 'web') return;
+    
     if (this.db) {
       await this.db.closeAsync();
       this.db = null;

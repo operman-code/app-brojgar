@@ -2,25 +2,40 @@
 import DatabaseService from '../../../database/DatabaseService';
 
 class PartiesService {
-  // Get all parties from database
-  static async getAllParties() {
+  // Get all parties with optional filtering
+  static async getAllParties(type = 'all', searchQuery = '') {
     try {
-      const db = await DatabaseService.getDatabase();
-      const query = `
-        SELECT * FROM parties 
-        WHERE is_active = 1 
-        ORDER BY name ASC
-      `;
-      const result = await db.getAllAsync(query);
-      return result.map(party => ({
-        ...party,
-        id: party.id.toString(),
-        balance: party.current_balance || 0,
-        creditLimit: party.credit_limit?.toString() || "0",
-        paymentTerms: `Net ${party.credit_days || 30} days`,
-        address: this.buildFullAddress(party),
-        gstNumber: party.gst_number || "",
-        panNumber: party.pan_number || ""
+      await DatabaseService.init();
+      
+      let conditions = 'WHERE deleted_at IS NULL';
+      let params = [];
+      
+      if (type !== 'all') {
+        conditions += ' AND type = ?';
+        params.push(type);
+      }
+      
+      if (searchQuery) {
+        conditions += ' AND (name LIKE ? OR phone LIKE ? OR email LIKE ?)';
+        const searchPattern = `%${searchQuery}%`;
+        params.push(searchPattern, searchPattern, searchPattern);
+      }
+      
+      conditions += ' ORDER BY name ASC';
+      
+      const parties = await DatabaseService.findAll('parties', conditions, params);
+      
+      return parties.map(party => ({
+        id: party.id,
+        name: party.name,
+        type: party.type,
+        phone: party.phone,
+        email: party.email,
+        balance: party.outstanding_balance || 0,
+        status: party.is_active ? 'active' : 'inactive',
+        address: party.address,
+        gst_number: party.gst_number,
+        created_at: party.created_at
       }));
     } catch (error) {
       console.error('❌ Error fetching parties:', error);
@@ -28,380 +43,385 @@ class PartiesService {
     }
   }
 
-  // Add new party to database
-  static async addParty(partyData) {
+  // Get party by ID
+  static async getPartyById(id) {
     try {
-      const db = await DatabaseService.getDatabase();
-      const query = `
-        INSERT INTO parties (
-          name, type, email, phone, gst_number, pan_number,
-          address_line1, address_line2, city, state, pincode, country,
-          opening_balance, current_balance, credit_limit, credit_days, notes
-        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
-      `;
+      const party = await DatabaseService.findById('parties', id);
+      if (!party || party.deleted_at) return null;
       
-      // Parse address if it's a single string
-      const addressParts = this.parseAddress(partyData.address || "");
-      
-      const result = await db.runAsync(query, [
-        partyData.name,
-        partyData.type || 'customer',
-        partyData.email || '',
-        partyData.phone || '',
-        partyData.gstNumber || '',
-        partyData.panNumber || '',
-        addressParts.line1 || '',
-        addressParts.line2 || '',
-        addressParts.city || '',
-        addressParts.state || '',
-        addressParts.pincode || '',
-        addressParts.country || 'India',
-        partyData.openingBalance || 0,
-        partyData.openingBalance || 0, // current_balance starts as opening_balance
-        partyData.creditLimit || 0,
-        partyData.creditDays || 30,
-        partyData.notes || ''
-      ]);
-
-      console.log('✅ Party added successfully:', partyData.name);
       return {
-        success: true,
-        id: result.lastInsertRowId,
-        message: 'Party added successfully'
+        id: party.id,
+        name: party.name,
+        type: party.type,
+        phone: party.phone,
+        email: party.email,
+        gst_number: party.gst_number,
+        pan_number: party.pan_number,
+        address: party.address,
+        city: party.city,
+        state: party.state,
+        pincode: party.pincode,
+        country: party.country,
+        outstanding_balance: party.outstanding_balance || 0,
+        credit_limit: party.credit_limit || 0,
+        credit_days: party.credit_days || 30,
+        is_active: party.is_active,
+        notes: party.notes,
+        created_at: party.created_at
       };
     } catch (error) {
-      console.error('❌ Error adding party:', error);
-      return {
-        success: false,
-        error: error.message
-      };
+      console.error('❌ Error fetching party by ID:', error);
+      return null;
     }
   }
 
-  // Update existing party
+  // Create new party
+  static async createParty(partyData) {
+    try {
+      await DatabaseService.init();
+      
+      const data = {
+        name: partyData.name,
+        type: partyData.type || 'customer',
+        phone: partyData.phone,
+        email: partyData.email || null,
+        gst_number: partyData.gst_number || null,
+        pan_number: partyData.pan_number || null,
+        address: partyData.address || null,
+        city: partyData.city || null,
+        state: partyData.state || null,
+        pincode: partyData.pincode || null,
+        country: partyData.country || 'India',
+        outstanding_balance: 0,
+        credit_limit: partyData.credit_limit || 0,
+        credit_days: partyData.credit_days || 30,
+        is_active: 1,
+        notes: partyData.notes || null
+      };
+      
+      const partyId = await DatabaseService.create('parties', data);
+      
+      // Create notification
+      await this.createNotification('Party Added', `${data.name} has been added as a ${data.type}`, 'info');
+      
+      return partyId;
+    } catch (error) {
+      console.error('❌ Error creating party:', error);
+      throw error;
+    }
+  }
+
+  // Update party
   static async updateParty(id, partyData) {
     try {
-      const db = await DatabaseService.getDatabase();
-      const addressParts = this.parseAddress(partyData.address || "");
-      
-      const query = `
-        UPDATE parties SET
-          name = ?, type = ?, email = ?, phone = ?, 
-          gst_number = ?, pan_number = ?,
-          address_line1 = ?, address_line2 = ?, city = ?, state = ?, pincode = ?,
-          credit_limit = ?, credit_days = ?, notes = ?,
-          updated_at = CURRENT_TIMESTAMP
-        WHERE id = ?
-      `;
-      
-      await db.runAsync(query, [
-        partyData.name,
-        partyData.type || 'customer',
-        partyData.email || '',
-        partyData.phone || '',
-        partyData.gstNumber || '',
-        partyData.panNumber || '',
-        addressParts.line1 || '',
-        addressParts.line2 || '',
-        addressParts.city || '',
-        addressParts.state || '',
-        addressParts.pincode || '',
-        partyData.creditLimit || 0,
-        partyData.creditDays || 30,
-        partyData.notes || '',
-        id
-      ]);
-
-      console.log('✅ Party updated successfully:', id);
-      return {
-        success: true,
-        message: 'Party updated successfully'
+      const updateData = {
+        name: partyData.name,
+        phone: partyData.phone,
+        email: partyData.email || null,
+        gst_number: partyData.gst_number || null,
+        pan_number: partyData.pan_number || null,
+        address: partyData.address || null,
+        city: partyData.city || null,
+        state: partyData.state || null,
+        pincode: partyData.pincode || null,
+        credit_limit: partyData.credit_limit || 0,
+        credit_days: partyData.credit_days || 30,
+        notes: partyData.notes || null
       };
+      
+      const result = await DatabaseService.update('parties', id, updateData);
+      
+      if (result > 0) {
+        await this.createNotification('Party Updated', `${partyData.name} information has been updated`, 'info');
+      }
+      
+      return result;
     } catch (error) {
       console.error('❌ Error updating party:', error);
-      return {
-        success: false,
-        error: error.message
-      };
+      throw error;
     }
   }
 
   // Delete party (soft delete)
   static async deleteParty(id) {
     try {
-      const db = await DatabaseService.getDatabase();
-      await db.runAsync(`
-        UPDATE parties 
-        SET is_active = 0, updated_at = CURRENT_TIMESTAMP
-        WHERE id = ?
-      `, [id]);
-
-      console.log('✅ Party deleted successfully:', id);
-      return {
-        success: true,
-        message: 'Party deleted successfully'
-      };
+      const party = await this.getPartyById(id);
+      if (!party) throw new Error('Party not found');
+      
+      const result = await DatabaseService.softDelete('parties', id);
+      
+      if (result > 0) {
+        await this.createNotification('Party Removed', `${party.name} has been removed`, 'warning');
+      }
+      
+      return result;
     } catch (error) {
       console.error('❌ Error deleting party:', error);
+      throw error;
+    }
+  }
+
+  // Get parties summary
+  static async getPartiesSummary() {
+    try {
+      const [customers, suppliers, totalBalance] = await Promise.all([
+        this.getCustomersCount(),
+        this.getSuppliersCount(),
+        this.getTotalOutstanding()
+      ]);
+      
       return {
-        success: false,
-        error: error.message
+        totalCustomers: customers,
+        totalSuppliers: suppliers,
+        totalParties: customers + suppliers,
+        totalOutstanding: totalBalance.receivable,
+        totalPayable: totalBalance.payable
+      };
+    } catch (error) {
+      console.error('❌ Error getting parties summary:', error);
+      return {
+        totalCustomers: 0,
+        totalSuppliers: 0,
+        totalParties: 0,
+        totalOutstanding: 0,
+        totalPayable: 0
       };
     }
   }
 
-  // Search parties
-  static async searchParties(searchTerm) {
+  // Get customers count
+  static async getCustomersCount() {
     try {
-      const db = await DatabaseService.getDatabase();
-      const query = `
-        SELECT * FROM parties 
-        WHERE is_active = 1 
-        AND (
-          name LIKE ? OR
-          phone LIKE ? OR
-          email LIKE ? OR
-          gst_number LIKE ?
-        )
-        ORDER BY name ASC
-      `;
+      const result = await DatabaseService.executeQuery(`
+        SELECT COUNT(*) as count 
+        FROM parties 
+        WHERE type = 'customer' AND deleted_at IS NULL
+      `);
+      return result[0]?.count || 0;
+    } catch (error) {
+      console.error('❌ Error getting customers count:', error);
+      return 0;
+    }
+  }
+
+  // Get suppliers count
+  static async getSuppliersCount() {
+    try {
+      const result = await DatabaseService.executeQuery(`
+        SELECT COUNT(*) as count 
+        FROM parties 
+        WHERE type = 'supplier' AND deleted_at IS NULL
+      `);
+      return result[0]?.count || 0;
+    } catch (error) {
+      console.error('❌ Error getting suppliers count:', error);
+      return 0;
+    }
+  }
+
+  // Get total outstanding balances
+  static async getTotalOutstanding() {
+    try {
+      const result = await DatabaseService.executeQuery(`
+        SELECT 
+          SUM(CASE WHEN type = 'customer' AND outstanding_balance > 0 THEN outstanding_balance ELSE 0 END) as receivable,
+          SUM(CASE WHEN type = 'supplier' AND outstanding_balance > 0 THEN outstanding_balance ELSE 0 END) as payable
+        FROM parties 
+        WHERE deleted_at IS NULL
+      `);
       
-      const searchPattern = `%${searchTerm}%`;
-      const result = await db.getAllAsync(query, [
-        searchPattern, searchPattern, searchPattern, searchPattern
-      ]);
+      return {
+        receivable: result[0]?.receivable || 0,
+        payable: result[0]?.payable || 0
+      };
+    } catch (error) {
+      console.error('❌ Error getting outstanding balances:', error);
+      return { receivable: 0, payable: 0 };
+    }
+  }
+
+  // Get top customers by sales
+  static async getTopCustomers(limit = 5) {
+    try {
+      const customers = await DatabaseService.executeQuery(`
+        SELECT 
+          p.id,
+          p.name,
+          p.phone,
+          p.outstanding_balance,
+          COALESCE(SUM(i.total), 0) as total_sales,
+          COUNT(i.id) as invoice_count
+        FROM parties p
+        LEFT JOIN invoices i ON p.id = i.party_id AND i.deleted_at IS NULL
+        WHERE p.type = 'customer' AND p.deleted_at IS NULL
+        GROUP BY p.id, p.name, p.phone, p.outstanding_balance
+        ORDER BY total_sales DESC
+        LIMIT ?
+      `, [limit]);
       
-      return result.map(party => ({
-        ...party,
-        id: party.id.toString(),
-        balance: party.current_balance || 0,
-        creditLimit: party.credit_limit?.toString() || "0",
-        address: this.buildFullAddress(party),
-        gstNumber: party.gst_number || "",
-        panNumber: party.pan_number || ""
+      return customers.map(customer => ({
+        id: customer.id,
+        name: customer.name,
+        phone: customer.phone,
+        totalSales: customer.total_sales,
+        invoiceCount: customer.invoice_count,
+        balance: customer.outstanding_balance
       }));
+    } catch (error) {
+      console.error('❌ Error getting top customers:', error);
+      return [];
+    }
+  }
+
+  // Update party balance
+  static async updatePartyBalance(partyId, amount, type = 'add') {
+    try {
+      const party = await this.getPartyById(partyId);
+      if (!party) throw new Error('Party not found');
+      
+      const newBalance = type === 'add' 
+        ? party.outstanding_balance + amount 
+        : party.outstanding_balance - amount;
+      
+      const result = await DatabaseService.update('parties', partyId, {
+        outstanding_balance: newBalance
+      });
+      
+      return result;
+    } catch (error) {
+      console.error('❌ Error updating party balance:', error);
+      throw error;
+    }
+  }
+
+  // Search parties
+  static async searchParties(query, type = 'all') {
+    try {
+      if (!query || query.trim().length < 2) {
+        return await this.getAllParties(type);
+      }
+      
+      return await this.getAllParties(type, query.trim());
     } catch (error) {
       console.error('❌ Error searching parties:', error);
       return [];
     }
   }
 
-  // Get parties by type
-  static async getPartiesByType(type) {
+  // Get party transactions
+  static async getPartyTransactions(partyId, limit = 10) {
     try {
-      const db = await DatabaseService.getDatabase();
-      const query = `
-        SELECT * FROM parties 
-        WHERE is_active = 1 AND (type = ? OR type = 'both')
-        ORDER BY name ASC
-      `;
+      const transactions = await DatabaseService.executeQuery(`
+        SELECT 
+          i.id,
+          i.invoice_number,
+          i.invoice_date,
+          i.total,
+          i.status,
+          'invoice' as type
+        FROM invoices i
+        WHERE i.party_id = ? AND i.deleted_at IS NULL
+        
+        UNION ALL
+        
+        SELECT 
+          p.id,
+          CONCAT('PAY-', p.id) as reference,
+          p.payment_date,
+          p.amount,
+          'received' as status,
+          'payment' as type
+        FROM payments p
+        WHERE p.party_id = ?
+        
+        ORDER BY invoice_date DESC
+        LIMIT ?
+      `, [partyId, partyId, limit]);
       
-      const result = await db.getAllAsync(query, [type]);
-      return result.map(party => ({
-        ...party,
-        id: party.id.toString(),
-        balance: party.current_balance || 0,
-        creditLimit: party.credit_limit?.toString() || "0",
-        address: this.buildFullAddress(party),
-        gstNumber: party.gst_number || "",
-        panNumber: party.pan_number || ""
+      return transactions.map(t => ({
+        id: t.id,
+        reference: t.invoice_number || t.reference,
+        date: t.invoice_date,
+        amount: t.total || t.amount,
+        status: t.status,
+        type: t.type
       }));
     } catch (error) {
-      console.error('❌ Error fetching parties by type:', error);
+      console.error('❌ Error getting party transactions:', error);
       return [];
     }
   }
 
-  // Get parties statistics
-  static async getPartiesStatistics() {
+  // Create notification
+  static async createNotification(title, message, type = 'info', priority = 'medium') {
     try {
-      const db = await DatabaseService.getDatabase();
-      
-      const [
-        totalCustomers,
-        totalSuppliers,
-        totalReceivables,
-        totalPayables
-      ] = await Promise.all([
-        db.getFirstAsync(`
-          SELECT COUNT(*) as count FROM parties 
-          WHERE is_active = 1 AND type IN ('customer', 'both')
-        `),
-        db.getFirstAsync(`
-          SELECT COUNT(*) as count FROM parties 
-          WHERE is_active = 1 AND type IN ('supplier', 'both')
-        `),
-        db.getFirstAsync(`
-          SELECT COALESCE(SUM(current_balance), 0) as total FROM parties 
-          WHERE is_active = 1 AND type IN ('customer', 'both') AND current_balance > 0
-        `),
-        db.getFirstAsync(`
-          SELECT COALESCE(SUM(ABS(current_balance)), 0) as total FROM parties 
-          WHERE is_active = 1 AND type IN ('supplier', 'both') AND current_balance < 0
-        `)
-      ]);
-
-      return {
-        totalCustomers: totalCustomers?.count || 0,
-        totalSuppliers: totalSuppliers?.count || 0,
-        totalReceivables: totalReceivables?.total || 0,
-        totalPayables: totalPayables?.total || 0,
-        totalParties: (totalCustomers?.count || 0) + (totalSuppliers?.count || 0)
-      };
+      await DatabaseService.create('notifications', {
+        title,
+        message,
+        type,
+        priority,
+        read: 0
+      });
     } catch (error) {
-      console.error('❌ Error getting parties statistics:', error);
-      return {
-        totalCustomers: 0,
-        totalSuppliers: 0,
-        totalReceivables: 0,
-        totalPayables: 0,
-        totalParties: 0
-      };
+      console.error('❌ Error creating notification:', error);
     }
   }
 
-  // Update party balance
-  static async updatePartyBalance(partyId, amount, type = 'debit') {
+  // Utility functions
+  static formatCurrency(amount) {
+    return new Intl.NumberFormat('en-IN', {
+      style: 'currency',
+      currency: 'INR',
+      maximumFractionDigits: 0
+    }).format(amount);
+  }
+
+  static formatDate(dateString) {
     try {
-      const db = await DatabaseService.getDatabase();
-      
-      const updateQuery = type === 'debit' 
-        ? 'UPDATE parties SET current_balance = current_balance + ? WHERE id = ?'
-        : 'UPDATE parties SET current_balance = current_balance - ? WHERE id = ?';
-      
-      await db.runAsync(updateQuery, [amount, partyId]);
-      
-      console.log('✅ Party balance updated:', partyId, type, amount);
-      return { success: true };
+      const date = new Date(dateString);
+      return date.toLocaleDateString('en-IN', {
+        day: '2-digit',
+        month: 'short',
+        year: 'numeric'
+      });
     } catch (error) {
-      console.error('❌ Error updating party balance:', error);
-      return { success: false, error: error.message };
+      return dateString;
     }
   }
 
-  // Helper function to parse address string into components
-  static parseAddress(addressString) {
-    if (!addressString) {
-      return {
-        line1: '',
-        line2: '',
-        city: '',
-        state: '',
-        pincode: '',
-        country: 'India'
-      };
+  static validatePartyData(data) {
+    const errors = {};
+    
+    if (!data.name || data.name.trim().length < 2) {
+      errors.name = 'Name must be at least 2 characters long';
     }
-
-    // Simple address parsing - in production, you might want more sophisticated parsing
-    const parts = addressString.split(',').map(part => part.trim());
+    
+    if (!data.phone || data.phone.trim().length < 10) {
+      errors.phone = 'Please enter a valid phone number';
+    }
+    
+    if (data.email && !this.validateEmail(data.email)) {
+      errors.email = 'Please enter a valid email address';
+    }
+    
+    if (data.gst_number && !this.validateGST(data.gst_number)) {
+      errors.gst_number = 'Please enter a valid GST number';
+    }
     
     return {
-      line1: parts[0] || '',
-      line2: parts[1] || '',
-      city: parts[2] || '',
-      state: parts[3] || '',
-      pincode: parts[4] || '',
-      country: parts[5] || 'India'
+      isValid: Object.keys(errors).length === 0,
+      errors
     };
   }
 
-  // Helper function to build full address from party object
-  static buildFullAddress(party) {
-    const parts = [
-      party.address_line1,
-      party.address_line2,
-      party.city,
-      party.state,
-      party.pincode
-    ].filter(part => part && part.trim());
-    
-    return parts.join(', ');
+  static validateEmail(email) {
+    const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+    return emailRegex.test(email);
   }
 
-  // Get party by ID
-  static async getPartyById(id) {
-    try {
-      const db = await DatabaseService.getDatabase();
-      const party = await db.getFirstAsync('SELECT * FROM parties WHERE id = ?', [id]);
-      
-      if (!party) {
-        throw new Error('Party not found');
-      }
-      
-      return {
-        ...party,
-        id: party.id.toString(),
-        balance: party.current_balance || 0,
-        creditLimit: party.credit_limit?.toString() || "0",
-        address: this.buildFullAddress(party),
-        gstNumber: party.gst_number || "",
-        panNumber: party.pan_number || ""
-      };
-    } catch (error) {
-      console.error('❌ Error fetching party by ID:', error);
-      throw error;
-    }
-  }
-
-  // Get top customers by revenue
-  static async getTopCustomers(limit = 10) {
-    try {
-      const db = await DatabaseService.getDatabase();
-      const query = `
-        SELECT 
-          p.*,
-          COALESCE(SUM(i.total_amount), 0) as total_revenue,
-          COUNT(i.id) as total_invoices
-        FROM parties p
-        LEFT JOIN invoices i ON p.id = i.party_id AND i.status != 'cancelled'
-        WHERE p.is_active = 1 AND p.type IN ('customer', 'both')
-        GROUP BY p.id
-        ORDER BY total_revenue DESC
-        LIMIT ?
-      `;
-      
-      const result = await db.getAllAsync(query, [limit]);
-      return result.map(party => ({
-        ...party,
-        id: party.id.toString(),
-        totalRevenue: party.total_revenue || 0,
-        totalInvoices: party.total_invoices || 0,
-        address: this.buildFullAddress(party)
-      }));
-    } catch (error) {
-      console.error('❌ Error fetching top customers:', error);
-      return [];
-    }
-  }
-
-  // Get customers with outstanding balances
-  static async getOutstandingCustomers(limit = 10) {
-    try {
-      const db = await DatabaseService.getDatabase();
-      const query = `
-        SELECT 
-          p.*,
-          COALESCE(SUM(i.balance_amount), 0) as outstanding_amount
-        FROM parties p
-        LEFT JOIN invoices i ON p.id = i.party_id AND i.balance_amount > 0
-        WHERE p.is_active = 1 AND p.type IN ('customer', 'both')
-        GROUP BY p.id
-        HAVING outstanding_amount > 0
-        ORDER BY outstanding_amount DESC
-        LIMIT ?
-      `;
-      
-      const result = await db.getAllAsync(query, [limit]);
-      return result.map(party => ({
-        ...party,
-        id: party.id.toString(),
-        outstandingAmount: party.outstanding_amount || 0,
-        address: this.buildFullAddress(party)
-      }));
-    } catch (error) {
-      console.error('❌ Error fetching outstanding customers:', error);
-      return [];
-    }
+  static validateGST(gstNumber) {
+    const gstRegex = /^[0-9]{2}[A-Z]{5}[0-9]{4}[A-Z]{1}[1-9A-Z]{1}Z[0-9A-Z]{1}$/;
+    return gstRegex.test(gstNumber);
   }
 }
 
