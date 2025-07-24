@@ -114,8 +114,8 @@ const BottomTabNavigator = () => {
         ),
       })}
     >
-      <Tab.Screen 
-        name="Dashboard" 
+      <Tab.Screen
+        name="Dashboard"
         children={() => <DashboardScreen navigation={navigation} />}
         options={{
           tabBarIcon: ({ color, focused }) => (
@@ -127,8 +127,8 @@ const BottomTabNavigator = () => {
               borderRadius: 12,
               backgroundColor: focused ? '#eff6ff' : 'transparent',
             }}>
-              <Text style={{ 
-                fontSize: 20, 
+              <Text style={{
+                fontSize: 20,
                 opacity: focused ? 1 : 0.7,
               }}>
                 🏠
@@ -137,8 +137,8 @@ const BottomTabNavigator = () => {
           ),
         }}
       />
-      <Tab.Screen 
-        name="Parties" 
+      <Tab.Screen
+        name="Parties"
         children={() => <PartiesScreen navigation={navigation} />}
         options={{
           tabBarIcon: ({ color, focused }) => (
@@ -150,8 +150,8 @@ const BottomTabNavigator = () => {
               borderRadius: 12,
               backgroundColor: focused ? '#eff6ff' : 'transparent',
             }}>
-              <Text style={{ 
-                fontSize: 20, 
+              <Text style={{
+                fontSize: 20,
                 opacity: focused ? 1 : 0.7,
               }}>
                 👥
@@ -160,8 +160,8 @@ const BottomTabNavigator = () => {
           ),
         }}
       />
-      <Tab.Screen 
-        name="Inventory" 
+      <Tab.Screen
+        name="Inventory"
         children={() => <InventoryScreen navigation={navigation} />}
         options={{
           tabBarIcon: ({ color, focused }) => (
@@ -173,8 +173,8 @@ const BottomTabNavigator = () => {
               borderRadius: 12,
               backgroundColor: focused ? '#eff6ff' : 'transparent',
             }}>
-              <Text style={{ 
-                fontSize: 20, 
+              <Text style={{
+                fontSize: 20,
                 opacity: focused ? 1 : 0.7,
               }}>
                 📦
@@ -183,8 +183,8 @@ const BottomTabNavigator = () => {
           ),
         }}
       />
-      <Tab.Screen 
-        name="Reports" 
+      <Tab.Screen
+        name="Reports"
         children={() => <ReportsScreen navigation={navigation} />}
         options={{
           tabBarIcon: ({ color, focused }) => (
@@ -196,8 +196,8 @@ const BottomTabNavigator = () => {
               borderRadius: 12,
               backgroundColor: focused ? '#eff6ff' : 'transparent',
             }}>
-              <Text style={{ 
-                fontSize: 20, 
+              <Text style={{
+                fontSize: 20,
                 opacity: focused ? 1 : 0.7,
               }}>
                 📊
@@ -206,8 +206,8 @@ const BottomTabNavigator = () => {
           ),
         }}
       />
-      <Tab.Screen 
-        name="Settings" 
+      <Tab.Screen
+        name="Settings"
         children={() => <SettingsScreen navigation={navigation} />}
         options={{
           tabBarIcon: ({ color, focused }) => (
@@ -219,8 +219,8 @@ const BottomTabNavigator = () => {
               borderRadius: 12,
               backgroundColor: focused ? '#eff6ff' : 'transparent',
             }}>
-              <Text style={{ 
-                fontSize: 20, 
+              <Text style={{
+                fontSize: 20,
                 opacity: focused ? 1 : 0.7,
               }}>
                 ⚙️
