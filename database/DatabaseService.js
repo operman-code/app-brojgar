@@ -191,32 +191,8 @@ class DatabaseService {
   }
 
   static async runMigrations() {
-    // Add any schema updates here
-    try {
-      // Migration 1: Ensure all required columns exist
-      const migrations = [
-        // Add missing columns to existing tables if they don't exist
-        `ALTER TABLE invoices ADD COLUMN paid_amount REAL DEFAULT 0`,
-        `ALTER TABLE notifications ADD COLUMN action_url TEXT`,
-        `ALTER TABLE notifications ADD COLUMN read_at DATETIME NULL`,
-        `ALTER TABLE business_settings ADD COLUMN deleted_at DATETIME NULL`,
-        `ALTER TABLE transactions ADD COLUMN status TEXT DEFAULT 'completed'`,
-        `ALTER TABLE inventory_items ADD COLUMN stock_quantity INTEGER DEFAULT 0`
-      ];
-
-      for (const migration of migrations) {
-        try {
-          await this.db.execAsync(migration);
-        } catch (error) {
-          // Column might already exist, ignore error
-          if (!error.message.includes('duplicate column name')) {
-            console.log('Migration note:', error.message);
-          }
-        }
-      }
-    } catch (error) {
-      console.log('Migration completed with notes:', error.message);
-    }
+    // Migrations are handled by the reset in App.js
+    console.log('✅ Schema is fresh, no migrations needed');
   }
 
   static async insertInitialData() {
@@ -228,7 +204,6 @@ class DatabaseService {
 
       if (existingSettings[0]?.count > 0) {
         console.log('ℹ️ Initial data already exists');
-        await this.insertSampleData();
         return;
       }
 
@@ -263,15 +238,6 @@ class DatabaseService {
 
   static async insertSampleData() {
     try {
-      // Check if sample data already exists
-      const existingCustomers = await this.executeQuery(
-        'SELECT COUNT(*) as count FROM parties WHERE deleted_at IS NULL'
-      );
-
-      if (existingCustomers[0]?.count > 0) {
-        return; // Sample data already exists
-      }
-
       // Insert sample customer
       await this.executeQuery(
         `INSERT INTO parties (name, phone, email, type, credit_limit, balance) 
@@ -293,7 +259,7 @@ class DatabaseService {
       );
 
       // Insert sample invoice
-      const invoiceResult = await this.executeQuery(
+      await this.executeQuery(
         `INSERT INTO invoices (invoice_number, party_id, date, due_date, subtotal, tax_amount, total, status) 
          VALUES (?, ?, ?, ?, ?, ?, ?, ?)`,
         ['INV001', 1, new Date().toISOString().split('T')[0], 
@@ -338,7 +304,8 @@ class DatabaseService {
       const isSelect = sql.trim().toUpperCase().startsWith('SELECT');
       
       if (isSelect) {
-        return await this.db.getAllAsync(sql, params);
+        const result = await this.db.getAllAsync(sql, params);
+        return result || [];
       } else {
         return await this.db.runAsync(sql, params);
       }
