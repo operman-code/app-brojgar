@@ -1,177 +1,344 @@
-import React, { useState, useEffect } from 'react';
+// screens/Dashboard/DashboardScreen.js
+import React, { useState, useEffect, useRef } from "react";
 import {
   View,
   Text,
+  TouchableOpacity,
   StyleSheet,
   ScrollView,
   SafeAreaView,
-  TouchableOpacity,
-  StatusBar,
+  FlatList,
+  Dimensions,
   Animated,
   RefreshControl,
+  TextInput,
   Alert,
-} from 'react-native';
-import { LinearGradient } from 'expo-linear-gradient';
-import DashboardService from './services/DashboardService';
+  StatusBar,
+} from "react-native";
+
+// Import components
+import KPICard from "./components/KPICard";
+import TransactionItem from "./components/TransactionItem";
+import QuickActionButton from "./components/QuickActionButton";
+import NotificationCard from "./components/NotificationCard";
+
+// Import service
+import DashboardService from "./services/DashboardService";
+
+const { width } = Dimensions.get('window');
 
 const DashboardScreen = ({ navigation }) => {
-  const [fadeAnim] = useState(new Animated.Value(0));
-  const [dashboardData, setDashboardData] = useState(null);
-  const [loading, setLoading] = useState(true);
+  // Enhanced state management
+  const [kpiData, setKpiData] = useState({});
+  const [recentTransactions, setRecentTransactions] = useState([]);
+  const [reminders, setReminders] = useState([]);
+  const [notifications, setNotifications] = useState([]);
+  const [salesChartData, setSalesChartData] = useState([]);
+  const [businessProfile, setBusinessProfile] = useState({});
+  
   const [refreshing, setRefreshing] = useState(false);
+  const [searchQuery, setSearchQuery] = useState("");
+  const [filteredTransactions, setFilteredTransactions] = useState([]);
+  const [activeTab, setActiveTab] = useState("overview");
+  const [loading, setLoading] = useState(true);
+  
+  // Animation values
+  const fadeAnim = useRef(new Animated.Value(0)).current;
+  const slideAnim = useRef(new Animated.Value(50)).current;
 
   useEffect(() => {
     loadDashboardData();
     
-    Animated.timing(fadeAnim, {
-      toValue: 1,
-      duration: 600,
-      useNativeDriver: true,
-    }).start();
+    // Enhanced animations
+    Animated.parallel([
+      Animated.timing(fadeAnim, {
+        toValue: 1,
+        duration: 1000,
+        useNativeDriver: true,
+      }),
+      Animated.timing(slideAnim, {
+        toValue: 0,
+        duration: 800,
+        useNativeDriver: true,
+      }),
+    ]).start();
   }, []);
 
+  useEffect(() => {
+    filterTransactions();
+  }, [recentTransactions, searchQuery]);
+
   const loadDashboardData = async () => {
+    setLoading(true);
     try {
-      setLoading(true);
-      const data = await DashboardService.getDashboardData();
-      setDashboardData(data);
+      const [
+        kpiResult,
+        transactionsResult,
+        remindersResult,
+        notificationsResult,
+        chartResult,
+        profileResult
+      ] = await Promise.all([
+        DashboardService.getKPIData(),
+        DashboardService.getRecentTransactions(),
+        DashboardService.getReminders(),
+        DashboardService.getNotifications(),
+        DashboardService.getSalesChartData(),
+        DashboardService.getBusinessProfile()
+      ]);
+
+      setKpiData(kpiResult);
+      setRecentTransactions(transactionsResult);
+      setReminders(remindersResult);
+      setNotifications(notificationsResult);
+      setSalesChartData(chartResult);
+      setBusinessProfile(profileResult);
     } catch (error) {
-      console.error('Error loading dashboard data:', error);
-      Alert.alert('Error', 'Failed to load dashboard data');
+      console.error('❌ Error loading dashboard:', error);
+      Alert.alert("Error", "Failed to load dashboard data");
     } finally {
       setLoading(false);
     }
   };
 
-  const onRefresh = async () => {
+  const filterTransactions = () => {
+    if (searchQuery.trim() === "") {
+      setFilteredTransactions(recentTransactions);
+    } else {
+      const filtered = recentTransactions.filter(transaction =>
+        transaction.customer?.toLowerCase().includes(searchQuery.toLowerCase()) ||
+        transaction.reference?.toLowerCase().includes(searchQuery.toLowerCase()) ||
+        transaction.type?.toLowerCase().includes(searchQuery.toLowerCase())
+      );
+      setFilteredTransactions(filtered);
+    }
+  };
+
+  const handleRefresh = async () => {
     setRefreshing(true);
     await loadDashboardData();
     setRefreshing(false);
   };
 
-  const formatCurrency = (amount) => {
-    return new Intl.NumberFormat('en-IN', {
-      style: 'currency',
-      currency: 'INR',
-      maximumFractionDigits: 0
-    }).format(amount);
+  const handleQuickAction = (action) => {
+    switch (action) {
+      case 'newSale':
+        navigation.navigate('Invoice');
+        break;
+      case 'addItem':
+        navigation.navigate('Inventory', { action: 'add' });
+        break;
+      case 'newCustomer':
+        navigation.navigate('Parties', { action: 'add', type: 'customer' });
+        break;
+      case 'receivePayment':
+        Alert.alert("Coming Soon", "Payment collection feature will be available soon");
+        break;
+      case 'newInvoice':
+        navigation.navigate('Invoice');
+        break;
+      case 'viewReports':
+        navigation.navigate('Reports');
+        break;
+      default:
+        Alert.alert("Feature", `${action} feature coming soon`);
+    }
   };
 
-  const kpiCards = dashboardData ? [
-    {
-      title: 'Today\'s Sales',
-      value: dashboardData.kpis.todaySales,
-      count: dashboardData.kpis.todayCount,
-      change: '+12.5%',
-      positive: true,
-      icon: '💰',
-      color: '#10b981'
-    },
-    {
-      title: 'Month Sales',
-      value: dashboardData.kpis.monthSales,
-      count: dashboardData.kpis.monthCount,
-      change: `+${dashboardData.insights.salesGrowth}%`,
-      positive: dashboardData.insights.salesGrowth >= 0,
-      icon: '📈',
-      color: '#3b82f6'
-    },
-    {
-      title: 'Customers',
-      value: dashboardData.kpis.totalCustomers,
-      change: '+5',
-      positive: true,
-      icon: '👥',
-      color: '#8b5cf6'
-    },
-    {
-      title: 'Low Stock',
-      value: dashboardData.kpis.lowStockCount,
-      change: dashboardData.kpis.lowStockCount > 0 ? 'Action needed' : 'All good',
-      positive: dashboardData.kpis.lowStockCount === 0,
-      icon: '📦',
-      color: dashboardData.kpis.lowStockCount > 0 ? '#ef4444' : '#10b981'
-    },
-  ] : [];
+  const renderKPICards = () => (
+    <View style={styles.kpiContainer}>
+      <KPICard
+        title="To Collect"
+        value={kpiData.toCollect || 0}
+        change={kpiData.toCollectTrend}
+        icon="💰"
+        color="#10b981"
+      />
+      <KPICard
+        title="To Pay"
+        value={kpiData.toPay || 0}
+        change={kpiData.toPayTrend}
+        icon="💳"
+        color="#ef4444"
+      />
+      <KPICard
+        title="Stock Value"
+        value={kpiData.stockValue || 0}
+        change={kpiData.stockTrend}
+        icon="📦"
+        color="#3b82f6"
+      />
+      <KPICard
+        title="This Week"
+        value={kpiData.weekSales || 0}
+        change={kpiData.salesTrend}
+        icon="📈"
+        color="#8b5cf6"
+      />
+    </View>
+  );
 
-  const quickActions = [
-    { id: 1, title: 'New Sale', icon: '💰', color: '#10b981', action: () => navigation.navigate('Invoice') },
-    { id: 2, title: 'Add Party', icon: '👤', color: '#3b82f6', action: () => navigation.navigate('Parties') },
-    { id: 3, title: 'Add Item', icon: '📦', color: '#8b5cf6', action: () => navigation.navigate('Inventory') },
-    { id: 4, title: 'View Reports', icon: '📊', color: '#f59e0b', action: () => navigation.navigate('Reports') },
-  ];
-
-  const renderKPICard = (kpi, index) => (
-    <View key={index} style={styles.kpiCard}>
-      <View style={styles.kpiHeader}>
-        <View style={[styles.kpiIcon, { backgroundColor: kpi.color + '20' }]}>
-          <Text style={styles.kpiIconText}>{kpi.icon}</Text>
-        </View>
-        <View style={[styles.changeIndicator, { backgroundColor: kpi.positive ? '#dcfce7' : '#fef2f2' }]}>
-          <Text style={[styles.changeText, { color: kpi.positive ? '#166534' : '#dc2626' }]}>
-            {kpi.change}
-          </Text>
-        </View>
+  const renderReminders = () => (
+    <View style={styles.section}>
+      <View style={styles.sectionHeader}>
+        <Text style={styles.sectionTitle}>🔔 Reminders</Text>
+        <TouchableOpacity>
+          <Text style={styles.viewAllText}>View All</Text>
+        </TouchableOpacity>
       </View>
-      <Text style={styles.kpiTitle}>{kpi.title}</Text>
-      <Text style={styles.kpiValue}>
-        {typeof kpi.value === 'number' && kpi.title.toLowerCase().includes('sales') 
-          ? formatCurrency(kpi.value)
-          : kpi.value}
-      </Text>
-      {kpi.count && (
-        <Text style={styles.kpiCount}>{kpi.count} transactions</Text>
+      
+      {reminders.length > 0 ? (
+        <FlatList
+          data={reminders.slice(0, 3)}
+          keyExtractor={(item) => item.id.toString()}
+          renderItem={({ item }) => (
+            <View style={styles.reminderCard}>
+              <View style={styles.reminderLeft}>
+                <View style={[styles.reminderIcon, { backgroundColor: item.color }]}>
+                  <Text style={styles.reminderIconText}>{item.icon}</Text>
+                </View>
+                <View style={styles.reminderContent}>
+                  <Text style={styles.reminderTitle}>{item.title}</Text>
+                  <Text style={styles.reminderSubtitle}>{item.subtitle}</Text>
+                </View>
+              </View>
+              <Text style={styles.reminderAmount}>₹{item.amount?.toLocaleString()}</Text>
+            </View>
+          )}
+          showsVerticalScrollIndicator={false}
+        />
+      ) : (
+        <View style={styles.emptyState}>
+          <Text style={styles.emptyStateText}>No pending reminders</Text>
+        </View>
       )}
     </View>
   );
 
-  const renderQuickAction = (action) => (
-    <TouchableOpacity
-      key={action.id}
-      style={[styles.quickActionCard, { borderColor: action.color + '30' }]}
-      onPress={action.action}
-    >
-      <View style={[styles.quickActionIcon, { backgroundColor: action.color }]}>
-        <Text style={styles.quickActionIconText}>{action.icon}</Text>
-      </View>
-      <Text style={styles.quickActionTitle}>{action.title}</Text>
-    </TouchableOpacity>
-  );
-
-  const renderTransaction = (transaction, index) => (
-    <View key={index} style={styles.transactionItem}>
-      <View style={styles.transactionLeft}>
-        <View style={[styles.transactionIcon, { backgroundColor: '#3b82f6' + '20' }]}>
-          <Text style={styles.transactionIconText}>💰</Text>
-        </View>
-        <View style={styles.transactionDetails}>
-          <Text style={styles.transactionTitle}>{transaction.party}</Text>
-          <Text style={styles.transactionSubtitle}>{transaction.reference}</Text>
-          <Text style={styles.transactionDate}>{transaction.date}</Text>
-        </View>
-      </View>
-      <View style={styles.transactionRight}>
-        <Text style={styles.transactionAmount}>
-          {formatCurrency(transaction.amount)}
-        </Text>
-        <View style={[styles.statusBadge, { 
-          backgroundColor: transaction.status === 'paid' ? '#dcfce7' : '#fef3c7' 
-        }]}>
-          <Text style={[styles.statusText, { 
-            color: transaction.status === 'paid' ? '#166534' : '#92400e' 
-          }]}>
-            {transaction.status}
-          </Text>
-        </View>
+  const renderQuickActions = () => (
+    <View style={styles.section}>
+      <Text style={styles.sectionTitle}>⚡ Quick Actions</Text>
+      <View style={styles.quickActionsGrid}>
+        {[
+          { id: '1', title: 'New Sale', icon: '💰', action: 'newSale', color: '#10b981' },
+          { id: '2', title: 'Add Item', icon: '📦', action: 'addItem', color: '#3b82f6' },
+          { id: '3', title: 'New Customer', icon: '👤', action: 'newCustomer', color: '#8b5cf6' },
+          { id: '4', title: 'Payment', icon: '💳', action: 'receivePayment', color: '#f59e0b' },
+          { id: '5', title: 'Invoice', icon: '🧾', action: 'newInvoice', color: '#ef4444' },
+          { id: '6', title: 'Reports', icon: '📊', action: 'viewReports', color: '#06b6d4' },
+        ].map((action) => (
+          <QuickActionButton
+            key={action.id}
+            title={action.title}
+            icon={action.icon}
+            color={action.color}
+            onPress={() => handleQuickAction(action.action)}
+          />
+        ))}
       </View>
     </View>
   );
 
-  if (loading && !dashboardData) {
+  const renderTransactions = () => (
+    <View style={styles.section}>
+      <View style={styles.sectionHeader}>
+        <Text style={styles.sectionTitle}>📋 Recent Transactions</Text>
+        <TouchableOpacity>
+          <Text style={styles.viewAllText}>View All</Text>
+        </TouchableOpacity>
+      </View>
+      
+      <View style={styles.searchContainer}>
+        <TextInput
+          style={styles.searchInput}
+          placeholder="Search transactions..."
+          value={searchQuery}
+          onChangeText={setSearchQuery}
+          placeholderTextColor="#9ca3af"
+        />
+      </View>
+
+      {filteredTransactions.length > 0 ? (
+        <FlatList
+          data={filteredTransactions.slice(0, 5)}
+          keyExtractor={(item) => item.id.toString()}
+          renderItem={({ item }) => (
+            <TransactionItem
+              transaction={item}
+              onPress={() => {
+                // Handle transaction press
+                Alert.alert("Transaction", `View ${item.type} details`);
+              }}
+            />
+          )}
+          showsVerticalScrollIndicator={false}
+        />
+      ) : (
+        <View style={styles.emptyState}>
+          <Text style={styles.emptyStateText}>
+            {searchQuery ? 'No matching transactions' : 'No recent transactions'}
+          </Text>
+        </View>
+      )}
+    </View>
+  );
+
+  const renderTabs = () => (
+    <View style={styles.tabContainer}>
+      {[
+        { id: 'overview', title: 'Overview', icon: '📊' },
+        { id: 'transactions', title: 'Transactions', icon: '📋' },
+        { id: 'reports', title: 'Reports', icon: '📈' }
+      ].map((tab) => (
+        <TouchableOpacity
+          key={tab.id}
+          style={[styles.tab, activeTab === tab.id && styles.activeTab]}
+          onPress={() => setActiveTab(tab.id)}
+        >
+          <Text style={styles.tabIcon}>{tab.icon}</Text>
+          <Text style={[styles.tabText, activeTab === tab.id && styles.activeTabText]}>
+            {tab.title}
+          </Text>
+        </TouchableOpacity>
+      ))}
+    </View>
+  );
+
+  const renderContent = () => {
+    switch (activeTab) {
+      case 'overview':
+        return (
+          <>
+            {renderKPICards()}
+            {renderReminders()}
+            {renderQuickActions()}
+          </>
+        );
+      case 'transactions':
+        return renderTransactions();
+      case 'reports':
+        return (
+          <View style={styles.section}>
+            <Text style={styles.sectionTitle}>📈 Quick Reports</Text>
+            <TouchableOpacity 
+              style={styles.reportButton}
+              onPress={() => navigation.navigate('Reports')}
+            >
+              <Text style={styles.reportButtonText}>View Detailed Reports</Text>
+            </TouchableOpacity>
+          </View>
+        );
+      default:
+        return null;
+    }
+  };
+
+  if (loading) {
     return (
       <SafeAreaView style={styles.container}>
+        <StatusBar barStyle="dark-content" backgroundColor="#ffffff" />
         <View style={styles.loadingContainer}>
-          <Text style={styles.loadingText}>Loading dashboard...</Text>
+          <Text style={styles.loadingText}>Loading Dashboard...</Text>
         </View>
       </SafeAreaView>
     );
@@ -181,126 +348,54 @@ const DashboardScreen = ({ navigation }) => {
     <SafeAreaView style={styles.container}>
       <StatusBar barStyle="dark-content" backgroundColor="#ffffff" />
       
-      <Animated.View style={[styles.content, { opacity: fadeAnim }]}>
+      <Animated.View 
+        style={[
+          styles.animatedContainer,
+          {
+            opacity: fadeAnim,
+            transform: [{ translateY: slideAnim }]
+          }
+        ]}
+      >
         {/* Header */}
         <View style={styles.header}>
-          <View style={styles.headerLeft}>
-            <Text style={styles.headerTitle}>Dashboard</Text>
-            <Text style={styles.headerSubtitle}>Welcome back! Here's your business overview</Text>
+          <View>
+            <Text style={styles.welcomeText}>Welcome back!</Text>
+            <Text style={styles.businessName}>{businessProfile.businessName || 'Brojgar Business'}</Text>
           </View>
-          <TouchableOpacity 
-            style={styles.notificationButton}
-            onPress={() => navigation.navigate('Notifications')}
-          >
-            <Text style={styles.notificationIcon}>🔔</Text>
-            {dashboardData?.reminders && dashboardData.reminders.length > 0 && (
-              <View style={styles.notificationBadge}>
-                <Text style={styles.notificationBadgeText}>{dashboardData.reminders.length}</Text>
-              </View>
-            )}
-          </TouchableOpacity>
-        </View>
-
-        <ScrollView 
-          style={styles.scrollContent} 
-          showsVerticalScrollIndicator={false}
-          refreshControl={
-            <RefreshControl refreshing={refreshing} onRefresh={onRefresh} />
-          }
-        >
-          {/* KPI Cards */}
-          <View style={styles.kpiContainer}>
-            <View style={styles.kpiRow}>
-              {kpiCards.slice(0, 2).map(renderKPICard)}
-            </View>
-            <View style={styles.kpiRow}>
-              {kpiCards.slice(2, 4).map(renderKPICard)}
-            </View>
-          </View>
-
-          {/* Business Insights */}
-          <View style={styles.insightsCard}>
-            <LinearGradient
-              colors={['#3b82f6', '#1d4ed8']}
-              style={styles.insightsGradient}
+          <View style={styles.headerActions}>
+            <TouchableOpacity 
+              style={styles.headerButton}
+              onPress={() => navigation.navigate('Search')}
             >
-              <Text style={styles.insightsTitle}>Business Insights</Text>
-              <View style={styles.insightsContent}>
-                <View style={styles.insightItem}>
-                  <Text style={styles.insightLabel}>Profit Margin</Text>
-                  <Text style={styles.insightValue}>{dashboardData?.insights.profitMargin || 0}%</Text>
-                </View>
-                <View style={styles.insightItem}>
-                  <Text style={styles.insightLabel}>Top Customer</Text>
-                  <Text style={styles.insightValue}>{dashboardData?.insights.topCustomer?.name || 'None'}</Text>
-                </View>
-                <View style={styles.insightItem}>
-                  <Text style={styles.insightLabel}>Inventory Value</Text>
-                  <Text style={styles.insightValue}>{formatCurrency(dashboardData?.insights.inventoryValue || 0)}</Text>
-                </View>
-              </View>
-            </LinearGradient>
-          </View>
-
-          {/* Quick Actions */}
-          <View style={styles.quickActionsContainer}>
-            <Text style={styles.sectionTitle}>Quick Actions</Text>
-            <View style={styles.quickActionsGrid}>
-              {quickActions.map(renderQuickAction)}
-            </View>
-          </View>
-
-          {/* Recent Transactions */}
-          <View style={styles.transactionsContainer}>
-            <View style={styles.sectionHeader}>
-              <Text style={styles.sectionTitle}>Recent Transactions</Text>
-              <TouchableOpacity onPress={() => navigation.navigate('Reports')}>
-                <Text style={styles.sectionLink}>View All</Text>
-              </TouchableOpacity>
-            </View>
-            <View style={styles.transactionsCard}>
-              {dashboardData?.recentTransactions && dashboardData.recentTransactions.length > 0 ? (
-                dashboardData.recentTransactions.map(renderTransaction)
-              ) : (
-                <View style={styles.emptyTransactions}>
-                  <Text style={styles.emptyTransactionsText}>No recent transactions</Text>
-                  <TouchableOpacity 
-                    style={styles.createSaleButton}
-                    onPress={() => navigation.navigate('Invoice')}
-                  >
-                    <Text style={styles.createSaleButtonText}>Create First Sale</Text>
-                  </TouchableOpacity>
+              <Text style={styles.headerButtonIcon}>🔍</Text>
+            </TouchableOpacity>
+            <TouchableOpacity 
+              style={styles.notificationButton}
+              onPress={() => navigation.navigate('Notifications')}
+            >
+              <Text style={styles.notificationIcon}>🔔</Text>
+              {notifications.length > 0 && (
+                <View style={styles.notificationBadge}>
+                  <Text style={styles.notificationBadgeText}>{notifications.length}</Text>
                 </View>
               )}
-            </View>
+            </TouchableOpacity>
           </View>
+        </View>
 
-          {/* Reminders */}
-          {dashboardData?.reminders && dashboardData.reminders.length > 0 && (
-            <View style={styles.remindersContainer}>
-              <Text style={styles.sectionTitle}>Reminders</Text>
-              {dashboardData.reminders.map((reminder, index) => (
-                <View key={index} style={styles.reminderCard}>
-                  <View style={styles.reminderLeft}>
-                    <View style={[styles.reminderIcon, { 
-                      backgroundColor: reminder.priority === 'high' ? '#fef2f2' : '#fef3c7' 
-                    }]}>
-                      <Text style={styles.reminderIconText}>
-                        {reminder.type === 'payment' ? '💳' : reminder.type === 'stock' ? '📦' : '📋'}
-                      </Text>
-                    </View>
-                    <View style={styles.reminderContent}>
-                      <Text style={styles.reminderTitle}>{reminder.title}</Text>
-                      <Text style={styles.reminderMessage}>{reminder.message}</Text>
-                    </View>
-                  </View>
-                  <View style={[styles.priorityIndicator, { 
-                    backgroundColor: reminder.priority === 'high' ? '#ef4444' : '#f59e0b' 
-                  }]} />
-                </View>
-              ))}
-            </View>
-          )}
+        {/* Tabs */}
+        {renderTabs()}
+
+        {/* Content */}
+        <ScrollView
+          style={styles.content}
+          showsVerticalScrollIndicator={false}
+          refreshControl={
+            <RefreshControl refreshing={refreshing} onRefresh={handleRefresh} />
+          }
+        >
+          {renderContent()}
         </ScrollView>
       </Animated.View>
     </SafeAreaView>
@@ -312,9 +407,6 @@ const styles = StyleSheet.create({
     flex: 1,
     backgroundColor: '#f8fafc',
   },
-  content: {
-    flex: 1,
-  },
   loadingContainer: {
     flex: 1,
     justifyContent: 'center',
@@ -322,33 +414,46 @@ const styles = StyleSheet.create({
   },
   loadingText: {
     fontSize: 16,
-    color: '#64748b',
+    color: '#6b7280',
+  },
+  animatedContainer: {
+    flex: 1,
   },
   header: {
     flexDirection: 'row',
     justifyContent: 'space-between',
     alignItems: 'center',
     paddingHorizontal: 20,
-    paddingVertical: 20,
+    paddingVertical: 16,
     backgroundColor: '#ffffff',
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.04,
-    shadowRadius: 8,
-    elevation: 2,
+    borderBottomWidth: 1,
+    borderBottomColor: '#e5e7eb',
   },
-  headerLeft: {
-    flex: 1,
-  },
-  headerTitle: {
-    fontSize: 24,
-    fontWeight: 'bold',
-    color: '#0f172a',
-  },
-  headerSubtitle: {
+  welcomeText: {
     fontSize: 14,
-    color: '#64748b',
-    marginTop: 2,
+    color: '#6b7280',
+    marginBottom: 4,
+  },
+  businessName: {
+    fontSize: 20,
+    fontWeight: 'bold',
+    color: '#111827',
+  },
+  headerActions: {
+    flexDirection: 'row',
+    alignItems: 'center',
+  },
+  headerButton: {
+    width: 40,
+    height: 40,
+    borderRadius: 20,
+    backgroundColor: '#f3f4f6',
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginRight: 12,
+  },
+  headerButtonIcon: {
+    fontSize: 18,
   },
   notificationButton: {
     position: 'relative',
@@ -363,166 +468,67 @@ const styles = StyleSheet.create({
     right: 4,
     backgroundColor: '#ef4444',
     borderRadius: 10,
-    width: 20,
+    minWidth: 20,
     height: 20,
-    alignItems: 'center',
     justifyContent: 'center',
+    alignItems: 'center',
   },
   notificationBadgeText: {
     color: '#ffffff',
     fontSize: 12,
     fontWeight: 'bold',
   },
-  scrollContent: {
-    flex: 1,
-  },
-  kpiContainer: {
-    paddingHorizontal: 20,
-    paddingTop: 20,
-  },
-  kpiRow: {
+  tabContainer: {
     flexDirection: 'row',
-    justifyContent: 'space-between',
-    marginBottom: 16,
-  },
-  kpiCard: {
     backgroundColor: '#ffffff',
-    borderRadius: 16,
-    padding: 16,
-    width: '48%',
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 1 },
-    shadowOpacity: 0.05,
-    shadowRadius: 8,
-    elevation: 2,
+    paddingHorizontal: 16,
+    paddingVertical: 8,
+    borderBottomWidth: 1,
+    borderBottomColor: '#e5e7eb',
   },
-  kpiHeader: {
+  tab: {
+    flex: 1,
     flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-    marginBottom: 12,
-  },
-  kpiIcon: {
-    width: 40,
-    height: 40,
-    borderRadius: 12,
     alignItems: 'center',
     justifyContent: 'center',
+    paddingVertical: 12,
+    paddingHorizontal: 16,
+    borderRadius: 8,
+    marginHorizontal: 4,
   },
-  kpiIconText: {
-    fontSize: 18,
+  activeTab: {
+    backgroundColor: '#eff6ff',
   },
-  changeIndicator: {
-    paddingHorizontal: 8,
-    paddingVertical: 4,
-    borderRadius: 12,
-  },
-  changeText: {
-    fontSize: 12,
-    fontWeight: '600',
-  },
-  kpiTitle: {
-    fontSize: 14,
-    color: '#64748b',
-    marginBottom: 4,
-  },
-  kpiValue: {
-    fontSize: 18,
-    fontWeight: 'bold',
-    color: '#0f172a',
-  },
-  kpiCount: {
-    fontSize: 12,
-    color: '#94a3b8',
-    marginTop: 2,
-  },
-  insightsCard: {
-    marginHorizontal: 20,
-    marginVertical: 20,
-    borderRadius: 16,
-    overflow: 'hidden',
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.1,
-    shadowRadius: 8,
-    elevation: 4,
-  },
-  insightsGradient: {
-    padding: 20,
-  },
-  insightsTitle: {
-    fontSize: 18,
-    fontWeight: 'bold',
-    color: '#ffffff',
-    marginBottom: 16,
-  },
-  insightsContent: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-  },
-  insightItem: {
-    flex: 1,
-    alignItems: 'center',
-  },
-  insightLabel: {
-    fontSize: 12,
-    color: 'rgba(255, 255, 255, 0.8)',
-    marginBottom: 4,
-  },
-  insightValue: {
+  tabIcon: {
     fontSize: 16,
-    fontWeight: 'bold',
-    color: '#ffffff',
+    marginRight: 6,
   },
-  quickActionsContainer: {
-    paddingHorizontal: 20,
-    marginBottom: 20,
-  },
-  sectionTitle: {
-    fontSize: 18,
-    fontWeight: 'bold',
-    color: '#0f172a',
-    marginBottom: 16,
-  },
-  quickActionsGrid: {
-    flexDirection: 'row',
-    flexWrap: 'wrap',
-    justifyContent: 'space-between',
-  },
-  quickActionCard: {
-    backgroundColor: '#ffffff',
-    borderRadius: 12,
-    padding: 16,
-    width: '48%',
-    marginBottom: 12,
-    alignItems: 'center',
-    borderWidth: 1,
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 1 },
-    shadowOpacity: 0.05,
-    shadowRadius: 4,
-    elevation: 2,
-  },
-  quickActionIcon: {
-    width: 48,
-    height: 48,
-    borderRadius: 24,
-    alignItems: 'center',
-    justifyContent: 'center',
-    marginBottom: 8,
-  },
-  quickActionIconText: {
-    fontSize: 20,
-  },
-  quickActionTitle: {
+  tabText: {
     fontSize: 14,
-    fontWeight: '600',
-    color: '#374151',
-    textAlign: 'center',
+    color: '#6b7280',
+    fontWeight: '500',
   },
-  transactionsContainer: {
-    paddingHorizontal: 20,
-    marginBottom: 20,
+  activeTabText: {
+    color: '#3b82f6',
+    fontWeight: '600',
+  },
+  content: {
+    flex: 1,
+  },
+  section: {
+    backgroundColor: '#ffffff',
+    marginHorizontal: 16,
+    marginVertical: 8,
+    padding: 16,
+    borderRadius: 12,
+    shadowColor: '#000',
+    shadowOffset: {
+      width: 0,
+      height: 2,
+    },
+    shadowOpacity: 0.1,
+    shadowRadius: 3.84,
+    elevation: 5,
   },
   sectionHeader: {
     flexDirection: 'row',
@@ -530,117 +536,30 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     marginBottom: 16,
   },
-  sectionLink: {
+  sectionTitle: {
+    fontSize: 18,
+    fontWeight: 'bold',
+    color: '#111827',
+  },
+  viewAllText: {
     fontSize: 14,
     color: '#3b82f6',
-    fontWeight: '600',
+    fontWeight: '500',
   },
-  transactionsCard: {
-    backgroundColor: '#ffffff',
-    borderRadius: 16,
-    padding: 16,
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 1 },
-    shadowOpacity: 0.05,
-    shadowRadius: 8,
-    elevation: 2,
+  kpiContainer: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    justifyContent: 'space-between',
+    paddingHorizontal: 16,
+    paddingVertical: 8,
   },
-  transactionItem: {
+  reminderCard: {
     flexDirection: 'row',
     justifyContent: 'space-between',
     alignItems: 'center',
     paddingVertical: 12,
     borderBottomWidth: 1,
-    borderBottomColor: '#f1f5f9',
-  },
-  transactionLeft: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    flex: 1,
-  },
-  transactionIcon: {
-    width: 40,
-    height: 40,
-    borderRadius: 20,
-    alignItems: 'center',
-    justifyContent: 'center',
-    marginRight: 12,
-  },
-  transactionIconText: {
-    fontSize: 16,
-  },
-  transactionDetails: {
-    flex: 1,
-  },
-  transactionTitle: {
-    fontSize: 14,
-    fontWeight: '600',
-    color: '#0f172a',
-    marginBottom: 2,
-  },
-  transactionSubtitle: {
-    fontSize: 12,
-    color: '#64748b',
-    marginBottom: 2,
-  },
-  transactionDate: {
-    fontSize: 11,
-    color: '#94a3b8',
-  },
-  transactionRight: {
-    alignItems: 'flex-end',
-  },
-  transactionAmount: {
-    fontSize: 14,
-    fontWeight: 'bold',
-    color: '#0f172a',
-    marginBottom: 4,
-  },
-  statusBadge: {
-    paddingHorizontal: 8,
-    paddingVertical: 2,
-    borderRadius: 12,
-  },
-  statusText: {
-    fontSize: 11,
-    fontWeight: '600',
-  },
-  emptyTransactions: {
-    alignItems: 'center',
-    paddingVertical: 40,
-  },
-  emptyTransactionsText: {
-    fontSize: 16,
-    color: '#64748b',
-    marginBottom: 16,
-  },
-  createSaleButton: {
-    backgroundColor: '#3b82f6',
-    paddingHorizontal: 24,
-    paddingVertical: 12,
-    borderRadius: 8,
-  },
-  createSaleButtonText: {
-    color: '#ffffff',
-    fontSize: 14,
-    fontWeight: '600',
-  },
-  remindersContainer: {
-    paddingHorizontal: 20,
-    marginBottom: 20,
-  },
-  reminderCard: {
-    backgroundColor: '#ffffff',
-    borderRadius: 12,
-    padding: 16,
-    marginBottom: 12,
-    flexDirection: 'row',
-    alignItems: 'center',
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 1 },
-    shadowOpacity: 0.05,
-    shadowRadius: 4,
-    elevation: 2,
+    borderBottomColor: '#f3f4f6',
   },
   reminderLeft: {
     flexDirection: 'row',
@@ -651,30 +570,67 @@ const styles = StyleSheet.create({
     width: 40,
     height: 40,
     borderRadius: 20,
-    alignItems: 'center',
     justifyContent: 'center',
+    alignItems: 'center',
     marginRight: 12,
   },
   reminderIconText: {
-    fontSize: 16,
+    fontSize: 18,
   },
   reminderContent: {
     flex: 1,
   },
   reminderTitle: {
-    fontSize: 14,
+    fontSize: 16,
     fontWeight: '600',
-    color: '#0f172a',
+    color: '#111827',
     marginBottom: 2,
   },
-  reminderMessage: {
-    fontSize: 12,
-    color: '#64748b',
+  reminderSubtitle: {
+    fontSize: 14,
+    color: '#6b7280',
   },
-  priorityIndicator: {
-    width: 4,
-    height: 24,
-    borderRadius: 2,
+  reminderAmount: {
+    fontSize: 16,
+    fontWeight: 'bold',
+    color: '#111827',
+  },
+  quickActionsGrid: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    justifyContent: 'space-between',
+  },
+  searchContainer: {
+    marginBottom: 16,
+  },
+  searchInput: {
+    backgroundColor: '#f9fafb',
+    borderRadius: 8,
+    paddingHorizontal: 12,
+    paddingVertical: 10,
+    fontSize: 16,
+    borderWidth: 1,
+    borderColor: '#e5e7eb',
+  },
+  emptyState: {
+    alignItems: 'center',
+    paddingVertical: 32,
+  },
+  emptyStateText: {
+    fontSize: 16,
+    color: '#6b7280',
+  },
+  reportButton: {
+    backgroundColor: '#3b82f6',
+    paddingVertical: 12,
+    paddingHorizontal: 24,
+    borderRadius: 8,
+    alignItems: 'center',
+  },
+  reportButtonText: {
+    color: '#ffffff',
+    fontSize: 16,
+    fontWeight: '600',
   },
 });
 
