@@ -177,16 +177,15 @@ class DashboardService {
     }
   }
 
-  // Get pending payments
+  // Get pending payments (simplified without paid_amount)
   static async getPendingPayments() {
     try {
       const query = `
         SELECT 
           COUNT(*) as count,
-          COALESCE(SUM(total - paid_amount), 0) as total
+          COALESCE(SUM(total), 0) as total
         FROM invoices 
         WHERE status = 'pending' 
-        AND (total - paid_amount) > 0
         AND (deleted_at IS NULL OR deleted_at = '')
       `;
       
@@ -198,19 +197,19 @@ class DashboardService {
     }
   }
 
-  // Get top selling items
+  // Get top selling items (simplified)
   static async getTopSellingItems() {
     try {
       const query = `
         SELECT 
-          ii.item_name,
-          SUM(ii.quantity) as total_quantity,
-          SUM(ii.total) as total_sales
+          item_name,
+          SUM(quantity) as total_quantity,
+          SUM(total) as total_sales
         FROM invoice_items ii
         JOIN invoices i ON ii.invoice_id = i.id
         WHERE (ii.deleted_at IS NULL OR ii.deleted_at = '')
         AND (i.deleted_at IS NULL OR i.deleted_at = '')
-        GROUP BY ii.item_name
+        GROUP BY item_name
         ORDER BY total_sales DESC
         LIMIT 5
       `;
