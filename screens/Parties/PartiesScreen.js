@@ -12,50 +12,72 @@ import {
   TextInput,
   Modal,
   Alert,
+  RefreshControl,
 } from 'react-native';
+import PartiesService from './services/PartiesService';
 
 const PartiesScreen = ({ navigation }) => {
   const [fadeAnim] = useState(new Animated.Value(0));
   const [selectedTab, setSelectedTab] = useState('all');
   const [searchQuery, setSearchQuery] = useState('');
   const [modalVisible, setModalVisible] = useState(false);
-  const [parties, setParties] = useState([
-    { id: 1, name: 'Rajesh Kumar', type: 'Customer', phone: '+91 98765 43210', balance: 15000, status: 'active' },
-    { id: 2, name: 'Priya Sharma', type: 'Customer', phone: '+91 87654 32109', balance: -5000, status: 'active' },
-    { id: 3, name: 'Tech Suppliers Ltd', type: 'Supplier', phone: '+91 76543 21098', balance: 25000, status: 'active' },
-    { id: 4, name: 'Mobile World', type: 'Customer', phone: '+91 65432 10987', balance: 12000, status: 'inactive' },
-  ]);
+  const [parties, setParties] = useState([]);
+  const [loading, setLoading] = useState(true);
+  const [refreshing, setRefreshing] = useState(false);
+  const [summary, setSummary] = useState({});
 
   const [newParty, setNewParty] = useState({
     name: '',
-    type: 'Customer',
+    type: 'customer',
     phone: '',
     email: '',
     address: '',
   });
 
   useEffect(() => {
+    loadParties();
+    loadSummary();
+    
     Animated.timing(fadeAnim, {
       toValue: 1,
       duration: 600,
       useNativeDriver: true,
     }).start();
-  }, []);
+  }, [selectedTab, searchQuery]);
+
+  const loadParties = async () => {
+    try {
+      setLoading(true);
+      const data = await PartiesService.getAllParties(selectedTab === 'all' ? 'all' : selectedTab.slice(0, -1), searchQuery);
+      setParties(data);
+    } catch (error) {
+      console.error('Error loading parties:', error);
+      Alert.alert('Error', 'Failed to load parties');
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const loadSummary = async () => {
+    try {
+      const summaryData = await PartiesService.getPartiesSummary();
+      setSummary(summaryData);
+    } catch (error) {
+      console.error('Error loading summary:', error);
+    }
+  };
+
+  const onRefresh = async () => {
+    setRefreshing(true);
+    await Promise.all([loadParties(), loadSummary()]);
+    setRefreshing(false);
+  };
 
   const tabs = [
-    { key: 'all', label: 'All Parties', count: parties.length },
-    { key: 'customers', label: 'Customers', count: parties.filter(p => p.type === 'Customer').length },
-    { key: 'suppliers', label: 'Suppliers', count: parties.filter(p => p.type === 'Supplier').length },
+    { key: 'all', label: 'All Parties', count: summary.totalParties || 0 },
+    { key: 'customers', label: 'Customers', count: summary.totalCustomers || 0 },
+    { key: 'suppliers', label: 'Suppliers', count: summary.totalSuppliers || 0 },
   ];
-
-  const filteredParties = parties.filter(party => {
-    const matchesSearch = party.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
-                         party.phone.includes(searchQuery);
-    const matchesTab = selectedTab === 'all' || 
-                      (selectedTab === 'customers' && party.type === 'Customer') ||
-                      (selectedTab === 'suppliers' && party.type === 'Supplier');
-    return matchesSearch && matchesTab;
-  });
 
   const getBalanceColor = (balance) => {
     if (balance > 0) return '#10b981';
@@ -63,21 +85,49 @@ const PartiesScreen = ({ navigation }) => {
     return '#64748b';
   };
 
-  const addParty = () => {
-    if (newParty.name.trim() && newParty.phone.trim()) {
-      const party = {
-        id: parties.length + 1,
-        ...newParty,
-        balance: 0,
-        status: 'active',
-      };
-      setParties([...parties, party]);
-      setNewParty({ name: '', type: 'Customer', phone: '', email: '', address: '' });
+  const addParty = async () => {
+    try {
+      const validation = PartiesService.validatePartyData(newParty);
+      if (!validation.isValid) {
+        Alert.alert('Validation Error', Object.values(validation.errors).join('\n'));
+        return;
+      }
+
+      await PartiesService.createParty(newParty);
+      setNewParty({ name: '', type: 'customer', phone: '', email: '', address: '' });
       setModalVisible(false);
       Alert.alert('Success', 'Party added successfully!');
-    } else {
-      Alert.alert('Error', 'Please fill required fields');
+      loadParties();
+      loadSummary();
+    } catch (error) {
+      console.error('Error adding party:', error);
+      Alert.alert('Error', 'Failed to add party');
     }
+  };
+
+  const deleteParty = async (partyId, partyName) => {
+    Alert.alert(
+      'Delete Party',
+      `Are you sure you want to delete ${partyName}?`,
+      [
+        { text: 'Cancel', style: 'cancel' },
+        {
+          text: 'Delete',
+          style: 'destructive',
+          onPress: async () => {
+            try {
+              await PartiesService.deleteParty(partyId);
+              Alert.alert('Success', 'Party deleted successfully');
+              loadParties();
+              loadSummary();
+            } catch (error) {
+              console.error('Error deleting party:', error);
+              Alert.alert('Error', 'Failed to delete party');
+            }
+          }
+        }
+      ]
+    );
   };
 
   const renderTab = (tab) => (
@@ -124,8 +174,17 @@ const PartiesScreen = ({ navigation }) => {
         <TouchableOpacity style={styles.actionButton}>
           <Text style={styles.actionButtonText}>💬 Message</Text>
         </TouchableOpacity>
-        <TouchableOpacity style={[styles.actionButton, styles.primaryActionButton]} onPress={() => navigation.navigate('Invoice')}>
+        <TouchableOpacity 
+          style={[styles.actionButton, styles.primaryActionButton]} 
+          onPress={() => navigation.navigate('Invoice')}
+        >
           <Text style={[styles.actionButtonText, styles.primaryActionButtonText]}>📄 Invoice</Text>
+        </TouchableOpacity>
+        <TouchableOpacity 
+          style={[styles.actionButton, styles.dangerActionButton]}
+          onPress={() => deleteParty(item.id, item.name)}
+        >
+          <Text style={[styles.actionButtonText, styles.dangerActionButtonText]}>🗑️</Text>
         </TouchableOpacity>
       </View>
     </TouchableOpacity>
@@ -140,7 +199,9 @@ const PartiesScreen = ({ navigation }) => {
         <View style={styles.header}>
           <View style={styles.headerLeft}>
             <Text style={styles.headerTitle}>Parties</Text>
-            <Text style={styles.headerSubtitle}>{filteredParties.length} total parties</Text>
+            <Text style={styles.headerSubtitle}>
+              {parties.length} total parties • ₹{(summary.totalOutstanding || 0).toLocaleString()} outstanding
+            </Text>
           </View>
           <TouchableOpacity style={styles.addButton} onPress={() => setModalVisible(true)}>
             <Text style={styles.addButtonText}>+ Add</Text>
@@ -171,12 +232,15 @@ const PartiesScreen = ({ navigation }) => {
 
         {/* Parties List */}
         <FlatList
-          data={filteredParties}
+          data={parties}
           renderItem={renderParty}
           keyExtractor={(item) => item.id.toString()}
           style={styles.partiesList}
           contentContainerStyle={styles.partiesListContent}
           showsVerticalScrollIndicator={false}
+          refreshControl={
+            <RefreshControl refreshing={refreshing} onRefresh={onRefresh} />
+          }
           ListEmptyComponent={
             <View style={styles.emptyContainer}>
               <Text style={styles.emptyIcon}>👥</Text>
@@ -184,6 +248,14 @@ const PartiesScreen = ({ navigation }) => {
               <Text style={styles.emptyMessage}>
                 {searchQuery ? 'Try different search terms' : 'Add your first party to get started'}
               </Text>
+              {!searchQuery && (
+                <TouchableOpacity 
+                  style={styles.emptyActionButton}
+                  onPress={() => setModalVisible(true)}
+                >
+                  <Text style={styles.emptyActionButtonText}>Add First Party</Text>
+                </TouchableOpacity>
+              )}
             </View>
           }
         />
@@ -217,16 +289,16 @@ const PartiesScreen = ({ navigation }) => {
               <Text style={styles.formLabel}>Type</Text>
               <View style={styles.typeButtons}>
                 <TouchableOpacity
-                  style={[styles.typeButton, newParty.type === 'Customer' && styles.activeTypeButton]}
-                  onPress={() => setNewParty({...newParty, type: 'Customer'})}
+                  style={[styles.typeButton, newParty.type === 'customer' && styles.activeTypeButton]}
+                  onPress={() => setNewParty({...newParty, type: 'customer'})}
                 >
-                  <Text style={[styles.typeButtonText, newParty.type === 'Customer' && styles.activeTypeButtonText]}>Customer</Text>
+                  <Text style={[styles.typeButtonText, newParty.type === 'customer' && styles.activeTypeButtonText]}>Customer</Text>
                 </TouchableOpacity>
                 <TouchableOpacity
-                  style={[styles.typeButton, newParty.type === 'Supplier' && styles.activeTypeButton]}
-                  onPress={() => setNewParty({...newParty, type: 'Supplier'})}
+                  style={[styles.typeButton, newParty.type === 'supplier' && styles.activeTypeButton]}
+                  onPress={() => setNewParty({...newParty, type: 'supplier'})}
                 >
-                  <Text style={[styles.typeButtonText, newParty.type === 'Supplier' && styles.activeTypeButtonText]}>Supplier</Text>
+                  <Text style={[styles.typeButtonText, newParty.type === 'supplier' && styles.activeTypeButtonText]}>Supplier</Text>
                 </TouchableOpacity>
               </View>
             </View>
@@ -469,6 +541,10 @@ const styles = StyleSheet.create({
   primaryActionButton: {
     backgroundColor: '#3b82f6',
   },
+  dangerActionButton: {
+    backgroundColor: '#fef2f2',
+    flex: 0.3,
+  },
   actionButtonText: {
     fontSize: 12,
     fontWeight: '600',
@@ -476,6 +552,9 @@ const styles = StyleSheet.create({
   },
   primaryActionButtonText: {
     color: '#ffffff',
+  },
+  dangerActionButtonText: {
+    color: '#ef4444',
   },
   emptyContainer: {
     flex: 1,
@@ -498,6 +577,18 @@ const styles = StyleSheet.create({
     color: '#64748b',
     textAlign: 'center',
     lineHeight: 20,
+    marginBottom: 20,
+  },
+  emptyActionButton: {
+    backgroundColor: '#3b82f6',
+    paddingHorizontal: 24,
+    paddingVertical: 12,
+    borderRadius: 8,
+  },
+  emptyActionButtonText: {
+    color: '#ffffff',
+    fontSize: 14,
+    fontWeight: '600',
   },
   modalContainer: {
     flex: 1,

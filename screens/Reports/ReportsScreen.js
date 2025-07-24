@@ -10,8 +10,10 @@ import {
   Animated,
   FlatList,
   Dimensions,
+  RefreshControl,
 } from 'react-native';
 import { LinearGradient } from 'expo-linear-gradient';
+import ReportsService from './services/ReportsService';
 
 const { width } = Dimensions.get('window');
 
@@ -19,42 +21,43 @@ const ReportsScreen = ({ navigation }) => {
   const [fadeAnim] = useState(new Animated.Value(0));
   const [selectedPeriod, setSelectedPeriod] = useState('this_month');
   const [selectedTab, setSelectedTab] = useState('overview');
-
-  const [reportData, setReportData] = useState({
-    overview: {
-      totalSales: 485000,
-      totalPurchases: 320000,
-      grossProfit: 165000,
-      netProfit: 125000,
-      salesCount: 42,
-      purchaseCount: 28,
-    },
-    topItems: [
-      { name: 'iPhone 15', sales: 85000, quantity: 8, profit: 15000 },
-      { name: 'Samsung S24', sales: 65000, quantity: 6, profit: 12000 },
-      { name: 'MacBook Air', sales: 120000, quantity: 3, profit: 18000 },
-    ],
-    recentTransactions: [
-      { id: 1, type: 'Sale', party: 'Rajesh Kumar', amount: 25000, date: '2024-01-15', status: 'Paid' },
-      { id: 2, type: 'Purchase', party: 'Tech Suppliers', amount: -15000, date: '2024-01-14', status: 'Pending' },
-      { id: 3, type: 'Sale', party: 'Priya Sharma', amount: 18000, date: '2024-01-13', status: 'Paid' },
-    ]
-  });
+  const [reportsData, setReportsData] = useState(null);
+  const [loading, setLoading] = useState(true);
+  const [refreshing, setRefreshing] = useState(false);
 
   useEffect(() => {
+    loadReportsData();
+    
     Animated.timing(fadeAnim, {
       toValue: 1,
       duration: 600,
       useNativeDriver: true,
     }).start();
-  }, []);
+  }, [selectedPeriod]);
+
+  const loadReportsData = async () => {
+    try {
+      setLoading(true);
+      const data = await ReportsService.getReportsData(selectedPeriod);
+      setReportsData(data);
+    } catch (error) {
+      console.error('Error loading reports data:', error);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const onRefresh = async () => {
+    setRefreshing(true);
+    await loadReportsData();
+    setRefreshing(false);
+  };
 
   const periods = [
     { key: 'today', label: 'Today' },
     { key: 'this_week', label: 'This Week' },
     { key: 'this_month', label: 'This Month' },
     { key: 'this_year', label: 'This Year' },
-    { key: 'custom', label: 'Custom' },
   ];
 
   const tabs = [
@@ -64,10 +67,10 @@ const ReportsScreen = ({ navigation }) => {
     { key: 'profit', label: 'Profit & Loss', icon: '📈' },
   ];
 
-  const kpiCards = [
+  const kpiCards = reportsData ? [
     {
       title: 'Total Sales',
-      value: reportData.overview.totalSales,
+      value: reportsData.overview.totalSales,
       change: '+12.5%',
       positive: true,
       icon: '💰',
@@ -75,7 +78,7 @@ const ReportsScreen = ({ navigation }) => {
     },
     {
       title: 'Total Purchases',
-      value: reportData.overview.totalPurchases,
+      value: reportsData.overview.totalPurchases,
       change: '+8.2%',
       positive: true,
       icon: '🛒',
@@ -83,7 +86,7 @@ const ReportsScreen = ({ navigation }) => {
     },
     {
       title: 'Gross Profit',
-      value: reportData.overview.grossProfit,
+      value: reportsData.overview.grossProfit,
       change: '+18.7%',
       positive: true,
       icon: '📈',
@@ -91,13 +94,13 @@ const ReportsScreen = ({ navigation }) => {
     },
     {
       title: 'Net Profit',
-      value: reportData.overview.netProfit,
+      value: reportsData.overview.netProfit,
       change: '+22.1%',
       positive: true,
       icon: '🎯',
       color: '#06b6d4'
     },
-  ];
+  ] : [];
 
   const renderPeriodButton = (period) => (
     <TouchableOpacity
@@ -159,9 +162,9 @@ const ReportsScreen = ({ navigation }) => {
   const renderTransaction = ({ item }) => (
     <View style={styles.transactionCard}>
       <View style={styles.transactionLeft}>
-        <View style={[styles.transactionType, { backgroundColor: item.type === 'Sale' ? '#dcfce7' : '#fef3c7' }]}>
-          <Text style={[styles.transactionTypeText, { color: item.type === 'Sale' ? '#166534' : '#92400e' }]}>
-            {item.type === 'Sale' ? '📈' : '📉'}
+        <View style={[styles.transactionType, { backgroundColor: item.type === 'sale' ? '#dcfce7' : '#fef3c7' }]}>
+          <Text style={[styles.transactionTypeText, { color: item.type === 'sale' ? '#166534' : '#92400e' }]}>
+            {item.type === 'sale' ? '📈' : '📉'}
           </Text>
         </View>
         <View style={styles.transactionInfo}>
@@ -173,14 +176,24 @@ const ReportsScreen = ({ navigation }) => {
         <Text style={[styles.transactionAmount, { color: item.amount > 0 ? '#10b981' : '#ef4444' }]}>
           {item.amount > 0 ? '+' : ''}₹{Math.abs(item.amount).toLocaleString()}
         </Text>
-        <View style={[styles.statusBadge, { backgroundColor: item.status === 'Paid' ? '#dcfce7' : '#fef3c7' }]}>
-          <Text style={[styles.statusText, { color: item.status === 'Paid' ? '#166534' : '#92400e' }]}>
+        <View style={[styles.statusBadge, { backgroundColor: item.status === 'paid' ? '#dcfce7' : '#fef3c7' }]}>
+          <Text style={[styles.statusText, { color: item.status === 'paid' ? '#166534' : '#92400e' }]}>
             {item.status}
           </Text>
         </View>
       </View>
     </View>
   );
+
+  if (loading && !reportsData) {
+    return (
+      <SafeAreaView style={styles.container}>
+        <View style={styles.loadingContainer}>
+          <Text style={styles.loadingText}>Loading reports...</Text>
+        </View>
+      </SafeAreaView>
+    );
+  }
 
   return (
     <SafeAreaView style={styles.container}>
@@ -214,8 +227,14 @@ const ReportsScreen = ({ navigation }) => {
           </ScrollView>
         </View>
 
-        <ScrollView style={styles.scrollContent} showsVerticalScrollIndicator={false}>
-          {selectedTab === 'overview' && (
+        <ScrollView 
+          style={styles.scrollContent} 
+          showsVerticalScrollIndicator={false}
+          refreshControl={
+            <RefreshControl refreshing={refreshing} onRefresh={onRefresh} />
+          }
+        >
+          {selectedTab === 'overview' && reportsData && (
             <>
               {/* KPI Cards */}
               <View style={styles.kpiContainer}>
@@ -227,51 +246,78 @@ const ReportsScreen = ({ navigation }) => {
                 </View>
               </View>
 
-              {/* Performance Chart Placeholder */}
+              {/* Performance Chart */}
               <View style={styles.chartCard}>
                 <LinearGradient
                   colors={['#3b82f6', '#1d4ed8']}
                   style={styles.chartGradient}
                 >
                   <Text style={styles.chartTitle}>Sales Performance</Text>
-                  <Text style={styles.chartSubtitle}>Last 30 days trend</Text>
+                  <Text style={styles.chartSubtitle}>
+                    {selectedPeriod.replace('_', ' ').replace('this', 'This')} trend
+                  </Text>
                   <View style={styles.chartPlaceholder}>
-                    <Text style={styles.chartPlaceholderText}>📈 Chart visualization would go here</Text>
+                    <Text style={styles.chartPlaceholderText}>📈 Sales trend visualization</Text>
+                    <Text style={styles.chartValue}>
+                      ₹{reportsData.overview.totalSales.toLocaleString()}
+                    </Text>
                   </View>
                 </LinearGradient>
               </View>
 
               {/* Top Selling Items */}
-              <View style={styles.sectionCard}>
-                <View style={styles.sectionHeader}>
-                  <Text style={styles.sectionTitle}>Top Selling Items</Text>
-                  <TouchableOpacity>
-                    <Text style={styles.sectionLink}>View All</Text>
-                  </TouchableOpacity>
+              {reportsData.topItems && reportsData.topItems.length > 0 && (
+                <View style={styles.sectionCard}>
+                  <View style={styles.sectionHeader}>
+                    <Text style={styles.sectionTitle}>Top Selling Items</Text>
+                    <TouchableOpacity>
+                      <Text style={styles.sectionLink}>View All</Text>
+                    </TouchableOpacity>
+                  </View>
+                  <FlatList
+                    data={reportsData.topItems}
+                    renderItem={renderTopItem}
+                    keyExtractor={(item, index) => index.toString()}
+                    scrollEnabled={false}
+                  />
                 </View>
-                <FlatList
-                  data={reportData.topItems}
-                  renderItem={renderTopItem}
-                  keyExtractor={(item, index) => index.toString()}
-                  scrollEnabled={false}
-                />
-              </View>
+              )}
 
               {/* Recent Transactions */}
-              <View style={styles.sectionCard}>
-                <View style={styles.sectionHeader}>
-                  <Text style={styles.sectionTitle}>Recent Transactions</Text>
-                  <TouchableOpacity>
-                    <Text style={styles.sectionLink}>View All</Text>
+              {reportsData.recentTransactions && reportsData.recentTransactions.length > 0 && (
+                <View style={styles.sectionCard}>
+                  <View style={styles.sectionHeader}>
+                    <Text style={styles.sectionTitle}>Recent Transactions</Text>
+                    <TouchableOpacity>
+                      <Text style={styles.sectionLink}>View All</Text>
+                    </TouchableOpacity>
+                  </View>
+                  <FlatList
+                    data={reportsData.recentTransactions}
+                    renderItem={renderTransaction}
+                    keyExtractor={(item) => item.id.toString()}
+                    scrollEnabled={false}
+                  />
+                </View>
+              )}
+
+              {/* Empty State */}
+              {(!reportsData.topItems || reportsData.topItems.length === 0) && 
+               (!reportsData.recentTransactions || reportsData.recentTransactions.length === 0) && (
+                <View style={styles.emptyState}>
+                  <Text style={styles.emptyIcon}>📊</Text>
+                  <Text style={styles.emptyTitle}>No data available</Text>
+                  <Text style={styles.emptyMessage}>
+                    Start making sales to see your business reports
+                  </Text>
+                  <TouchableOpacity 
+                    style={styles.emptyActionButton}
+                    onPress={() => navigation.navigate('Invoice')}
+                  >
+                    <Text style={styles.emptyActionButtonText}>Create First Sale</Text>
                   </TouchableOpacity>
                 </View>
-                <FlatList
-                  data={reportData.recentTransactions}
-                  renderItem={renderTransaction}
-                  keyExtractor={(item) => item.id.toString()}
-                  scrollEnabled={false}
-                />
-              </View>
+              )}
             </>
           )}
 
@@ -295,6 +341,15 @@ const styles = StyleSheet.create({
   },
   content: {
     flex: 1,
+  },
+  loadingContainer: {
+    flex: 1,
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  loadingText: {
+    fontSize: 16,
+    color: '#64748b',
   },
   header: {
     flexDirection: 'row',
@@ -486,6 +541,12 @@ const styles = StyleSheet.create({
   chartPlaceholderText: {
     color: 'rgba(255, 255, 255, 0.8)',
     fontSize: 14,
+    marginBottom: 8,
+  },
+  chartValue: {
+    color: '#ffffff',
+    fontSize: 24,
+    fontWeight: 'bold',
   },
   sectionCard: {
     backgroundColor: '#ffffff',
@@ -609,6 +670,39 @@ const styles = StyleSheet.create({
   },
   statusText: {
     fontSize: 11,
+    fontWeight: '600',
+  },
+  emptyState: {
+    alignItems: 'center',
+    paddingVertical: 60,
+    paddingHorizontal: 40,
+  },
+  emptyIcon: {
+    fontSize: 48,
+    marginBottom: 16,
+  },
+  emptyTitle: {
+    fontSize: 18,
+    fontWeight: '600',
+    color: '#374151',
+    marginBottom: 8,
+  },
+  emptyMessage: {
+    fontSize: 14,
+    color: '#64748b',
+    textAlign: 'center',
+    lineHeight: 20,
+    marginBottom: 20,
+  },
+  emptyActionButton: {
+    backgroundColor: '#3b82f6',
+    paddingHorizontal: 24,
+    paddingVertical: 12,
+    borderRadius: 8,
+  },
+  emptyActionButtonText: {
+    color: '#ffffff',
+    fontSize: 14,
     fontWeight: '600',
   },
   comingSoonCard: {

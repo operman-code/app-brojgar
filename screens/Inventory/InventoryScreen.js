@@ -12,75 +12,144 @@ import {
   TextInput,
   Modal,
   Alert,
+  RefreshControl,
 } from 'react-native';
+import InventoryService from './services/InventoryService';
 
 const InventoryScreen = ({ navigation }) => {
   const [fadeAnim] = useState(new Animated.Value(0));
   const [selectedTab, setSelectedTab] = useState('all');
   const [searchQuery, setSearchQuery] = useState('');
   const [modalVisible, setModalVisible] = useState(false);
-  const [items, setItems] = useState([
-    { id: 1, name: 'Apple iPhone 15', category: 'Smartphones', stock: 25, minStock: 5, price: 79999, cost: 70000, status: 'active' },
-    { id: 2, name: 'Samsung Galaxy S24', category: 'Smartphones', stock: 18, minStock: 5, price: 74999, cost: 65000, status: 'active' },
-    { id: 3, name: 'OnePlus 12', category: 'Smartphones', stock: 2, minStock: 5, price: 64999, cost: 58000, status: 'low_stock' },
-    { id: 4, name: 'MacBook Air M2', category: 'Laptops', stock: 8, minStock: 3, price: 114900, cost: 105000, status: 'active' },
-    { id: 5, name: 'iPad Pro', category: 'Tablets', stock: 0, minStock: 2, price: 89900, cost: 82000, status: 'out_of_stock' },
-  ]);
+  const [items, setItems] = useState([]);
+  const [categories, setCategories] = useState([]);
+  const [loading, setLoading] = useState(true);
+  const [refreshing, setRefreshing] = useState(false);
+  const [summary, setSummary] = useState({});
 
   const [newItem, setNewItem] = useState({
     name: '',
-    category: '',
-    stock: '',
-    minStock: '',
-    price: '',
-    cost: '',
+    category_id: null,
+    cost_price: '',
+    selling_price: '',
+    current_stock: '',
+    minimum_stock: '',
+    unit: 'pcs',
   });
 
   useEffect(() => {
+    loadInventory();
+    loadCategories();
+    loadSummary();
+    
     Animated.timing(fadeAnim, {
       toValue: 1,
       duration: 600,
       useNativeDriver: true,
     }).start();
-  }, []);
+  }, [selectedTab, searchQuery]);
 
-  const tabs = [
-    { key: 'all', label: 'All Items', count: items.length },
-    { key: 'low_stock', label: 'Low Stock', count: items.filter(i => i.status === 'low_stock').length },
-    { key: 'out_of_stock', label: 'Out of Stock', count: items.filter(i => i.status === 'out_of_stock').length },
-  ];
-
-  const filteredItems = items.filter(item => {
-    const matchesSearch = item.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
-                         item.category.toLowerCase().includes(searchQuery.toLowerCase());
-    const matchesTab = selectedTab === 'all' || item.status === selectedTab;
-    return matchesSearch && matchesTab;
-  });
-
-  const getStockStatus = (stock, minStock) => {
-    if (stock === 0) return { status: 'out_of_stock', color: '#ef4444', text: 'Out of Stock' };
-    if (stock <= minStock) return { status: 'low_stock', color: '#f59e0b', text: 'Low Stock' };
-    return { status: 'active', color: '#10b981', text: 'In Stock' };
+  const loadInventory = async () => {
+    try {
+      setLoading(true);
+      const data = await InventoryService.getAllItems(null, searchQuery, selectedTab);
+      setItems(data);
+    } catch (error) {
+      console.error('Error loading inventory:', error);
+      Alert.alert('Error', 'Failed to load inventory');
+    } finally {
+      setLoading(false);
+    }
   };
 
-  const addItem = () => {
-    if (newItem.name.trim() && newItem.price.trim()) {
-      const item = {
-        id: items.length + 1,
+  const loadCategories = async () => {
+    try {
+      const data = await InventoryService.getCategories();
+      setCategories(data);
+    } catch (error) {
+      console.error('Error loading categories:', error);
+    }
+  };
+
+  const loadSummary = async () => {
+    try {
+      const summaryData = await InventoryService.getInventorySummary();
+      setSummary(summaryData);
+    } catch (error) {
+      console.error('Error loading summary:', error);
+    }
+  };
+
+  const onRefresh = async () => {
+    setRefreshing(true);
+    await Promise.all([loadInventory(), loadCategories(), loadSummary()]);
+    setRefreshing(false);
+  };
+
+  const tabs = [
+    { key: 'all', label: 'All Items', count: summary.totalItems || 0 },
+    { key: 'low_stock', label: 'Low Stock', count: summary.lowStockCount || 0 },
+    { key: 'out_of_stock', label: 'Out of Stock', count: 0 },
+  ];
+
+  const addItem = async () => {
+    try {
+      const validation = InventoryService.validateItemData(newItem);
+      if (!validation.isValid) {
+        Alert.alert('Validation Error', Object.values(validation.errors).join('\n'));
+        return;
+      }
+
+      await InventoryService.createItem({
         ...newItem,
-        stock: parseInt(newItem.stock) || 0,
-        minStock: parseInt(newItem.minStock) || 0,
-        price: parseFloat(newItem.price) || 0,
-        cost: parseFloat(newItem.cost) || 0,
-        status: 'active',
-      };
-      setItems([...items, item]);
-      setNewItem({ name: '', category: '', stock: '', minStock: '', price: '', cost: '' });
+        cost_price: parseFloat(newItem.cost_price) || 0,
+        selling_price: parseFloat(newItem.selling_price) || 0,
+        current_stock: parseFloat(newItem.current_stock) || 0,
+        minimum_stock: parseFloat(newItem.minimum_stock) || 0,
+      });
+      
+      setNewItem({
+        name: '',
+        category_id: null,
+        cost_price: '',
+        selling_price: '',
+        current_stock: '',
+        minimum_stock: '',
+        unit: 'pcs',
+      });
       setModalVisible(false);
       Alert.alert('Success', 'Item added successfully!');
-    } else {
-      Alert.alert('Error', 'Please fill required fields');
+      loadInventory();
+      loadSummary();
+    } catch (error) {
+      console.error('Error adding item:', error);
+      Alert.alert('Error', 'Failed to add item');
     }
+  };
+
+  const deleteItem = async (itemId, itemName) => {
+    Alert.alert(
+      'Delete Item',
+      `Are you sure you want to delete ${itemName}?`,
+      [
+        { text: 'Cancel', style: 'cancel' },
+        {
+          text: 'Delete',
+          style: 'destructive',
+          onPress: async () => {
+            try {
+              await InventoryService.deleteItem(itemId);
+              Alert.alert('Success', 'Item deleted successfully');
+              loadInventory();
+              loadSummary();
+            } catch (error) {
+              console.error('Error deleting item:', error);
+              Alert.alert('Error', 'Failed to delete item');
+            }
+          }
+        }
+      ]
+    );
   };
 
   const renderTab = (tab) => (
@@ -101,15 +170,13 @@ const InventoryScreen = ({ navigation }) => {
   );
 
   const renderItem = ({ item }) => {
-    const stockInfo = getStockStatus(item.stock, item.minStock);
-    const profit = item.price - item.cost;
-    const profitMargin = item.price > 0 ? ((profit / item.price) * 100).toFixed(1) : 0;
+    const stockInfo = InventoryService.getStockStatus(item.currentStock, item.minimumStock);
 
     return (
       <TouchableOpacity style={styles.itemCard}>
         <View style={styles.itemHeader}>
           <View style={styles.itemIcon}>
-            <Text style={styles.itemIconText}>📦</Text>
+            <Text style={styles.itemIconText}>{item.categoryIcon}</Text>
           </View>
           <View style={styles.itemInfo}>
             <Text style={styles.itemName}>{item.name}</Text>
@@ -118,27 +185,27 @@ const InventoryScreen = ({ navigation }) => {
               <View style={[styles.stockBadge, { backgroundColor: stockInfo.color }]}>
                 <Text style={styles.stockBadgeText}>{stockInfo.text}</Text>
               </View>
-              <Text style={styles.stockQuantity}>Stock: {item.stock}</Text>
+              <Text style={styles.stockQuantity}>Stock: {item.currentStock}</Text>
             </View>
           </View>
           <View style={styles.itemPricing}>
-            <Text style={styles.itemPrice}>₹{item.price.toLocaleString()}</Text>
-            <Text style={styles.profitMargin}>+{profitMargin}% margin</Text>
+            <Text style={styles.itemPrice}>₹{item.sellingPrice.toLocaleString()}</Text>
+            <Text style={styles.profitMargin}>+{item.profitMargin}% margin</Text>
           </View>
         </View>
         
         <View style={styles.itemDetails}>
           <View style={styles.detailItem}>
             <Text style={styles.detailLabel}>Cost</Text>
-            <Text style={styles.detailValue}>₹{item.cost.toLocaleString()}</Text>
+            <Text style={styles.detailValue}>₹{item.costPrice.toLocaleString()}</Text>
           </View>
           <View style={styles.detailItem}>
             <Text style={styles.detailLabel}>Min Stock</Text>
-            <Text style={styles.detailValue}>{item.minStock}</Text>
+            <Text style={styles.detailValue}>{item.minimumStock}</Text>
           </View>
           <View style={styles.detailItem}>
             <Text style={styles.detailLabel}>Value</Text>
-            <Text style={styles.detailValue}>₹{(item.stock * item.cost).toLocaleString()}</Text>
+            <Text style={styles.detailValue}>₹{item.stockValue.toLocaleString()}</Text>
           </View>
         </View>
 
@@ -149,8 +216,17 @@ const InventoryScreen = ({ navigation }) => {
           <TouchableOpacity style={styles.actionButton}>
             <Text style={styles.actionButtonText}>📊 Report</Text>
           </TouchableOpacity>
-          <TouchableOpacity style={[styles.actionButton, styles.primaryActionButton]} onPress={() => navigation.navigate('Invoice')}>
+          <TouchableOpacity 
+            style={[styles.actionButton, styles.primaryActionButton]} 
+            onPress={() => navigation.navigate('Invoice')}
+          >
             <Text style={[styles.actionButtonText, styles.primaryActionButtonText]}>💰 Sell</Text>
+          </TouchableOpacity>
+          <TouchableOpacity 
+            style={[styles.actionButton, styles.dangerActionButton]}
+            onPress={() => deleteItem(item.id, item.name)}
+          >
+            <Text style={[styles.actionButtonText, styles.dangerActionButtonText]}>🗑️</Text>
           </TouchableOpacity>
         </View>
       </TouchableOpacity>
@@ -166,7 +242,9 @@ const InventoryScreen = ({ navigation }) => {
         <View style={styles.header}>
           <View style={styles.headerLeft}>
             <Text style={styles.headerTitle}>Inventory</Text>
-            <Text style={styles.headerSubtitle}>{filteredItems.length} items • ₹{items.reduce((sum, item) => sum + (item.stock * item.cost), 0).toLocaleString()} value</Text>
+            <Text style={styles.headerSubtitle}>
+              {items.length} items • ₹{(summary.totalValue || 0).toLocaleString()} value
+            </Text>
           </View>
           <TouchableOpacity style={styles.addButton} onPress={() => setModalVisible(true)}>
             <Text style={styles.addButtonText}>+ Add</Text>
@@ -197,12 +275,15 @@ const InventoryScreen = ({ navigation }) => {
 
         {/* Items List */}
         <FlatList
-          data={filteredItems}
+          data={items}
           renderItem={renderItem}
           keyExtractor={(item) => item.id.toString()}
           style={styles.itemsList}
           contentContainerStyle={styles.itemsListContent}
           showsVerticalScrollIndicator={false}
+          refreshControl={
+            <RefreshControl refreshing={refreshing} onRefresh={onRefresh} />
+          }
           ListEmptyComponent={
             <View style={styles.emptyContainer}>
               <Text style={styles.emptyIcon}>📦</Text>
@@ -210,6 +291,14 @@ const InventoryScreen = ({ navigation }) => {
               <Text style={styles.emptyMessage}>
                 {searchQuery ? 'Try different search terms' : 'Add your first item to get started'}
               </Text>
+              {!searchQuery && (
+                <TouchableOpacity 
+                  style={styles.emptyActionButton}
+                  onPress={() => setModalVisible(true)}
+                >
+                  <Text style={styles.emptyActionButtonText}>Add First Item</Text>
+                </TouchableOpacity>
+              )}
             </View>
           }
         />
@@ -241,12 +330,26 @@ const InventoryScreen = ({ navigation }) => {
             
             <View style={styles.formGroup}>
               <Text style={styles.formLabel}>Category</Text>
-              <TextInput
-                style={styles.formInput}
-                value={newItem.category}
-                onChangeText={(text) => setNewItem({...newItem, category: text})}
-                placeholder="e.g. Smartphones, Laptops"
-              />
+              <View style={styles.categoryButtons}>
+                {categories.map((category) => (
+                  <TouchableOpacity
+                    key={category.id}
+                    style={[
+                      styles.categoryButton, 
+                      newItem.category_id === category.id && styles.activeCategoryButton
+                    ]}
+                    onPress={() => setNewItem({...newItem, category_id: category.id})}
+                  >
+                    <Text style={styles.categoryIcon}>{category.icon}</Text>
+                    <Text style={[
+                      styles.categoryText,
+                      newItem.category_id === category.id && styles.activeCategoryText
+                    ]}>
+                      {category.name}
+                    </Text>
+                  </TouchableOpacity>
+                ))}
+              </View>
             </View>
             
             <View style={styles.formRow}>
@@ -254,8 +357,8 @@ const InventoryScreen = ({ navigation }) => {
                 <Text style={styles.formLabel}>Stock Quantity</Text>
                 <TextInput
                   style={styles.formInput}
-                  value={newItem.stock}
-                  onChangeText={(text) => setNewItem({...newItem, stock: text})}
+                  value={newItem.current_stock}
+                  onChangeText={(text) => setNewItem({...newItem, current_stock: text})}
                   placeholder="0"
                   keyboardType="numeric"
                 />
@@ -265,8 +368,8 @@ const InventoryScreen = ({ navigation }) => {
                 <Text style={styles.formLabel}>Min Stock</Text>
                 <TextInput
                   style={styles.formInput}
-                  value={newItem.minStock}
-                  onChangeText={(text) => setNewItem({...newItem, minStock: text})}
+                  value={newItem.minimum_stock}
+                  onChangeText={(text) => setNewItem({...newItem, minimum_stock: text})}
                   placeholder="0"
                   keyboardType="numeric"
                 />
@@ -278,8 +381,8 @@ const InventoryScreen = ({ navigation }) => {
                 <Text style={styles.formLabel}>Cost Price *</Text>
                 <TextInput
                   style={styles.formInput}
-                  value={newItem.cost}
-                  onChangeText={(text) => setNewItem({...newItem, cost: text})}
+                  value={newItem.cost_price}
+                  onChangeText={(text) => setNewItem({...newItem, cost_price: text})}
                   placeholder="0"
                   keyboardType="numeric"
                 />
@@ -289,8 +392,8 @@ const InventoryScreen = ({ navigation }) => {
                 <Text style={styles.formLabel}>Selling Price *</Text>
                 <TextInput
                   style={styles.formInput}
-                  value={newItem.price}
-                  onChangeText={(text) => setNewItem({...newItem, price: text})}
+                  value={newItem.selling_price}
+                  onChangeText={(text) => setNewItem({...newItem, selling_price: text})}
                   placeholder="0"
                   keyboardType="numeric"
                 />
@@ -537,6 +640,10 @@ const styles = StyleSheet.create({
   primaryActionButton: {
     backgroundColor: '#3b82f6',
   },
+  dangerActionButton: {
+    backgroundColor: '#fef2f2',
+    flex: 0.3,
+  },
   actionButtonText: {
     fontSize: 12,
     fontWeight: '600',
@@ -544,6 +651,9 @@ const styles = StyleSheet.create({
   },
   primaryActionButtonText: {
     color: '#ffffff',
+  },
+  dangerActionButtonText: {
+    color: '#ef4444',
   },
   emptyContainer: {
     flex: 1,
@@ -566,6 +676,18 @@ const styles = StyleSheet.create({
     color: '#64748b',
     textAlign: 'center',
     lineHeight: 20,
+    marginBottom: 20,
+  },
+  emptyActionButton: {
+    backgroundColor: '#3b82f6',
+    paddingHorizontal: 24,
+    paddingVertical: 12,
+    borderRadius: 8,
+  },
+  emptyActionButtonText: {
+    color: '#ffffff',
+    fontSize: 14,
+    fontWeight: '600',
   },
   modalContainer: {
     flex: 1,
@@ -624,6 +746,38 @@ const styles = StyleSheet.create({
     paddingVertical: 12,
     fontSize: 16,
     color: '#0f172a',
+  },
+  categoryButtons: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    gap: 8,
+  },
+  categoryButton: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    paddingHorizontal: 12,
+    paddingVertical: 8,
+    backgroundColor: '#f8fafc',
+    borderWidth: 1,
+    borderColor: '#e2e8f0',
+    borderRadius: 8,
+    marginBottom: 8,
+  },
+  activeCategoryButton: {
+    backgroundColor: '#3b82f6',
+    borderColor: '#3b82f6',
+  },
+  categoryIcon: {
+    fontSize: 16,
+    marginRight: 6,
+  },
+  categoryText: {
+    fontSize: 14,
+    fontWeight: '600',
+    color: '#64748b',
+  },
+  activeCategoryText: {
+    color: '#ffffff',
   },
 });
 

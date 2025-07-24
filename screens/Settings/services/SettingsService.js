@@ -1,460 +1,524 @@
 // screens/Settings/services/SettingsService.js
 import DatabaseService from '../../../database/DatabaseService';
-import * as FileSystem from 'expo-file-system';
-import * as Sharing from 'expo-sharing';
 
 class SettingsService {
-  
-  // Get all settings from database
-  static async getSettings() {
+  static async getBusinessProfile() {
     try {
-      const db = await DatabaseService.getDatabase();
-      const settingsRows = await db.getAllAsync('SELECT key, value, type FROM settings');
+      await DatabaseService.init();
       
-      // Convert to object
-      const settings = {};
-      settingsRows.forEach(row => {
-        let value = row.value;
-        
-        // Parse value based on type
-        switch (row.type) {
-          case 'boolean':
-            value = value === 'true';
-            break;
-          case 'number':
-            value = parseFloat(value);
-            break;
-          case 'json':
-            try {
-              value = JSON.parse(value);
-            } catch (e) {
-              value = row.value;
-            }
-            break;
-          default:
-            // string - keep as is
-            break;
-        }
-        
-        settings[row.key] = value;
+      const query = `
+        SELECT * FROM business_settings 
+        WHERE setting_key LIKE 'business_%' 
+        ORDER BY setting_key
+      `;
+      
+      const result = await DatabaseService.executeQuery(query);
+      const settings = result.rows._array;
+      
+      // Convert array of settings to object
+      const profile = {};
+      settings.forEach(setting => {
+        const key = setting.setting_key.replace('business_', '');
+        profile[key] = setting.setting_value;
       });
       
-      // Return settings with defaults
+      // Set defaults if no data exists
       return {
-        // Business Configuration
-        businessName: settings.businessName || "Brojgar Business",
-        ownerName: settings.ownerName || "Business Owner",
-        gstNumber: settings.gstNumber || "",
-        phoneNumber: settings.phoneNumber || "",
-        emailAddress: settings.emailAddress || "",
-        businessAddress: settings.businessAddress || "",
-        
-        // Financial Settings
-        defaultCreditLimit: settings.defaultCreditLimit || 50000,
-        monthlySalesTarget: settings.monthlySalesTarget || 500000,
-        currency: settings.currency || "₹ INR",
-        defaultTaxRate: settings.defaultTaxRate || 18,
-        
-        // Inventory Settings
-        lowStockAlerts: settings.lowStockAlerts !== false,
-        autoReorderSuggestions: settings.autoReorderSuggestions !== false,
-        defaultMinStockLevel: settings.defaultMinStockLevel || 10,
-        defaultMaxStockLevel: settings.defaultMaxStockLevel || 100,
-        
-        // Notification Settings
-        pushNotifications: settings.pushNotifications !== false,
-        emailNotifications: settings.emailNotifications !== false,
-        paymentReminders: settings.paymentReminders !== false,
-        dailyReports: settings.dailyReports || false,
-        
-        // App Preferences
-        darkMode: settings.darkMode || false,
-        biometricLock: settings.biometricLock || false,
-        autoBackup: settings.autoBackup !== false,
-        language: settings.language || "English (India)",
-        
-        // System Settings
-        appVersion: "1.0.0",
-        lastBackup: settings.lastBackup || new Date().toISOString(),
-        dataSize: await this.calculateDataSize(),
+        name: profile.name || '',
+        address: profile.address || '',
+        phone: profile.phone || '',
+        email: profile.email || '',
+        gstin: profile.gstin || '',
+        pan: profile.pan || '',
+        website: profile.website || '',
+        logo: profile.logo || null,
+        tagline: profile.tagline || '',
+        established_year: profile.established_year || '',
+        business_type: profile.business_type || 'Retail'
       };
     } catch (error) {
-      console.error('❌ Error getting settings:', error);
-      return this.getDefaultSettings();
+      console.error('Error getting business profile:', error);
+      return this.getDefaultBusinessProfile();
     }
   }
 
-  // Get default settings
-  static getDefaultSettings() {
-    return {
-      businessName: "Brojgar Business",
-      ownerName: "Business Owner",
-      gstNumber: "",
-      phoneNumber: "",
-      emailAddress: "",
-      businessAddress: "",
-      defaultCreditLimit: 50000,
-      monthlySalesTarget: 500000,
-      currency: "₹ INR",
-      defaultTaxRate: 18,
-      lowStockAlerts: true,
-      autoReorderSuggestions: true,
-      defaultMinStockLevel: 10,
-      defaultMaxStockLevel: 100,
-      pushNotifications: true,
-      emailNotifications: true,
-      paymentReminders: true,
-      dailyReports: false,
-      darkMode: false,
-      biometricLock: false,
-      autoBackup: true,
-      language: "English (India)",
-      appVersion: "1.0.0",
-      lastBackup: new Date().toISOString(),
-      dataSize: "0 MB",
-    };
-  }
-
-  // Update setting in database
-  static async updateSetting(key, value) {
+  static async updateBusinessProfile(profileData) {
     try {
-      const db = await DatabaseService.getDatabase();
+      await DatabaseService.init();
       
-      // Determine value type
-      let type = 'string';
-      let stringValue = value;
-      
-      if (typeof value === 'boolean') {
-        type = 'boolean';
-        stringValue = value.toString();
-      } else if (typeof value === 'number') {
-        type = 'number';
-        stringValue = value.toString();
-      } else if (typeof value === 'object') {
-        type = 'json';
-        stringValue = JSON.stringify(value);
+      // Update each setting
+      for (const [key, value] of Object.entries(profileData)) {
+        const settingKey = `business_${key}`;
+        
+        // Check if setting exists
+        const checkQuery = 'SELECT id FROM business_settings WHERE setting_key = ?';
+        const checkResult = await DatabaseService.executeQuery(checkQuery, [settingKey]);
+        
+        if (checkResult.rows._array.length > 0) {
+          // Update existing setting
+          const updateQuery = `
+            UPDATE business_settings 
+            SET setting_value = ?, updated_at = datetime('now')
+            WHERE setting_key = ?
+          `;
+          await DatabaseService.executeQuery(updateQuery, [value, settingKey]);
+        } else {
+          // Insert new setting
+          const insertQuery = `
+            INSERT INTO business_settings (setting_key, setting_value, created_at, updated_at)
+            VALUES (?, ?, datetime('now'), datetime('now'))
+          `;
+          await DatabaseService.executeQuery(insertQuery, [settingKey, value]);
+        }
       }
       
-      await db.runAsync(`
-        INSERT OR REPLACE INTO settings (key, value, type, updated_at)
-        VALUES (?, ?, ?, CURRENT_TIMESTAMP)
-      `, [key, stringValue, type]);
-      
-      console.log('✅ Setting updated:', key, value);
       return { success: true };
     } catch (error) {
-      console.error('❌ Error updating setting:', error);
+      console.error('Error updating business profile:', error);
       return { success: false, error: error.message };
     }
   }
 
-  // Update multiple settings at once
-  static async updateSettings(settings) {
+  static async getAppSettings() {
     try {
-      const db = await DatabaseService.getDatabase();
+      await DatabaseService.init();
       
-      await db.execAsync('BEGIN TRANSACTION');
+      const query = `
+        SELECT * FROM business_settings 
+        WHERE setting_key LIKE 'app_%' 
+        ORDER BY setting_key
+      `;
       
-      try {
-        for (const [key, value] of Object.entries(settings)) {
-          // Skip system settings
-          if (['appVersion', 'dataSize'].includes(key)) continue;
-          
-          let type = 'string';
-          let stringValue = value;
-          
-          if (typeof value === 'boolean') {
-            type = 'boolean';
-            stringValue = value.toString();
-          } else if (typeof value === 'number') {
-            type = 'number';
-            stringValue = value.toString();
-          } else if (typeof value === 'object') {
-            type = 'json';
-            stringValue = JSON.stringify(value);
-          }
-          
-          await db.runAsync(`
-            INSERT OR REPLACE INTO settings (key, value, type, updated_at)
-            VALUES (?, ?, ?, CURRENT_TIMESTAMP)
-          `, [key, stringValue, type]);
-        }
-        
-        await db.execAsync('COMMIT');
-        console.log('✅ Settings updated successfully');
-        return { success: true };
-        
-      } catch (error) {
-        await db.execAsync('ROLLBACK');
-        throw error;
-      }
-    } catch (error) {
-      console.error('❌ Error updating settings:', error);
-      return { success: false, error: error.message };
-    }
-  }
-
-  // Calculate database size
-  static async calculateDataSize() {
-    try {
-      const db = await DatabaseService.getDatabase();
+      const result = await DatabaseService.executeQuery(query);
+      const settings = result.rows._array;
       
-      // Get record counts
-      const counts = await Promise.all([
-        db.getFirstAsync('SELECT COUNT(*) as count FROM parties'),
-        db.getFirstAsync('SELECT COUNT(*) as count FROM items'),
-        db.getFirstAsync('SELECT COUNT(*) as count FROM invoices'),
-        db.getFirstAsync('SELECT COUNT(*) as count FROM payments'),
-        db.getFirstAsync('SELECT COUNT(*) as count FROM expenses'),
-        db.getFirstAsync('SELECT COUNT(*) as count FROM stock_movements'),
-      ]);
+      // Convert array of settings to object
+      const appSettings = {};
+      settings.forEach(setting => {
+        const key = setting.setting_key.replace('app_', '');
+        appSettings[key] = setting.setting_value;
+      });
       
-      const totalRecords = counts.reduce((sum, result) => sum + (result?.count || 0), 0);
-      const estimatedSizeKB = totalRecords * 2; // Rough estimate: 2KB per record
-      
-      if (estimatedSizeKB < 1024) {
-        return `${estimatedSizeKB} KB`;
-      } else {
-        return `${(estimatedSizeKB / 1024).toFixed(1)} MB`;
-      }
-    } catch (error) {
-      console.error('❌ Error calculating data size:', error);
-      return '0 KB';
-    }
-  }
-
-  // Backup database to file
-  static async backupDatabase() {
-    try {
-      const backupData = await this.exportAllData();
-      
-      const timestamp = new Date().toISOString().replace(/[:.]/g, '-');
-      const filename = `brojgar_backup_${timestamp.split('T')[0]}.json`;
-      const fileUri = `${FileSystem.documentDirectory}${filename}`;
-      
-      await FileSystem.writeAsStringAsync(fileUri, JSON.stringify(backupData, null, 2));
-      
-      // Update last backup timestamp
-      await this.updateSetting('lastBackup', new Date().toISOString());
-      
-      // Share the backup file
-      if (await Sharing.isAvailableAsync()) {
-        await Sharing.shareAsync(fileUri, {
-          mimeType: 'application/json',
-          dialogTitle: 'Save Brojgar Database Backup',
-          UTI: 'public.json'
-        });
-        
-        return { success: true, filename };
-      } else {
-        return { success: false, error: 'Sharing not available on this device' };
-      }
-    } catch (error) {
-      console.error('❌ Error creating backup:', error);
-      return { success: false, error: error.message };
-    }
-  }
-
-  // Export all data from database
-  static async exportAllData() {
-    try {
-      const db = await DatabaseService.getDatabase();
-      
-      // Get all data from all tables
-      const [
-        settings,
-        categories,
-        parties,
-        items,
-        invoices,
-        invoiceItems,
-        payments,
-        expenses,
-        stockMovements
-      ] = await Promise.all([
-        db.getAllAsync('SELECT * FROM settings'),
-        db.getAllAsync('SELECT * FROM categories'),
-        db.getAllAsync('SELECT * FROM parties'),
-        db.getAllAsync('SELECT * FROM items'),
-        db.getAllAsync('SELECT * FROM invoices'),
-        db.getAllAsync('SELECT * FROM invoice_items'),
-        db.getAllAsync('SELECT * FROM payments'),
-        db.getAllAsync('SELECT * FROM expenses'),
-        db.getAllAsync('SELECT * FROM stock_movements')
-      ]);
-
+      // Set defaults
       return {
-        version: '1.0.0',
-        exportedAt: new Date().toISOString(),
-        data: {
-          settings,
-          categories,
-          parties,
-          items,
-          invoices,
-          invoiceItems,
-          payments,
-          expenses,
-          stockMovements
-        }
+        theme: appSettings.theme || 'light',
+        notifications_enabled: appSettings.notifications_enabled === 'true',
+        backup_frequency: appSettings.backup_frequency || 'weekly',
+        currency: appSettings.currency || 'INR',
+        date_format: appSettings.date_format || 'DD/MM/YYYY',
+        decimal_places: parseInt(appSettings.decimal_places) || 2,
+        auto_backup: appSettings.auto_backup === 'true',
+        sound_enabled: appSettings.sound_enabled !== 'false', // default true
+        vibration_enabled: appSettings.vibration_enabled !== 'false', // default true
+        language: appSettings.language || 'en',
+        tax_rate: parseFloat(appSettings.tax_rate) || 18.0
       };
     } catch (error) {
-      console.error('❌ Error exporting data:', error);
-      throw error;
+      console.error('Error getting app settings:', error);
+      return this.getDefaultAppSettings();
     }
   }
 
-  // Clear all data from database
+  static async updateAppSettings(settings) {
+    try {
+      await DatabaseService.init();
+      
+      // Update each setting
+      for (const [key, value] of Object.entries(settings)) {
+        const settingKey = `app_${key}`;
+        const settingValue = typeof value === 'boolean' ? value.toString() : value.toString();
+        
+        // Check if setting exists
+        const checkQuery = 'SELECT id FROM business_settings WHERE setting_key = ?';
+        const checkResult = await DatabaseService.executeQuery(checkQuery, [settingKey]);
+        
+        if (checkResult.rows._array.length > 0) {
+          // Update existing setting
+          const updateQuery = `
+            UPDATE business_settings 
+            SET setting_value = ?, updated_at = datetime('now')
+            WHERE setting_key = ?
+          `;
+          await DatabaseService.executeQuery(updateQuery, [settingValue, settingKey]);
+        } else {
+          // Insert new setting
+          const insertQuery = `
+            INSERT INTO business_settings (setting_key, setting_value, created_at, updated_at)
+            VALUES (?, ?, datetime('now'), datetime('now'))
+          `;
+          await DatabaseService.executeQuery(insertQuery, [settingKey, settingValue]);
+        }
+      }
+      
+      return { success: true };
+    } catch (error) {
+      console.error('Error updating app settings:', error);
+      return { success: false, error: error.message };
+    }
+  }
+
+  static async getSecuritySettings() {
+    try {
+      await DatabaseService.init();
+      
+      const query = `
+        SELECT * FROM business_settings 
+        WHERE setting_key LIKE 'security_%' 
+        ORDER BY setting_key
+      `;
+      
+      const result = await DatabaseService.executeQuery(query);
+      const settings = result.rows._array;
+      
+      // Convert array of settings to object
+      const securitySettings = {};
+      settings.forEach(setting => {
+        const key = setting.setting_key.replace('security_', '');
+        securitySettings[key] = setting.setting_value;
+      });
+      
+      return {
+        pin_enabled: securitySettings.pin_enabled === 'true',
+        fingerprint_enabled: securitySettings.fingerprint_enabled === 'true',
+        auto_lock_time: parseInt(securitySettings.auto_lock_time) || 5, // minutes
+        failed_attempts_limit: parseInt(securitySettings.failed_attempts_limit) || 3,
+        data_encryption: securitySettings.data_encryption === 'true',
+        backup_encryption: securitySettings.backup_encryption === 'true'
+      };
+    } catch (error) {
+      console.error('Error getting security settings:', error);
+      return {
+        pin_enabled: false,
+        fingerprint_enabled: false,
+        auto_lock_time: 5,
+        failed_attempts_limit: 3,
+        data_encryption: false,
+        backup_encryption: false
+      };
+    }
+  }
+
+  static async updateSecuritySettings(settings) {
+    try {
+      await DatabaseService.init();
+      
+      // Update each setting
+      for (const [key, value] of Object.entries(settings)) {
+        const settingKey = `security_${key}`;
+        const settingValue = typeof value === 'boolean' ? value.toString() : value.toString();
+        
+        // Check if setting exists
+        const checkQuery = 'SELECT id FROM business_settings WHERE setting_key = ?';
+        const checkResult = await DatabaseService.executeQuery(checkQuery, [settingKey]);
+        
+        if (checkResult.rows._array.length > 0) {
+          // Update existing setting
+          const updateQuery = `
+            UPDATE business_settings 
+            SET setting_value = ?, updated_at = datetime('now')
+            WHERE setting_key = ?
+          `;
+          await DatabaseService.executeQuery(updateQuery, [settingValue, settingKey]);
+        } else {
+          // Insert new setting
+          const insertQuery = `
+            INSERT INTO business_settings (setting_key, setting_value, created_at, updated_at)
+            VALUES (?, ?, datetime('now'), datetime('now'))
+          `;
+          await DatabaseService.executeQuery(insertQuery, [settingKey, settingValue]);
+        }
+      }
+      
+      return { success: true };
+    } catch (error) {
+      console.error('Error updating security settings:', error);
+      return { success: false, error: error.message };
+    }
+  }
+
+  static async getDataSettings() {
+    try {
+      await DatabaseService.init();
+      
+      // Get database statistics
+      const stats = await this.getDatabaseStats();
+      
+      const query = `
+        SELECT * FROM business_settings 
+        WHERE setting_key LIKE 'data_%' 
+        ORDER BY setting_key
+      `;
+      
+      const result = await DatabaseService.executeQuery(query);
+      const settings = result.rows._array;
+      
+      // Convert array of settings to object
+      const dataSettings = {};
+      settings.forEach(setting => {
+        const key = setting.setting_key.replace('data_', '');
+        dataSettings[key] = setting.setting_value;
+      });
+      
+      return {
+        auto_sync: dataSettings.auto_sync === 'true',
+        sync_frequency: dataSettings.sync_frequency || 'daily',
+        cloud_backup: dataSettings.cloud_backup === 'true',
+        data_retention_days: parseInt(dataSettings.data_retention_days) || 365,
+        compress_backups: dataSettings.compress_backups !== 'false', // default true
+        ...stats
+      };
+    } catch (error) {
+      console.error('Error getting data settings:', error);
+      return {
+        auto_sync: false,
+        sync_frequency: 'daily',
+        cloud_backup: false,
+        data_retention_days: 365,
+        compress_backups: true,
+        totalRecords: 0,
+        databaseSize: '0 KB',
+        lastBackup: 'Never'
+      };
+    }
+  }
+
+  static async getDatabaseStats() {
+    try {
+      const tables = [
+        'parties', 'inventory_items', 'invoices', 'invoice_items', 
+        'transactions', 'notifications', 'business_settings'
+      ];
+      
+      let totalRecords = 0;
+      
+      for (const table of tables) {
+        try {
+          const query = `SELECT COUNT(*) as count FROM ${table} WHERE deleted_at IS NULL OR deleted_at = ''`;
+          const result = await DatabaseService.executeQuery(query);
+          totalRecords += result.rows._array[0].count;
+        } catch (error) {
+          console.warn(`Table ${table} might not exist:`, error);
+        }
+      }
+      
+      // Get last backup date
+      const backupQuery = `
+        SELECT created_at FROM backups 
+        WHERE deleted_at IS NULL 
+        ORDER BY created_at DESC 
+        LIMIT 1
+      `;
+      
+      let lastBackup = 'Never';
+      try {
+        const backupResult = await DatabaseService.executeQuery(backupQuery);
+        if (backupResult.rows._array.length > 0) {
+          lastBackup = new Date(backupResult.rows._array[0].created_at).toLocaleDateString();
+        }
+      } catch (error) {
+        console.warn('Backup table might not exist:', error);
+      }
+      
+      return {
+        totalRecords,
+        databaseSize: `${Math.round(totalRecords * 0.5)} KB`, // Rough estimate
+        lastBackup
+      };
+    } catch (error) {
+      console.error('Error getting database stats:', error);
+      return {
+        totalRecords: 0,
+        databaseSize: '0 KB',
+        lastBackup: 'Never'
+      };
+    }
+  }
+
+  static async exportSettings() {
+    try {
+      const [businessProfile, appSettings, securitySettings] = await Promise.all([
+        this.getBusinessProfile(),
+        this.getAppSettings(),
+        this.getSecuritySettings()
+      ]);
+      
+      const settingsExport = {
+        export_date: new Date().toISOString(),
+        version: '1.0',
+        business_profile: businessProfile,
+        app_settings: appSettings,
+        security_settings: {
+          // Don't export sensitive security settings
+          auto_lock_time: securitySettings.auto_lock_time,
+          failed_attempts_limit: securitySettings.failed_attempts_limit
+        }
+      };
+      
+      return { success: true, data: settingsExport };
+    } catch (error) {
+      console.error('Error exporting settings:', error);
+      return { success: false, error: error.message };
+    }
+  }
+
+  static async importSettings(settingsData) {
+    try {
+      if (!settingsData.business_profile && !settingsData.app_settings) {
+        throw new Error('Invalid settings format');
+      }
+      
+      const results = [];
+      
+      if (settingsData.business_profile) {
+        const businessResult = await this.updateBusinessProfile(settingsData.business_profile);
+        results.push({ type: 'business_profile', success: businessResult.success });
+      }
+      
+      if (settingsData.app_settings) {
+        const appResult = await this.updateAppSettings(settingsData.app_settings);
+        results.push({ type: 'app_settings', success: appResult.success });
+      }
+      
+      return { success: true, results };
+    } catch (error) {
+      console.error('Error importing settings:', error);
+      return { success: false, error: error.message };
+    }
+  }
+
+  static async resetSettings(settingType = 'all') {
+    try {
+      await DatabaseService.init();
+      
+      let query;
+      
+      switch (settingType) {
+        case 'business':
+          query = "DELETE FROM business_settings WHERE setting_key LIKE 'business_%'";
+          break;
+        case 'app':
+          query = "DELETE FROM business_settings WHERE setting_key LIKE 'app_%'";
+          break;
+        case 'security':
+          query = "DELETE FROM business_settings WHERE setting_key LIKE 'security_%'";
+          break;
+        case 'all':
+          query = "DELETE FROM business_settings";
+          break;
+        default:
+          throw new Error('Invalid setting type');
+      }
+      
+      await DatabaseService.executeQuery(query);
+      return { success: true };
+    } catch (error) {
+      console.error('Error resetting settings:', error);
+      return { success: false, error: error.message };
+    }
+  }
+
   static async clearAllData() {
     try {
-      const db = await DatabaseService.getDatabase();
+      await DatabaseService.init();
       
-      await db.execAsync('BEGIN TRANSACTION');
+      const tables = [
+        'parties', 'inventory_items', 'categories', 'invoices', 
+        'invoice_items', 'transactions', 'notifications'
+      ];
       
-      try {
-        // Clear all tables
-        await db.execAsync('DELETE FROM stock_movements');
-        await db.execAsync('DELETE FROM invoice_items');
-        await db.execAsync('DELETE FROM payments');
-        await db.execAsync('DELETE FROM expenses');
-        await db.execAsync('DELETE FROM invoices');
-        await db.execAsync('DELETE FROM items');
-        await db.execAsync('DELETE FROM parties');
-        await db.execAsync('DELETE FROM categories');
-        await db.execAsync('DELETE FROM settings');
-        
-        // Reset auto-increment counters
-        await db.execAsync('DELETE FROM sqlite_sequence');
-        
-        await db.execAsync('COMMIT');
-        
-        console.log('✅ All data cleared successfully');
-        return { success: true };
-        
-      } catch (error) {
-        await db.execAsync('ROLLBACK');
-        throw error;
-      }
-    } catch (error) {
-      console.error('❌ Error clearing data:', error);
-      return { success: false, error: error.message };
-    }
-  }
-
-  // Restore database from backup
-  static async restoreDatabase(backupFile) {
-    try {
-      const db = await DatabaseService.getDatabase();
-      
-      // Read backup file
-      const backupContent = await FileSystem.readAsStringAsync(backupFile);
-      const backupData = JSON.parse(backupContent);
-      
-      await db.execAsync('BEGIN TRANSACTION');
-      
-      try {
-        // Clear existing data
-        await this.clearAllData();
-        
-        // Restore each table
-        const tables = ['settings', 'categories', 'parties', 'items', 'invoices', 'invoice_items', 'payments', 'expenses', 'stock_movements'];
-        
-        for (const tableName of tables) {
-          if (backupData.data[tableName]) {
-            await this.restoreTableData(db, tableName, backupData.data[tableName]);
-          }
+      // Soft delete all data
+      for (const table of tables) {
+        try {
+          const query = `UPDATE ${table} SET deleted_at = datetime('now') WHERE deleted_at IS NULL`;
+          await DatabaseService.executeQuery(query);
+        } catch (error) {
+          console.warn(`Table ${table} might not exist:`, error);
         }
-        
-        await db.execAsync('COMMIT');
-        
-        console.log('✅ Database restored successfully');
-        return { success: true };
-        
-      } catch (error) {
-        await db.execAsync('ROLLBACK');
-        throw error;
       }
+      
+      // Reset auto-increment counters
+      try {
+        await DatabaseService.executeQuery("UPDATE business_settings SET setting_value = '1' WHERE setting_key = 'last_invoice_number'");
+        await DatabaseService.executeQuery("UPDATE business_settings SET setting_value = '1' WHERE setting_key = 'last_party_code'");
+      } catch (error) {
+        console.warn('Error resetting counters:', error);
+      }
+      
+      return { success: true };
     } catch (error) {
-      console.error('❌ Error restoring database:', error);
+      console.error('Error clearing all data:', error);
       return { success: false, error: error.message };
     }
   }
 
-  // Helper function to restore table data
-  static async restoreTableData(db, tableName, records) {
-    if (!records || records.length === 0) return;
-    
-    const firstRecord = records[0];
-    const columns = Object.keys(firstRecord);
-    const placeholders = columns.map(() => '?').join(', ');
-    
-    const insertSQL = `INSERT INTO ${tableName} (${columns.join(', ')}) VALUES (${placeholders})`;
-    
-    for (const record of records) {
-      const values = columns.map(col => record[col]);
-      await db.runAsync(insertSQL, values);
-    }
-  }
-
-  // Validate setting value
-  static validateSetting(key, value) {
-    const validations = {
-      businessName: (val) => val && val.trim().length > 0,
-      ownerName: (val) => val && val.trim().length > 0,
-      phoneNumber: (val) => val && /^[+]?[\d\s-()]{10,}$/.test(val),
-      emailAddress: (val) => !val || /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(val),
-      gstNumber: (val) => !val || /^[0-9]{2}[A-Z]{5}[0-9]{4}[A-Z]{1}[1-9A-Z]{1}[Z]{1}[0-9A-Z]{1}$/.test(val),
-      defaultCreditLimit: (val) => typeof val === 'number' && val >= 0,
-      monthlySalesTarget: (val) => typeof val === 'number' && val >= 0,
-      defaultTaxRate: (val) => typeof val === 'number' && val >= 0 && val <= 100,
-      defaultMinStockLevel: (val) => typeof val === 'number' && val >= 0,
-      defaultMaxStockLevel: (val) => typeof val === 'number' && val > 0,
+  static getDefaultBusinessProfile() {
+    return {
+      name: '',
+      address: '',
+      phone: '',
+      email: '',
+      gstin: '',
+      pan: '',
+      website: '',
+      logo: null,
+      tagline: '',
+      established_year: '',
+      business_type: 'Retail'
     };
-
-    if (validations[key]) {
-      return validations[key](value);
-    }
-
-    return true; // Default to valid for unknown keys
   }
 
-  // Get app statistics
-  static async getAppStatistics() {
+  static getDefaultAppSettings() {
+    return {
+      theme: 'light',
+      notifications_enabled: true,
+      backup_frequency: 'weekly',
+      currency: 'INR',
+      date_format: 'DD/MM/YYYY',
+      decimal_places: 2,
+      auto_backup: true,
+      sound_enabled: true,
+      vibration_enabled: true,
+      language: 'en',
+      tax_rate: 18.0
+    };
+  }
+
+  // Initialize settings tables
+  static async initializeSettings() {
     try {
-      const db = await DatabaseService.getDatabase();
+      await DatabaseService.init();
       
-      const [
-        partiesCount,
-        itemsCount,
-        invoicesCount,
-        paymentsCount,
-        totalRevenue
-      ] = await Promise.all([
-        db.getFirstAsync('SELECT COUNT(*) as count FROM parties WHERE is_active = 1'),
-        db.getFirstAsync('SELECT COUNT(*) as count FROM items WHERE is_active = 1'),
-        db.getFirstAsync('SELECT COUNT(*) as count FROM invoices'),
-        db.getFirstAsync('SELECT COUNT(*) as count FROM payments'),
-        db.getFirstAsync('SELECT COALESCE(SUM(total_amount), 0) as total FROM invoices WHERE status != "cancelled"')
-      ]);
+      // Create business_settings table if not exists
+      await DatabaseService.executeQuery(`
+        CREATE TABLE IF NOT EXISTS business_settings (
+          id INTEGER PRIMARY KEY AUTOINCREMENT,
+          setting_key TEXT NOT NULL UNIQUE,
+          setting_value TEXT,
+          created_at TEXT NOT NULL,
+          updated_at TEXT NOT NULL
+        )
+      `);
       
-      return {
-        totalParties: partiesCount?.count || 0,
-        totalItems: itemsCount?.count || 0,
-        totalInvoices: invoicesCount?.count || 0,
-        totalPayments: paymentsCount?.count || 0,
-        totalRevenue: totalRevenue?.total || 0,
-        dataSize: await this.calculateDataSize(),
-        appVersion: "1.0.0",
-      };
+      // Create backups table if not exists (for settings data section)
+      await DatabaseService.executeQuery(`
+        CREATE TABLE IF NOT EXISTS backups (
+          id INTEGER PRIMARY KEY AUTOINCREMENT,
+          backup_name TEXT NOT NULL,
+          backup_size INTEGER DEFAULT 0,
+          record_count INTEGER DEFAULT 0,
+          include_images INTEGER DEFAULT 0,
+          backup_data TEXT,
+          status TEXT DEFAULT 'completed',
+          created_at TEXT NOT NULL,
+          updated_at TEXT NOT NULL,
+          deleted_at TEXT
+        )
+      `);
+      
+      console.log('✅ Settings tables initialized');
     } catch (error) {
-      console.error('❌ Error getting app statistics:', error);
-      return {};
+      console.error('Error initializing settings tables:', error);
     }
-  }
-
-  // Format currency
-  static formatCurrency(amount) {
-    return `₹${amount.toLocaleString('en-IN')}`;
   }
 }
 
