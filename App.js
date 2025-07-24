@@ -21,15 +21,15 @@ export default function App() {
     try {
       console.log('🚀 Initializing Brojgar Business App...');
       
-      // RESET DATABASE FIRST - Run this ONCE then comment out
-      await resetDatabase();
+      // RESET DATABASE FIRST - COMMENTED OUT AFTER FIRST RUN
+      // await resetDatabase();
       
-      // Initialize database AFTER reset
+      // Initialize database
       await DatabaseService.init();
       console.log('✅ Database initialized');
       
       // Small delay to ensure database is ready
-      await new Promise(resolve => setTimeout(resolve, 1000));
+      await new Promise(resolve => setTimeout(resolve, 500));
       
       // Initialize all services with error handling
       try {
@@ -78,37 +78,37 @@ export default function App() {
     }
   };
 
-  // RESET function - Run once then comment out
-  const resetDatabase = async () => {
-    try {
-      console.log('🗑️ Resetting database completely...');
+  // RESET function - COMMENTED OUT AFTER FIRST RUN
+  // const resetDatabase = async () => {
+  //   try {
+  //     console.log('🗑️ Resetting database completely...');
       
-      // Get database connection without initializing
-      const SQLite = require('expo-sqlite');
-      const db = await SQLite.openDatabaseAsync('brojgar_business.db');
+  //     // Get database connection without initializing
+  //     const SQLite = require('expo-sqlite');
+  //     const db = await SQLite.openDatabaseAsync('brojgar_business.db');
       
-      // Drop all tables
-      const tables = [
-        'parties', 'inventory_items', 'categories', 'invoices', 
-        'invoice_items', 'transactions', 'notifications', 
-        'business_settings', 'recent_searches', 'backups'
-      ];
+  //     // Drop all tables
+  //     const tables = [
+  //       'parties', 'inventory_items', 'categories', 'invoices', 
+  //       'invoice_items', 'transactions', 'notifications', 
+  //       'business_settings', 'recent_searches', 'backups'
+  //     ];
       
-      for (const table of tables) {
-        try {
-          await db.execAsync(`DROP TABLE IF EXISTS ${table}`);
-          console.log(`✅ Dropped table: ${table}`);
-        } catch (error) {
-          console.warn(`Could not drop table ${table}:`, error);
-        }
-      }
+  //     for (const table of tables) {
+  //       try {
+  //         await db.execAsync(`DROP TABLE IF EXISTS ${table}`);
+  //         console.log(`✅ Dropped table: ${table}`);
+  //       } catch (error) {
+  //         console.warn(`Could not drop table ${table}:`, error);
+  //       }
+  //     }
       
-      await db.closeAsync();
-      console.log('✅ Database reset complete');
-    } catch (error) {
-      console.error('❌ Error resetting database:', error);
-    }
-  };
+  //     await db.closeAsync();
+  //     console.log('✅ Database reset complete');
+  //   } catch (error) {
+  //     console.error('❌ Error resetting database:', error);
+  //   }
+  // };
 
   if (isLoading) {
     return (
