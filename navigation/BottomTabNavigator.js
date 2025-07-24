@@ -1,14 +1,14 @@
 import React, { useState } from "react";
 import { createBottomTabNavigator } from "@react-navigation/bottom-tabs";
-import DashboardScreen from "../screens/Dashboard/DashboardScreenMyBillBook";
-import PartiesScreen from "../screens/Parties/PartiesScreenMyBillBook";
-import InventoryScreen from "../screens/Inventory/InventoryScreenMyBillBook";
-import ReportsScreen from "../screens/Reports/ReportsScreenMyBillBook";
-import SettingsScreen from "../screens/Settings/SettingsScreenMyBillBook";
-import InvoiceScreen from "../screens/Invoice/InvoiceScreenMyBillBook";
-import InvoiceTemplateScreen from "../screens/Invoice/InvoiceTemplateScreenMyBillBook";
-import NotificationScreen from "../screens/Notifications/NotificationScreenMyBillBook";
-import GlobalSearchScreen from "../screens/Search/GlobalSearchScreenMyBillBook";
+import DashboardScreen from "../screens/Dashboard/DashboardScreen";
+import PartiesScreen from "../screens/Parties/PartiesScreen";
+import InventoryScreen from "../screens/Inventory/InventoryScreen";
+import ReportsScreen from "../screens/Reports/ReportsScreen";
+import SettingsScreen from "../screens/Settings/SettingsScreen";
+import InvoiceScreen from "../screens/Invoice/InvoiceScreen";
+import InvoiceTemplateScreen from "../screens/Invoice/InvoiceTemplateScreen";
+import NotificationScreen from "../screens/Notifications/NotificationScreen";
+import GlobalSearchScreen from "../screens/Search/GlobalSearchScreen";
 import { View, Text, TouchableOpacity } from "react-native";
 
 const Tab = createBottomTabNavigator();
