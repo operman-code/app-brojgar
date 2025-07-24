@@ -197,19 +197,19 @@ class DashboardService {
     }
   }
 
-  // Get top selling items (simplified)
+  // Get top selling items (FIXED - removed ambiguous total column)
   static async getTopSellingItems() {
     try {
       const query = `
         SELECT 
-          item_name,
-          SUM(quantity) as total_quantity,
-          SUM(total) as total_sales
+          ii.item_name,
+          SUM(ii.quantity) as total_quantity,
+          SUM(ii.total) as total_sales
         FROM invoice_items ii
         JOIN invoices i ON ii.invoice_id = i.id
         WHERE (ii.deleted_at IS NULL OR ii.deleted_at = '')
         AND (i.deleted_at IS NULL OR i.deleted_at = '')
-        GROUP BY item_name
+        GROUP BY ii.item_name
         ORDER BY total_sales DESC
         LIMIT 5
       `;
