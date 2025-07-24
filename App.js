@@ -21,29 +21,69 @@ export default function App() {
     try {
       console.log('🚀 Initializing Brojgar Business App...');
       
+      // TEMPORARY: Reset database on first run (REMOVE this after testing)
+      // Uncomment the line below ONLY if you want to reset the database
+      // await resetDatabase();
+      
       // Initialize database first
       await DatabaseService.init();
       console.log('✅ Database initialized');
       
-      // Initialize all services
-      await Promise.all([
-        NotificationService.checkAndCreateAutomaticNotifications(),
-        GlobalSearchService.initializeSearch(),
-        BackupService.initializeBackupSystem(),
-        SettingsService.initializeSettings()
-      ]);
+      // Initialize all services with error handling
+      try {
+        await NotificationService.checkAndCreateAutomaticNotifications();
+        console.log('✅ Notification service initialized');
+      } catch (error) {
+        console.warn('⚠️ Notification service initialization failed:', error);
+      }
+
+      try {
+        await GlobalSearchService.initializeSearch();
+        console.log('✅ Search service initialized');
+      } catch (error) {
+        console.warn('⚠️ Search service initialization failed:', error);
+      }
+
+      try {
+        await BackupService.initializeBackupSystem();
+        console.log('✅ Backup service initialized');
+      } catch (error) {
+        console.warn('⚠️ Backup service initialization failed:', error);
+      }
+
+      try {
+        await SettingsService.initializeSettings();
+        console.log('✅ Settings service initialized');
+      } catch (error) {
+        console.warn('⚠️ Settings service initialization failed:', error);
+      }
       
       console.log('✅ All services initialized');
       
       // Schedule automatic backup check
-      await BackupService.scheduleAutomaticBackup();
-      console.log('✅ Automatic backup check completed');
+      try {
+        await BackupService.scheduleAutomaticBackup();
+        console.log('✅ Automatic backup check completed');
+      } catch (error) {
+        console.warn('⚠️ Automatic backup check failed:', error);
+      }
       
       setIsLoading(false);
     } catch (error) {
       console.error('❌ App initialization failed:', error);
       setError(error.message);
       setIsLoading(false);
+    }
+  };
+
+  // TEMPORARY function to reset database - REMOVE after testing
+  const resetDatabase = async () => {
+    try {
+      console.log('🗑️ Resetting database...');
+      await DatabaseService.clearAllData();
+      console.log('✅ Database reset complete');
+    } catch (error) {
+      console.error('❌ Error resetting database:', error);
     }
   };
 
