@@ -1,24 +1,36 @@
 {
   "expo": {
-    "name": "Brojgar",
-    "slug": "brojgar-app",
+    "name": "Brojgar Business",
+    "slug": "app-brojgar",
     "version": "1.0.0",
     "orientation": "portrait",
     "userInterfaceStyle": "light",
     "newArchEnabled": false,
-    "assetBundlePatterns": [
-      "**/*"
-    ],
+    "splash": {
+      "resizeMode": "contain",
+      "backgroundColor": "#ffffff"
+    },
     "ios": {
-      "supportsTablet": true,
-      "bundleIdentifier": "com.operman.brojgar",
-      "newArchEnabled": false
+      "supportsTablet": true
     },
     "android": {
-      "package": "com.operman.brojgar",
-      "newArchEnabled": false
+      "adaptiveIcon": {
+        "backgroundColor": "#ffffff"
+      },
+      "permissions": [
+        "WRITE_EXTERNAL_STORAGE",
+        "READ_EXTERNAL_STORAGE"
+      ]
     },
-    "platforms": ["ios", "android"],
-    "sdkVersion": "53.0.0"
+    "web": {
+    },
+    "plugins": [
+      [
+        "expo-sqlite",
+        {
+          "enableFTS": true
+        }
+      ]
+    ]
   }
 }
