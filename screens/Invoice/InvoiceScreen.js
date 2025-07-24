@@ -13,11 +13,14 @@ import {
   Alert,
   Modal,
 } from 'react-native';
+import InvoiceService from './services/InvoiceService';
+import PartiesService from '../Parties/services/PartiesService';
+import InventoryService from '../Inventory/services/InventoryService';
 
 const InvoiceScreen = ({ navigation }) => {
   const [fadeAnim] = useState(new Animated.Value(0));
   const [invoiceData, setInvoiceData] = useState({
-    invoiceNumber: 'INV-2024-001',
+    invoiceNumber: '',
     date: new Date().toISOString().split('T')[0],
     dueDate: '',
     customer: null,
@@ -28,30 +31,42 @@ const InvoiceScreen = ({ navigation }) => {
     tax: 18,
   });
 
-  const [customers] = useState([
-    { id: 1, name: 'Rajesh Kumar', phone: '+91 98765 43210', email: 'rajesh@example.com' },
-    { id: 2, name: 'Priya Sharma', phone: '+91 87654 32109', email: 'priya@example.com' },
-    { id: 3, name: 'Tech Solutions Ltd', phone: '+91 76543 21098', email: 'info@techsolutions.com' },
-  ]);
-
-  const [products] = useState([
-    { id: 1, name: 'iPhone 15', price: 79999, stock: 25 },
-    { id: 2, name: 'Samsung Galaxy S24', price: 74999, stock: 18 },
-    { id: 3, name: 'MacBook Air M2', price: 114900, stock: 8 },
-    { id: 4, name: 'iPad Pro', price: 89900, stock: 12 },
-  ]);
-
+  const [customers, setCustomers] = useState([]);
+  const [products, setProducts] = useState([]);
   const [showCustomerModal, setShowCustomerModal] = useState(false);
   const [showProductModal, setShowProductModal] = useState(false);
   const [searchQuery, setSearchQuery] = useState('');
+  const [loading, setLoading] = useState(true);
 
   useEffect(() => {
+    loadInitialData();
+    
     Animated.timing(fadeAnim, {
       toValue: 1,
       duration: 600,
       useNativeDriver: true,
     }).start();
   }, []);
+
+  const loadInitialData = async () => {
+    try {
+      setLoading(true);
+      const [invoiceNumber, customersList, productsList] = await Promise.all([
+        InvoiceService.getNextInvoiceNumber(),
+        PartiesService.getAllParties('customer'),
+        InventoryService.getAllItems()
+      ]);
+      
+      setInvoiceData(prev => ({ ...prev, invoiceNumber }));
+      setCustomers(customersList);
+      setProducts(productsList);
+    } catch (error) {
+      console.error('Error loading initial data:', error);
+      Alert.alert('Error', 'Failed to load invoice data');
+    } finally {
+      setLoading(false);
+    }
+  };
 
   const calculateSubtotal = () => {
     return invoiceData.items.reduce((sum, item) => sum + (item.quantity * item.price), 0);
@@ -93,7 +108,7 @@ const InvoiceScreen = ({ navigation }) => {
         items: [...invoiceData.items, {
           id: product.id,
           name: product.name,
-          price: product.price,
+          price: product.sellingPrice,
           quantity: 1
         }]
       });
@@ -122,7 +137,7 @@ const InvoiceScreen = ({ navigation }) => {
     setShowCustomerModal(false);
   };
 
-  const generateInvoice = () => {
+  const generateInvoice = async () => {
     if (!invoiceData.customer) {
       Alert.alert('Error', 'Please select a customer');
       return;
@@ -132,7 +147,52 @@ const InvoiceScreen = ({ navigation }) => {
       return;
     }
 
-    navigation.navigate('InvoiceTemplate', { invoiceData });
+    try {
+      const result = await InvoiceService.createInvoice({
+        customer: invoiceData.customer,
+        items: invoiceData.items,
+        notes: invoiceData.notes,
+        terms: invoiceData.terms,
+        discount: invoiceData.discount,
+        tax: invoiceData.tax
+      });
+
+      Alert.alert(
+        'Success', 
+        `Invoice ${result.invoiceNumber} created successfully!`,
+        [
+          { text: 'Create New', onPress: () => resetInvoice() },
+          { 
+            text: 'View Invoice', 
+            onPress: () => navigation.navigate('InvoiceTemplate', { 
+              invoiceData: { ...invoiceData, invoiceNumber: result.invoiceNumber, total: result.total }
+            })
+          }
+        ]
+      );
+    } catch (error) {
+      console.error('Error creating invoice:', error);
+      Alert.alert('Error', 'Failed to create invoice');
+    }
+  };
+
+  const resetInvoice = async () => {
+    try {
+      const newInvoiceNumber = await InvoiceService.getNextInvoiceNumber();
+      setInvoiceData({
+        invoiceNumber: newInvoiceNumber,
+        date: new Date().toISOString().split('T')[0],
+        dueDate: '',
+        customer: null,
+        items: [],
+        notes: '',
+        terms: '',
+        discount: 0,
+        tax: 18,
+      });
+    } catch (error) {
+      console.error('Error resetting invoice:', error);
+    }
   };
 
   const filteredCustomers = customers.filter(customer =>
@@ -186,14 +246,24 @@ const InvoiceScreen = ({ navigation }) => {
     <TouchableOpacity style={styles.productItem} onPress={() => addItem(item)}>
       <View style={styles.productInfo}>
         <Text style={styles.productName}>{item.name}</Text>
-        <Text style={styles.productPrice}>₹{item.price.toLocaleString()}</Text>
-        <Text style={styles.productStock}>Stock: {item.stock}</Text>
+        <Text style={styles.productPrice}>₹{item.sellingPrice.toLocaleString()}</Text>
+        <Text style={styles.productStock}>Stock: {item.currentStock}</Text>
       </View>
       <View style={styles.addButton}>
         <Text style={styles.addButtonText}>+ Add</Text>
       </View>
     </TouchableOpacity>
   );
+
+  if (loading) {
+    return (
+      <SafeAreaView style={styles.container}>
+        <View style={styles.loadingContainer}>
+          <Text style={styles.loadingText}>Loading invoice...</Text>
+        </View>
+      </SafeAreaView>
+    );
+  }
 
   return (
     <SafeAreaView style={styles.container}>
@@ -295,11 +365,11 @@ const InvoiceScreen = ({ navigation }) => {
                   <Text style={styles.summaryValue}>₹{calculateSubtotal().toLocaleString()}</Text>
                 </View>
                 <View style={styles.summaryRow}>
-                  <Text style={styles.summaryLabel}>Discount (0%)</Text>
+                  <Text style={styles.summaryLabel}>Discount ({invoiceData.discount}%)</Text>
                   <Text style={styles.summaryValue}>-₹{calculateDiscount().toLocaleString()}</Text>
                 </View>
                 <View style={styles.summaryRow}>
-                  <Text style={styles.summaryLabel}>Tax (18%)</Text>
+                  <Text style={styles.summaryLabel}>Tax ({invoiceData.tax}%)</Text>
                   <Text style={styles.summaryValue}>+₹{calculateTax().toLocaleString()}</Text>
                 </View>
                 <View style={[styles.summaryRow, styles.totalRow]}>
@@ -319,7 +389,12 @@ const InvoiceScreen = ({ navigation }) => {
                 <Text style={styles.modalCloseText}>Cancel</Text>
               </TouchableOpacity>
               <Text style={styles.modalTitle}>Select Customer</Text>
-              <View style={styles.modalHeaderRight} />
+              <TouchableOpacity onPress={() => {
+                setShowCustomerModal(false);
+                navigation.navigate('Parties');
+              }}>
+                <Text style={styles.modalAddText}>+ Add</Text>
+              </TouchableOpacity>
             </View>
             
             <View style={styles.searchContainer}>
@@ -336,6 +411,20 @@ const InvoiceScreen = ({ navigation }) => {
               renderItem={renderCustomer}
               keyExtractor={(item) => item.id.toString()}
               style={styles.modalList}
+              ListEmptyComponent={
+                <View style={styles.emptyModalContainer}>
+                  <Text style={styles.emptyModalText}>No customers found</Text>
+                  <TouchableOpacity 
+                    style={styles.emptyModalButton}
+                    onPress={() => {
+                      setShowCustomerModal(false);
+                      navigation.navigate('Parties');
+                    }}
+                  >
+                    <Text style={styles.emptyModalButtonText}>Add First Customer</Text>
+                  </TouchableOpacity>
+                </View>
+              }
             />
           </SafeAreaView>
         </Modal>
@@ -348,7 +437,12 @@ const InvoiceScreen = ({ navigation }) => {
                 <Text style={styles.modalCloseText}>Cancel</Text>
               </TouchableOpacity>
               <Text style={styles.modalTitle}>Add Product</Text>
-              <View style={styles.modalHeaderRight} />
+              <TouchableOpacity onPress={() => {
+                setShowProductModal(false);
+                navigation.navigate('Inventory');
+              }}>
+                <Text style={styles.modalAddText}>+ Add</Text>
+              </TouchableOpacity>
             </View>
             
             <View style={styles.searchContainer}>
@@ -365,6 +459,20 @@ const InvoiceScreen = ({ navigation }) => {
               renderItem={renderProduct}
               keyExtractor={(item) => item.id.toString()}
               style={styles.modalList}
+              ListEmptyComponent={
+                <View style={styles.emptyModalContainer}>
+                  <Text style={styles.emptyModalText}>No products found</Text>
+                  <TouchableOpacity 
+                    style={styles.emptyModalButton}
+                    onPress={() => {
+                      setShowProductModal(false);
+                      navigation.navigate('Inventory');
+                    }}
+                  >
+                    <Text style={styles.emptyModalButtonText}>Add First Product</Text>
+                  </TouchableOpacity>
+                </View>
+              }
             />
           </SafeAreaView>
         </Modal>
@@ -373,6 +481,7 @@ const InvoiceScreen = ({ navigation }) => {
   );
 };
 
+// Add all the styles here (same as before but I'll include them for completeness)
 const styles = StyleSheet.create({
   container: {
     flex: 1,
@@ -380,6 +489,15 @@ const styles = StyleSheet.create({
   },
   content: {
     flex: 1,
+  },
+  loadingContainer: {
+    flex: 1,
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  loadingText: {
+    fontSize: 16,
+    color: '#64748b',
   },
   header: {
     flexDirection: 'row',
@@ -675,8 +793,10 @@ const styles = StyleSheet.create({
     fontWeight: 'bold',
     color: '#0f172a',
   },
-  modalHeaderRight: {
-    width: 60,
+  modalAddText: {
+    fontSize: 16,
+    fontWeight: '600',
+    color: '#3b82f6',
   },
   searchContainer: {
     paddingHorizontal: 20,
@@ -742,6 +862,28 @@ const styles = StyleSheet.create({
     borderRadius: 8,
   },
   addButtonText: {
+    color: '#ffffff',
+    fontSize: 14,
+    fontWeight: '600',
+  },
+  emptyModalContainer: {
+    flex: 1,
+    alignItems: 'center',
+    justifyContent: 'center',
+    paddingVertical: 60,
+  },
+  emptyModalText: {
+    fontSize: 16,
+    color: '#64748b',
+    marginBottom: 20,
+  },
+  emptyModalButton: {
+    backgroundColor: '#3b82f6',
+    paddingHorizontal: 24,
+    paddingVertical: 12,
+    borderRadius: 8,
+  },
+  emptyModalButtonText: {
     color: '#ffffff',
     fontSize: 14,
     fontWeight: '600',
