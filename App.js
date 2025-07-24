@@ -21,9 +21,8 @@ export default function App() {
     try {
       console.log('🚀 Initializing Brojgar Business App...');
       
-      // TEMPORARY: Reset database on first run (REMOVE this after testing)
-      // Uncomment the line below ONLY if you want to reset the database
-      // await resetDatabase();
+      // RESET DATABASE - Run this ONCE then comment out
+      await resetDatabase();
       
       // Initialize database first
       await DatabaseService.init();
@@ -76,11 +75,30 @@ export default function App() {
     }
   };
 
-  // TEMPORARY function to reset database - REMOVE after testing
+  // RESET function - Run once then comment out
   const resetDatabase = async () => {
     try {
-      console.log('🗑️ Resetting database...');
-      await DatabaseService.clearAllData();
+      console.log('🗑️ Resetting database completely...');
+      
+      // Drop all tables
+      const tables = [
+        'parties', 'inventory_items', 'categories', 'invoices', 
+        'invoice_items', 'transactions', 'notifications', 
+        'business_settings', 'recent_searches', 'backups'
+      ];
+      
+      const db = await DatabaseService.getDatabase();
+      if (db) {
+        for (const table of tables) {
+          try {
+            await db.execAsync(`DROP TABLE IF EXISTS ${table}`);
+            console.log(`Dropped table: ${table}`);
+          } catch (error) {
+            console.warn(`Could not drop table ${table}:`, error);
+          }
+        }
+      }
+      
       console.log('✅ Database reset complete');
     } catch (error) {
       console.error('❌ Error resetting database:', error);
