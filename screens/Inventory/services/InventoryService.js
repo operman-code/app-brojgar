@@ -2,41 +2,33 @@
 import DatabaseService from '../../../database/DatabaseService';
 
 class InventoryService {
-  // Get all items with optional filtering
-  static async getAllItems(categoryId = null, searchQuery = '', status = 'all') {
+  // Get all inventory items
+  static async getAllItems() {
     try {
-      await DatabaseService.init();
-      
-      let query = `
-        SELECT i.*, c.name as category_name
-        FROM inventory_items i
-        LEFT JOIN categories c ON i.category_id = c.id
-        WHERE (i.deleted_at IS NULL OR i.deleted_at = '')
+      const query = `
+        SELECT 
+          id,
+          item_name,
+          item_code,
+          category,
+          description,
+          stock_quantity,
+          min_stock_level,
+          cost_price,
+          selling_price,
+          tax_rate,
+          unit,
+          hsn_code,
+          created_at,
+          updated_at
+        FROM inventory_items 
+        WHERE deleted_at IS NULL
+        ORDER BY item_name ASC
       `;
-      let params = [];
       
-      if (categoryId) {
-        query += ' AND i.category_id = ?';
-        params.push(categoryId);
-      }
-      
-      if (searchQuery) {
-        query += ' AND (i.name LIKE ? OR i.description LIKE ? OR i.sku LIKE ?)';
-        params.push(`%${searchQuery}%`, `%${searchQuery}%`, `%${searchQuery}%`);
-      }
-      
-      if (status === 'low_stock') {
-        query += ' AND i.current_stock <= i.min_stock';
-      } else if (status === 'out_of_stock') {
-        query += ' AND i.current_stock = 0';
-      }
-      
-      query += ' ORDER BY i.name ASC';
-      
-      const result = await DatabaseService.executeQuery(query, params);
-      return result.rows._array || [];
+      return await DatabaseService.executeQuery(query);
     } catch (error) {
-      console.error('Error fetching items:', error);
+      console.error('❌ Error fetching items:', error);
       return [];
     }
   }
@@ -44,197 +36,343 @@ class InventoryService {
   // Create new item
   static async createItem(itemData) {
     try {
-      await DatabaseService.init();
-      
-      const {
-        name,
-        description = '',
-        category_id = null,
-        sku = '',
-        unit = 'pcs',
-        purchase_price = 0,
-        sale_price = 0,
-        current_stock = 0,
-        min_stock = 0
-      } = itemData;
-      
       const query = `
         INSERT INTO inventory_items (
-          name, description, category_id, sku, unit, purchase_price, 
-          sale_price, current_stock, min_stock, created_at, updated_at
-        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, datetime('now'), datetime('now'))
+          item_name, item_code, category, description, 
+          stock_quantity, min_stock_level, cost_price, 
+          selling_price, tax_rate, unit, hsn_code
+        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
       `;
       
-      const result = await DatabaseService.executeQuery(query, [
-        name, description, category_id, sku, unit, purchase_price,
-        sale_price, current_stock, min_stock
-      ]);
+      const params = [
+        itemData.item_name || itemData.name,
+        itemData.item_code || this.generateItemCode(),
+        itemData.category || 'General',
+        itemData.description || '',
+        parseInt(itemData.stock_quantity || 0),
+        parseInt(itemData.min_stock_level || 5),
+        parseFloat(itemData.cost_price || 0),
+        parseFloat(itemData.selling_price || 0),
+        parseFloat(itemData.tax_rate || 18),
+        itemData.unit || 'pcs',
+        itemData.hsn_code || ''
+      ];
       
-      return { success: true, id: result.insertId };
+      const result = await DatabaseService.executeQuery(query, params);
+      console.log('✅ Item created successfully');
+      return result;
     } catch (error) {
-      console.error('Error creating item:', error);
-      return { success: false, error: error.message };
+      console.error('❌ Error creating item:', error);
+      throw error;
     }
   }
 
   // Update item
-  static async updateItem(id, itemData) {
+  static async updateItem(itemId, itemData) {
     try {
-      await DatabaseService.init();
-      
-      const {
-        name,
-        description,
-        category_id,
-        sku,
-        unit,
-        purchase_price,
-        sale_price,
-        current_stock,
-        min_stock
-      } = itemData;
-      
       const query = `
         UPDATE inventory_items 
-        SET name = ?, description = ?, category_id = ?, sku = ?, unit = ?,
-            purchase_price = ?, sale_price = ?, current_stock = ?, min_stock = ?,
-            updated_at = datetime('now')
-        WHERE id = ?
+        SET 
+          item_name = ?, 
+          item_code = ?, 
+          category = ?, 
+          description = ?,
+          stock_quantity = ?, 
+          min_stock_level = ?, 
+          cost_price = ?, 
+          selling_price = ?,
+          tax_rate = ?, 
+          unit = ?, 
+          hsn_code = ?,
+          updated_at = CURRENT_TIMESTAMP
+        WHERE id = ? AND deleted_at IS NULL
       `;
       
-      await DatabaseService.executeQuery(query, [
-        name, description, category_id, sku, unit, purchase_price,
-        sale_price, current_stock, min_stock, id
-      ]);
+      const params = [
+        itemData.item_name || itemData.name,
+        itemData.item_code,
+        itemData.category,
+        itemData.description || '',
+        parseInt(itemData.stock_quantity || 0),
+        parseInt(itemData.min_stock_level || 5),
+        parseFloat(itemData.cost_price || 0),
+        parseFloat(itemData.selling_price || 0),
+        parseFloat(itemData.tax_rate || 18),
+        itemData.unit || 'pcs',
+        itemData.hsn_code || '',
+        itemId
+      ];
       
-      return { success: true };
+      const result = await DatabaseService.executeQuery(query, params);
+      console.log('✅ Item updated successfully');
+      return result;
     } catch (error) {
-      console.error('Error updating item:', error);
-      return { success: false, error: error.message };
+      console.error('❌ Error updating item:', error);
+      throw error;
     }
   }
 
   // Delete item (soft delete)
-  static async deleteItem(id) {
+  static async deleteItem(itemId) {
     try {
-      await DatabaseService.init();
-      
       const query = `
         UPDATE inventory_items 
-        SET deleted_at = datetime('now'), updated_at = datetime('now')
+        SET deleted_at = CURRENT_TIMESTAMP 
         WHERE id = ?
       `;
       
-      await DatabaseService.executeQuery(query, [id]);
-      return { success: true };
+      const result = await DatabaseService.executeQuery(query, [itemId]);
+      console.log('✅ Item deleted successfully');
+      return result;
     } catch (error) {
-      console.error('Error deleting item:', error);
-      return { success: false, error: error.message };
+      console.error('❌ Error deleting item:', error);
+      throw error;
     }
   }
 
-  // Get categories
+  // Get item by ID
+  static async getItemById(itemId) {
+    try {
+      const query = `
+        SELECT * FROM inventory_items 
+        WHERE id = ? AND deleted_at IS NULL
+      `;
+      
+      const result = await DatabaseService.executeQuery(query, [itemId]);
+      return result[0] || null;
+    } catch (error) {
+      console.error('❌ Error fetching item by ID:', error);
+      return null;
+    }
+  }
+
+  // Get all categories
   static async getCategories() {
     try {
-      await DatabaseService.init();
-      
       const query = `
         SELECT * FROM categories 
-        WHERE (deleted_at IS NULL OR deleted_at = '') 
+        WHERE deleted_at IS NULL
         ORDER BY name ASC
       `;
       
-      const result = await DatabaseService.executeQuery(query);
-      return result.rows._array || [];
+      return await DatabaseService.executeQuery(query);
     } catch (error) {
-      console.error('Error fetching categories:', error);
+      console.error('❌ Error fetching categories:', error);
       return [];
     }
   }
 
-  // Create category
+  // Create new category
   static async createCategory(categoryData) {
     try {
-      await DatabaseService.init();
-      
-      const { name, description = '', icon = '📦', color = '#3b82f6' } = categoryData;
-      
       const query = `
-        INSERT INTO categories (name, description, icon, color, created_at, updated_at)
-        VALUES (?, ?, ?, ?, datetime('now'), datetime('now'))
+        INSERT INTO categories (name, description) 
+        VALUES (?, ?)
       `;
       
-      const result = await DatabaseService.executeQuery(query, [name, description, icon, color]);
-      return { success: true, id: result.insertId };
+      const params = [
+        categoryData.name,
+        categoryData.description || ''
+      ];
+      
+      const result = await DatabaseService.executeQuery(query, params);
+      console.log('✅ Category created successfully');
+      return result;
     } catch (error) {
-      console.error('Error creating category:', error);
-      return { success: false, error: error.message };
+      console.error('❌ Error creating category:', error);
+      throw error;
     }
   }
-
-  // ===== MISSING METHODS ADDED =====
 
   // Get inventory summary
   static async getInventorySummary() {
     try {
-      await DatabaseService.init();
-      
+      const [totalItems, lowStockItems, totalValue, categories] = await Promise.all([
+        this.getTotalItemsCount(),
+        this.getLowStockItemsCount(),
+        this.getTotalInventoryValue(),
+        this.getCategoriesCount()
+      ]);
+
+      return {
+        totalItems,
+        lowStockItems,
+        totalValue,
+        categories
+      };
+    } catch (error) {
+      console.error('❌ Error getting inventory summary:', error);
+      return {
+        totalItems: 0,
+        lowStockItems: 0,
+        totalValue: 0,
+        categories: 0
+      };
+    }
+  }
+
+  // Get total items count
+  static async getTotalItemsCount() {
+    try {
       const query = `
-        SELECT 
-          COUNT(*) as total_items,
-          COUNT(CASE WHEN current_stock <= min_stock THEN 1 END) as low_stock_items,
-          COUNT(CASE WHEN current_stock = 0 THEN 1 END) as out_of_stock_items,
-          COALESCE(SUM(current_stock * sale_price), 0) as total_value
+        SELECT COUNT(*) as count 
         FROM inventory_items 
-        WHERE (deleted_at IS NULL OR deleted_at = '')
+        WHERE deleted_at IS NULL
       `;
       
       const result = await DatabaseService.executeQuery(query);
-      return result.rows._array[0] || {
-        total_items: 0,
-        low_stock_items: 0,
-        out_of_stock_items: 0,
-        total_value: 0
-      };
+      return result[0]?.count || 0;
     } catch (error) {
-      console.error('Error getting inventory summary:', error);
-      return {
-        total_items: 0,
-        low_stock_items: 0,
-        out_of_stock_items: 0,
-        total_value: 0
-      };
+      console.error('❌ Error getting total items count:', error);
+      return 0;
+    }
+  }
+
+  // Get low stock items count
+  static async getLowStockItemsCount() {
+    try {
+      const query = `
+        SELECT COUNT(*) as count 
+        FROM inventory_items 
+        WHERE deleted_at IS NULL 
+          AND stock_quantity <= min_stock_level
+      `;
+      
+      const result = await DatabaseService.executeQuery(query);
+      return result[0]?.count || 0;
+    } catch (error) {
+      console.error('❌ Error getting low stock items count:', error);
+      return 0;
+    }
+  }
+
+  // Get total inventory value
+  static async getTotalInventoryValue() {
+    try {
+      const query = `
+        SELECT COALESCE(SUM(stock_quantity * cost_price), 0) as total_value 
+        FROM inventory_items 
+        WHERE deleted_at IS NULL
+      `;
+      
+      const result = await DatabaseService.executeQuery(query);
+      return result[0]?.total_value || 0;
+    } catch (error) {
+      console.error('❌ Error getting total inventory value:', error);
+      return 0;
+    }
+  }
+
+  // Get categories count
+  static async getCategoriesCount() {
+    try {
+      const query = `
+        SELECT COUNT(*) as count 
+        FROM categories 
+        WHERE deleted_at IS NULL
+      `;
+      
+      const result = await DatabaseService.executeQuery(query);
+      return result[0]?.count || 0;
+    } catch (error) {
+      console.error('❌ Error getting categories count:', error);
+      return 0;
     }
   }
 
   // Validate item data
   static validateItemData(itemData) {
     const errors = [];
-    
-    if (!itemData.name || itemData.name.trim().length === 0) {
+
+    if (!itemData.item_name && !itemData.name) {
       errors.push('Item name is required');
     }
-    
-    if (itemData.sale_price < 0) {
-      errors.push('Sale price cannot be negative');
+
+    if (itemData.selling_price && parseFloat(itemData.selling_price) < 0) {
+      errors.push('Selling price cannot be negative');
     }
-    
-    if (itemData.purchase_price < 0) {
-      errors.push('Purchase price cannot be negative');
+
+    if (itemData.cost_price && parseFloat(itemData.cost_price) < 0) {
+      errors.push('Cost price cannot be negative');
     }
-    
-    if (itemData.current_stock < 0) {
-      errors.push('Current stock cannot be negative');
+
+    if (itemData.stock_quantity && parseInt(itemData.stock_quantity) < 0) {
+      errors.push('Stock quantity cannot be negative');
     }
-    
-    if (itemData.min_stock < 0) {
-      errors.push('Minimum stock cannot be negative');
-    }
-    
+
     return {
       isValid: errors.length === 0,
       errors
     };
+  }
+
+  // Generate item code
+  static generateItemCode() {
+    const timestamp = Date.now().toString();
+    const random = Math.floor(Math.random() * 1000).toString().padStart(3, '0');
+    return `ITM${timestamp.slice(-6)}${random}`;
+  }
+
+  // Search items
+  static async searchItems(searchQuery) {
+    try {
+      const query = `
+        SELECT * FROM inventory_items 
+        WHERE deleted_at IS NULL 
+          AND (
+            item_name LIKE ? OR 
+            item_code LIKE ? OR 
+            category LIKE ? OR
+            description LIKE ?
+          )
+        ORDER BY item_name ASC
+      `;
+      
+      const searchTerm = `%${searchQuery}%`;
+      const params = [searchTerm, searchTerm, searchTerm, searchTerm];
+      
+      return await DatabaseService.executeQuery(query, params);
+    } catch (error) {
+      console.error('❌ Error searching items:', error);
+      return [];
+    }
+  }
+
+  // Update stock quantity
+  static async updateStockQuantity(itemId, newQuantity) {
+    try {
+      const query = `
+        UPDATE inventory_items 
+        SET 
+          stock_quantity = ?, 
+          updated_at = CURRENT_TIMESTAMP 
+        WHERE id = ? AND deleted_at IS NULL
+      `;
+      
+      const result = await DatabaseService.executeQuery(query, [newQuantity, itemId]);
+      console.log('✅ Stock quantity updated successfully');
+      return result;
+    } catch (error) {
+      console.error('❌ Error updating stock quantity:', error);
+      throw error;
+    }
+  }
+
+  // Get low stock items
+  static async getLowStockItems() {
+    try {
+      const query = `
+        SELECT * FROM inventory_items 
+        WHERE deleted_at IS NULL 
+          AND stock_quantity <= min_stock_level
+        ORDER BY stock_quantity ASC
+      `;
+      
+      return await DatabaseService.executeQuery(query);
+    } catch (error) {
+      console.error('❌ Error getting low stock items:', error);
+      return [];
+    }
   }
 }
 
