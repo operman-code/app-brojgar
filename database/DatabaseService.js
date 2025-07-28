@@ -3,9 +3,15 @@ import * as SQLite from 'expo-sqlite';
 
 class DatabaseService {
   static db = null;
+  static isInitialized = false;
 
   static async init() {
     try {
+      // Prevent multiple initializations
+      if (this.isInitialized && this.db) {
+        return true;
+      }
+
       console.log('🔌 Connecting to SQLite database...');
       this.db = await SQLite.openDatabaseAsync('brojgar_business.db');
       
@@ -21,6 +27,7 @@ class DatabaseService {
       console.log('⚙️ Inserting initial configuration...');
       await this.insertInitialData();
       
+      this.isInitialized = true;
       console.log('✅ Database connected successfully');
       return true;
     } catch (error) {
@@ -191,7 +198,6 @@ class DatabaseService {
   }
 
   static async runMigrations() {
-    // Migrations are handled by the reset in App.js
     console.log('✅ Schema is fresh, no migrations needed');
   }
 
@@ -297,7 +303,7 @@ class DatabaseService {
   static async executeQuery(sql, params = []) {
     try {
       if (!this.db) {
-        throw new Error('Database not initialized');
+        await this.init();
       }
 
       // Determine if this is a SELECT query or a modification query
@@ -395,6 +401,7 @@ class DatabaseService {
       if (this.db) {
         await this.db.closeAsync();
         this.db = null;
+        this.isInitialized = false;
         console.log('✅ Database connection closed');
       }
     } catch (error) {
@@ -402,10 +409,8 @@ class DatabaseService {
     }
   }
 
-  // Add backup method for file operations
   static async backup() {
     try {
-      // For SQLite, we can export the data as JSON
       const tables = [
         'business_settings', 'categories', 'parties', 'inventory_items',
         'invoices', 'invoice_items', 'transactions', 'notifications'
@@ -434,10 +439,8 @@ class DatabaseService {
         throw new Error('Invalid backup data');
       }
 
-      // Clear existing data
       await this.clearAllData();
 
-      // Restore data
       for (const [tableName, tableData] of Object.entries(backupData.data)) {
         if (Array.isArray(tableData) && tableData.length > 0) {
           const columns = Object.keys(tableData[0]).filter(col => col !== 'id');
