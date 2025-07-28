@@ -50,227 +50,187 @@ const InvoiceScreen = ({ navigation, route }) => {
   const [itemPrice, setItemPrice] = useState("");
 
   useEffect(() => {
-    loadInitialData();
-    
-    Animated.timing(fadeAnim, {
-      toValue: 1,
-      duration: 600,
-      useNativeDriver: true,
-    }).start();
+    loadInvoiceData();
   }, []);
 
-  const loadInitialData = async () => {
+  const loadInvoiceData = async () => {
     try {
       setLoading(true);
-      const [invoiceNumber, customersList, productsList] = await Promise.all([
-        InvoiceService.getNextInvoiceNumber(),
-        PartiesService.getAllParties('customer'),
+      
+      // Generate invoice number
+      const invoiceNumber = await InvoiceService.getNextInvoiceNumber();
+      
+      // Load parties and inventory
+      const [partiesData, inventoryData] = await Promise.all([
+        PartiesService.getCustomers(), // This gets customers only
         InventoryService.getAllItems()
       ]);
+
+      setInvoiceData(prev => ({
+        ...prev,
+        invoiceNumber
+      }));
       
-      setInvoiceData(prev => ({ ...prev, invoiceNumber }));
-      setCustomers(customersList);
-      setProducts(productsList);
+      setParties(partiesData || []);
+      setInventory(inventoryData || []);
     } catch (error) {
-      console.error('Error loading initial data:', error);
-      Alert.alert('Error', 'Failed to load invoice data');
+      console.error('❌ Error loading invoice data:', error);
+      Alert.alert("Error", "Failed to load invoice data");
     } finally {
       setLoading(false);
     }
   };
 
-  const calculateSubtotal = () => {
-    return invoiceData.items.reduce((sum, item) => sum + (item.quantity * item.price), 0);
+  const handleSelectParty = (party) => {
+    setInvoiceData(prev => ({
+      ...prev,
+      partyId: party.id,
+      partyName: party.name,
+      partyDetails: party
+    }));
+    setShowPartyModal(false);
+    setSearchPartyQuery("");
   };
 
-  const calculateDiscount = () => {
-    const subtotal = calculateSubtotal();
-    return (subtotal * invoiceData.discount) / 100;
-  };
-
-  const calculateTax = () => {
-    const subtotal = calculateSubtotal();
-    const discount = calculateDiscount();
-    return ((subtotal - discount) * invoiceData.tax) / 100;
-  };
-
-  const calculateTotal = () => {
-    const subtotal = calculateSubtotal();
-    const discount = calculateDiscount();
-    const tax = calculateTax();
-    return subtotal - discount + tax;
-  };
-
-  const addItem = (product) => {
-    const existingItem = invoiceData.items.find(item => item.id === product.id);
-    
-    if (existingItem) {
-      setInvoiceData({
-        ...invoiceData,
-        items: invoiceData.items.map(item =>
-          item.id === product.id
-            ? { ...item, quantity: item.quantity + 1 }
-            : item
-        )
-      });
-    } else {
-      setInvoiceData({
-        ...invoiceData,
-        items: [...invoiceData.items, {
-          id: product.id,
-          name: product.name,
-          price: product.sellingPrice,
-          quantity: 1
-        }]
-      });
-    }
-    setShowProductModal(false);
-  };
-
-  const updateItemQuantity = (itemId, quantity) => {
-    if (quantity <= 0) {
-      setInvoiceData({
-        ...invoiceData,
-        items: invoiceData.items.filter(item => item.id !== itemId)
-      });
-    } else {
-      setInvoiceData({
-        ...invoiceData,
-        items: invoiceData.items.map(item =>
-          item.id === itemId ? { ...item, quantity } : item
-        )
-      });
-    }
-  };
-
-  const selectCustomer = (customer) => {
-    setInvoiceData({ ...invoiceData, customer });
-    setShowCustomerModal(false);
-  };
-
-  const generateInvoice = async () => {
-    if (!invoiceData.customer) {
-      Alert.alert('Error', 'Please select a customer');
+  const handleSelectItem = () => {
+    if (!selectedItem || !itemQuantity || !itemPrice) {
+      Alert.alert("Error", "Please fill all item details");
       return;
     }
+
+    const quantity = parseFloat(itemQuantity);
+    const price = parseFloat(itemPrice);
+    const total = quantity * price;
+    const taxAmount = (total * invoiceData.taxRate) / 100;
+
+    const newItem = {
+      id: Date.now(), // Temporary ID for the invoice item
+      itemId: selectedItem.id,
+      itemName: selectedItem.item_name,
+      quantity: quantity,
+      rate: price,
+      taxRate: invoiceData.taxRate,
+      taxAmount: taxAmount,
+      total: total + taxAmount
+    };
+
+    setInvoiceData(prev => ({
+      ...prev,
+      items: [...prev.items, newItem]
+    }));
+
+    calculateTotals([...invoiceData.items, newItem]);
+    
+    setShowItemModal(false);
+    setSelectedItem(null);
+    setItemQuantity("1");
+    setItemPrice("");
+    setSearchItemQuery("");
+  };
+
+  const handleRemoveItem = (itemIndex) => {
+    const updatedItems = invoiceData.items.filter((_, index) => index !== itemIndex);
+    setInvoiceData(prev => ({
+      ...prev,
+      items: updatedItems
+    }));
+    calculateTotals(updatedItems);
+  };
+
+  const calculateTotals = (items) => {
+    const subtotal = items.reduce((sum, item) => sum + (item.quantity * item.rate), 0);
+    const taxAmount = (subtotal * invoiceData.taxRate) / 100;
+    const total = subtotal + taxAmount - invoiceData.discountAmount;
+
+    setInvoiceData(prev => ({
+      ...prev,
+      subtotal,
+      taxAmount,
+      total
+    }));
+  };
+
+  const handleSaveInvoice = async () => {
+    if (!invoiceData.partyId) {
+      Alert.alert("Error", "Please select a customer");
+      return;
+    }
+
     if (invoiceData.items.length === 0) {
-      Alert.alert('Error', 'Please add at least one item');
+      Alert.alert("Error", "Please add at least one item");
       return;
     }
 
     try {
-      const result = await InvoiceService.createInvoice({
-        customer: invoiceData.customer,
-        items: invoiceData.items,
+      setSaving(true);
+      
+      const invoicePayload = {
+        invoice_number: invoiceData.invoiceNumber,
+        party_id: invoiceData.partyId,
+        date: invoiceData.date,
+        due_date: invoiceData.dueDate || null,
+        subtotal: invoiceData.subtotal,
+        tax_amount: invoiceData.taxAmount,
+        discount_amount: invoiceData.discountAmount,
+        total: invoiceData.total,
         notes: invoiceData.notes,
         terms: invoiceData.terms,
-        discount: invoiceData.discount,
-        tax: invoiceData.tax
-      });
+        items: invoiceData.items.map(item => ({
+          item_id: item.itemId,
+          item_name: item.itemName,
+          quantity: item.quantity,
+          rate: item.rate,
+          tax_rate: item.taxRate,
+          tax_amount: item.taxAmount,
+          total: item.total
+        }))
+      };
 
+      await InvoiceService.createInvoice(invoicePayload);
+      
       Alert.alert(
-        'Success', 
-        `Invoice ${result.invoiceNumber} created successfully!`,
+        "Success", 
+        "Invoice created successfully!",
         [
-          { text: 'Create New', onPress: () => resetInvoice() },
-          { 
-            text: 'View Invoice', 
-            onPress: () => navigation.navigate('InvoiceTemplate', { 
-              invoiceData: { ...invoiceData, invoiceNumber: result.invoiceNumber, total: result.total }
-            })
+          {
+            text: "OK",
+            onPress: () => {
+              // Reset form
+              loadInvoiceData();
+            }
           }
         ]
       );
     } catch (error) {
-      console.error('Error creating invoice:', error);
-      Alert.alert('Error', 'Failed to create invoice');
+      console.error('❌ Error saving invoice:', error);
+      Alert.alert("Error", "Failed to save invoice");
+    } finally {
+      setSaving(false);
     }
   };
 
-  const resetInvoice = async () => {
-    try {
-      const newInvoiceNumber = await InvoiceService.getNextInvoiceNumber();
-      setInvoiceData({
-        invoiceNumber: newInvoiceNumber,
-        date: new Date().toISOString().split('T')[0],
-        dueDate: '',
-        customer: null,
-        items: [],
-        notes: '',
-        terms: '',
-        discount: 0,
-        tax: 18,
-      });
-    } catch (error) {
-      console.error('Error resetting invoice:', error);
-    }
+  const getFilteredParties = () => {
+    if (!searchPartyQuery.trim()) return parties;
+    return parties.filter(party => 
+      party.name.toLowerCase().includes(searchPartyQuery.toLowerCase()) ||
+      (party.phone && party.phone.includes(searchPartyQuery))
+    );
   };
 
-  const filteredCustomers = customers.filter(customer =>
-    customer.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
-    customer.phone.includes(searchQuery)
-  );
-
-  const filteredProducts = products.filter(product =>
-    product.name.toLowerCase().includes(searchQuery.toLowerCase())
-  );
-
-  const renderInvoiceItem = ({ item }) => (
-    <View style={styles.invoiceItem}>
-      <View style={styles.itemInfo}>
-        <Text style={styles.itemName}>{item.name}</Text>
-        <Text style={styles.itemPrice}>₹{item.price.toLocaleString()}</Text>
-      </View>
-      <View style={styles.quantityControls}>
-        <TouchableOpacity 
-          style={styles.quantityButton}
-          onPress={() => updateItemQuantity(item.id, item.quantity - 1)}
-        >
-          <Text style={styles.quantityButtonText}>-</Text>
-        </TouchableOpacity>
-        <Text style={styles.quantityText}>{item.quantity}</Text>
-        <TouchableOpacity 
-          style={styles.quantityButton}
-          onPress={() => updateItemQuantity(item.id, item.quantity + 1)}
-        >
-          <Text style={styles.quantityButtonText}>+</Text>
-        </TouchableOpacity>
-      </View>
-      <Text style={styles.itemTotal}>₹{(item.quantity * item.price).toLocaleString()}</Text>
-    </View>
-  );
-
-  const renderCustomer = ({ item }) => (
-    <TouchableOpacity style={styles.customerItem} onPress={() => selectCustomer(item)}>
-      <View style={styles.customerAvatar}>
-        <Text style={styles.customerAvatarText}>{item.name.charAt(0)}</Text>
-      </View>
-      <View style={styles.customerInfo}>
-        <Text style={styles.customerName}>{item.name}</Text>
-        <Text style={styles.customerPhone}>{item.phone}</Text>
-      </View>
-      <Text style={styles.selectText}>Select</Text>
-    </TouchableOpacity>
-  );
-
-  const renderProduct = ({ item }) => (
-    <TouchableOpacity style={styles.productItem} onPress={() => addItem(item)}>
-      <View style={styles.productInfo}>
-        <Text style={styles.productName}>{item.name}</Text>
-        <Text style={styles.productPrice}>₹{item.sellingPrice.toLocaleString()}</Text>
-        <Text style={styles.productStock}>Stock: {item.currentStock}</Text>
-      </View>
-      <View style={styles.addButton}>
-        <Text style={styles.addButtonText}>+ Add</Text>
-      </View>
-    </TouchableOpacity>
-  );
+  const getFilteredInventory = () => {
+    if (!searchItemQuery.trim()) return inventory;
+    return inventory.filter(item => 
+      item.item_name.toLowerCase().includes(searchItemQuery.toLowerCase()) ||
+      (item.item_code && item.item_code.toLowerCase().includes(searchItemQuery.toLowerCase()))
+    );
+  };
 
   if (loading) {
     return (
       <SafeAreaView style={styles.container}>
+        <StatusBar barStyle="dark-content" />
         <View style={styles.loadingContainer}>
-          <Text style={styles.loadingText}>Loading invoice...</Text>
+          <Text style={styles.loadingText}>Loading Invoice...</Text>
         </View>
       </SafeAreaView>
     );
@@ -278,228 +238,337 @@ const InvoiceScreen = ({ navigation, route }) => {
 
   return (
     <SafeAreaView style={styles.container}>
-      <StatusBar barStyle="dark-content" backgroundColor="#ffffff" />
-      
-      <Animated.View style={[styles.content, { opacity: fadeAnim }]}>
-        {/* Header */}
-        <View style={styles.header}>
-          <TouchableOpacity onPress={() => navigation.goBack()}>
-            <Text style={styles.backButton}>← Back</Text>
-          </TouchableOpacity>
-          <Text style={styles.headerTitle}>Create Invoice</Text>
-          <TouchableOpacity onPress={generateInvoice} style={styles.generateButton}>
-            <Text style={styles.generateButtonText}>Generate</Text>
-          </TouchableOpacity>
-        </View>
+      <StatusBar barStyle="dark-content" />
 
-        <ScrollView style={styles.scrollContent} showsVerticalScrollIndicator={false}>
-          {/* Invoice Details */}
-          <View style={styles.section}>
-            <Text style={styles.sectionTitle}>Invoice Details</Text>
-            <View style={styles.sectionCard}>
-              <View style={styles.invoiceRow}>
-                <Text style={styles.invoiceLabel}>Invoice Number</Text>
-                <Text style={styles.invoiceValue}>{invoiceData.invoiceNumber}</Text>
-              </View>
-              <View style={styles.invoiceRow}>
-                <Text style={styles.invoiceLabel}>Date</Text>
-                <Text style={styles.invoiceValue}>{invoiceData.date}</Text>
-              </View>
+      {/* Header */}
+      <View style={styles.header}>
+        <TouchableOpacity onPress={() => navigation.goBack()}>
+          <Text style={styles.backButton}>← Back</Text>
+        </TouchableOpacity>
+        <Text style={styles.headerTitle}>Create Invoice</Text>
+        <TouchableOpacity onPress={handleSaveInvoice} disabled={saving}>
+          <Text style={[styles.saveButton, saving && styles.saveButtonDisabled]}>
+            {saving ? 'Saving...' : 'Save'}
+          </Text>
+        </TouchableOpacity>
+      </View>
+
+      <ScrollView style={styles.content} showsVerticalScrollIndicator={false}>
+        {/* Invoice Header */}
+        <View style={styles.section}>
+          <Text style={styles.sectionTitle}>Invoice Details</Text>
+          
+          <View style={styles.row}>
+            <View style={[styles.inputGroup, styles.halfWidth]}>
+              <Text style={styles.inputLabel}>Invoice Number</Text>
+              <TextInput
+                style={[styles.input, styles.disabledInput]}
+                value={invoiceData.invoiceNumber}
+                editable={false}
+              />
+            </View>
+
+            <View style={[styles.inputGroup, styles.halfWidth]}>
+              <Text style={styles.inputLabel}>Date</Text>
+              <TextInput
+                style={styles.input}
+                value={invoiceData.date}
+                onChangeText={(text) => setInvoiceData(prev => ({ ...prev, date: text }))}
+                placeholder="YYYY-MM-DD"
+              />
             </View>
           </View>
 
-          {/* Customer Selection */}
-          <View style={styles.section}>
-            <Text style={styles.sectionTitle}>Customer</Text>
-            <TouchableOpacity 
-              style={styles.customerSelector}
-              onPress={() => setShowCustomerModal(true)}
-            >
-              {invoiceData.customer ? (
-                <View style={styles.selectedCustomer}>
-                  <View style={styles.customerAvatar}>
-                    <Text style={styles.customerAvatarText}>{invoiceData.customer.name.charAt(0)}</Text>
-                  </View>
-                  <View style={styles.customerInfo}>
-                    <Text style={styles.customerName}>{invoiceData.customer.name}</Text>
-                    <Text style={styles.customerPhone}>{invoiceData.customer.phone}</Text>
-                  </View>
-                  <Text style={styles.changeText}>Change</Text>
-                </View>
-              ) : (
-                <View style={styles.selectCustomerPlaceholder}>
-                  <Text style={styles.selectCustomerIcon}>👤</Text>
-                  <Text style={styles.selectCustomerText}>Select Customer</Text>
-                  <Text style={styles.chevron}>›</Text>
-                </View>
+          <View style={styles.inputGroup}>
+            <Text style={styles.inputLabel}>Due Date</Text>
+            <TextInput
+              style={styles.input}
+              value={invoiceData.dueDate}
+              onChangeText={(text) => setInvoiceData(prev => ({ ...prev, dueDate: text }))}
+              placeholder="YYYY-MM-DD (Optional)"
+            />
+          </View>
+        </View>
+
+        {/* Customer Selection */}
+        <View style={styles.section}>
+          <Text style={styles.sectionTitle}>Customer</Text>
+          
+          <TouchableOpacity
+            style={styles.selectButton}
+            onPress={() => setShowPartyModal(true)}
+          >
+            <Text style={invoiceData.partyName ? styles.selectedText : styles.placeholderText}>
+              {invoiceData.partyName || 'Select Customer'}
+            </Text>
+            <Text style={styles.selectArrow}>›</Text>
+          </TouchableOpacity>
+
+          {invoiceData.partyDetails.name && (
+            <View style={styles.customerDetails}>
+              <Text style={styles.customerName}>{invoiceData.partyDetails.name}</Text>
+              {invoiceData.partyDetails.phone && (
+                <Text style={styles.customerInfo}>📞 {invoiceData.partyDetails.phone}</Text>
               )}
+              {invoiceData.partyDetails.email && (
+                <Text style={styles.customerInfo}>📧 {invoiceData.partyDetails.email}</Text>
+              )}
+            </View>
+          )}
+        </View>
+
+        {/* Items Section */}
+        <View style={styles.section}>
+          <View style={styles.sectionHeader}>
+            <Text style={styles.sectionTitle}>Items</Text>
+            <TouchableOpacity
+              style={styles.addButton}
+              onPress={() => setShowItemModal(true)}
+            >
+              <Text style={styles.addButtonText}>+ Add Item</Text>
             </TouchableOpacity>
           </View>
 
-          {/* Items Section */}
-          <View style={styles.section}>
-            <View style={styles.sectionHeader}>
-              <Text style={styles.sectionTitle}>Items ({invoiceData.items.length})</Text>
-              <TouchableOpacity 
-                style={styles.addItemButton}
-                onPress={() => setShowProductModal(true)}
-              >
-                <Text style={styles.addItemText}>+ Add Item</Text>
-              </TouchableOpacity>
+          {invoiceData.items.length > 0 ? (
+            <View style={styles.itemsList}>
+              {invoiceData.items.map((item, index) => (
+                <View key={index} style={styles.itemCard}>
+                  <View style={styles.itemHeader}>
+                    <Text style={styles.itemName}>{item.itemName}</Text>
+                    <TouchableOpacity
+                      onPress={() => handleRemoveItem(index)}
+                      style={styles.removeButton}
+                    >
+                      <Text style={styles.removeButtonText}>×</Text>
+                    </TouchableOpacity>
+                  </View>
+                  <View style={styles.itemDetails}>
+                    <Text style={styles.itemDetail}>Qty: {item.quantity}</Text>
+                    <Text style={styles.itemDetail}>Rate: ₹{item.rate}</Text>
+                    <Text style={styles.itemDetail}>Total: ₹{item.total.toFixed(2)}</Text>
+                  </View>
+                </View>
+              ))}
             </View>
-            
-            {invoiceData.items.length > 0 ? (
-              <View style={styles.sectionCard}>
-                <FlatList
-                  data={invoiceData.items}
-                  renderItem={renderInvoiceItem}
-                  keyExtractor={(item) => item.id.toString()}
-                  scrollEnabled={false}
-                />
-              </View>
-            ) : (
-              <View style={styles.emptyItems}>
-                <Text style={styles.emptyItemsIcon}>📦</Text>
-                <Text style={styles.emptyItemsText}>No items added yet</Text>
-                <Text style={styles.emptyItemsSubtext}>Tap "Add Item" to get started</Text>
-              </View>
-            )}
-          </View>
-
-          {/* Invoice Summary */}
-          {invoiceData.items.length > 0 && (
-            <View style={styles.section}>
-              <Text style={styles.sectionTitle}>Summary</Text>
-              <View style={styles.sectionCard}>
-                <View style={styles.summaryRow}>
-                  <Text style={styles.summaryLabel}>Subtotal</Text>
-                  <Text style={styles.summaryValue}>₹{calculateSubtotal().toLocaleString()}</Text>
-                </View>
-                <View style={styles.summaryRow}>
-                  <Text style={styles.summaryLabel}>Discount ({invoiceData.discount}%)</Text>
-                  <Text style={styles.summaryValue}>-₹{calculateDiscount().toLocaleString()}</Text>
-                </View>
-                <View style={styles.summaryRow}>
-                  <Text style={styles.summaryLabel}>Tax ({invoiceData.tax}%)</Text>
-                  <Text style={styles.summaryValue}>+₹{calculateTax().toLocaleString()}</Text>
-                </View>
-                <View style={[styles.summaryRow, styles.totalRow]}>
-                  <Text style={styles.totalLabel}>Total</Text>
-                  <Text style={styles.totalValue}>₹{calculateTotal().toLocaleString()}</Text>
-                </View>
-              </View>
+          ) : (
+            <View style={styles.emptyItems}>
+              <Text style={styles.emptyItemsText}>No items added yet</Text>
             </View>
           )}
-        </ScrollView>
+        </View>
 
-        {/* Customer Selection Modal */}
-        <Modal visible={showCustomerModal} animationType="slide" presentationStyle="pageSheet">
-          <SafeAreaView style={styles.modalContainer}>
-            <View style={styles.modalHeader}>
-              <TouchableOpacity onPress={() => setShowCustomerModal(false)}>
-                <Text style={styles.modalCloseText}>Cancel</Text>
+        {/* Totals Section */}
+        <View style={styles.section}>
+          <Text style={styles.sectionTitle}>Summary</Text>
+          
+          <View style={styles.totalRow}>
+            <Text style={styles.totalLabel}>Subtotal:</Text>
+            <Text style={styles.totalValue}>₹{invoiceData.subtotal.toFixed(2)}</Text>
+          </View>
+
+          <View style={styles.totalRow}>
+            <Text style={styles.totalLabel}>Tax ({invoiceData.taxRate}%):</Text>
+            <Text style={styles.totalValue}>₹{invoiceData.taxAmount.toFixed(2)}</Text>
+          </View>
+
+          <View style={styles.totalRow}>
+            <Text style={styles.totalLabel}>Discount:</Text>
+            <TextInput
+              style={styles.discountInput}
+              value={invoiceData.discountAmount.toString()}
+              onChangeText={(text) => {
+                const discount = parseFloat(text) || 0;
+                setInvoiceData(prev => ({ ...prev, discountAmount: discount }));
+                calculateTotals(invoiceData.items);
+              }}
+              keyboardType="numeric"
+              placeholder="0"
+            />
+          </View>
+
+          <View style={[styles.totalRow, styles.grandTotalRow]}>
+            <Text style={styles.grandTotalLabel}>Total:</Text>
+            <Text style={styles.grandTotalValue}>₹{invoiceData.total.toFixed(2)}</Text>
+          </View>
+        </View>
+
+        {/* Notes Section */}
+        <View style={styles.section}>
+          <Text style={styles.sectionTitle}>Additional Information</Text>
+          
+          <View style={styles.inputGroup}>
+            <Text style={styles.inputLabel}>Notes</Text>
+            <TextInput
+              style={[styles.input, styles.textArea]}
+              value={invoiceData.notes}
+              onChangeText={(text) => setInvoiceData(prev => ({ ...prev, notes: text }))}
+              placeholder="Enter any additional notes"
+              multiline
+              numberOfLines={3}
+            />
+          </View>
+
+          <View style={styles.inputGroup}>
+            <Text style={styles.inputLabel}>Terms & Conditions</Text>
+            <TextInput
+              style={[styles.input, styles.textArea]}
+              value={invoiceData.terms}
+              onChangeText={(text) => setInvoiceData(prev => ({ ...prev, terms: text }))}
+              placeholder="Enter terms and conditions"
+              multiline
+              numberOfLines={3}
+            />
+          </View>
+        </View>
+
+        <View style={{ height: 50 }} />
+      </ScrollView>
+
+      {/* Party Selection Modal */}
+      <Modal
+        visible={showPartyModal}
+        animationType="slide"
+        presentationStyle="pageSheet"
+      >
+        <SafeAreaView style={styles.modalContainer}>
+          <View style={styles.modalHeader}>
+            <TouchableOpacity onPress={() => setShowPartyModal(false)}>
+              <Text style={styles.modalCloseText}>Cancel</Text>
+            </TouchableOpacity>
+            <Text style={styles.modalTitle}>Select Customer</Text>
+            <View />
+          </View>
+
+          <View style={styles.searchContainer}>
+            <TextInput
+              style={styles.searchInput}
+              placeholder="Search customers..."
+              value={searchPartyQuery}
+              onChangeText={setSearchPartyQuery}
+            />
+          </View>
+
+          <FlatList
+            data={getFilteredParties()}
+            keyExtractor={(item) => item.id.toString()}
+            renderItem={({ item }) => (
+              <TouchableOpacity
+                style={styles.modalItem}
+                onPress={() => handleSelectParty(item)}
+              >
+                <Text style={styles.modalItemName}>{item.name}</Text>
+                {item.phone && (
+                  <Text style={styles.modalItemDetail}>📞 {item.phone}</Text>
+                )}
               </TouchableOpacity>
-              <Text style={styles.modalTitle}>Select Customer</Text>
-              <TouchableOpacity onPress={() => {
-                setShowCustomerModal(false);
-                navigation.navigate('Parties');
-              }}>
-                <Text style={styles.modalAddText}>+ Add</Text>
-              </TouchableOpacity>
-            </View>
-            
-            <View style={styles.searchContainer}>
-              <TextInput
-                style={styles.searchInput}
-                placeholder="Search customers..."
-                value={searchQuery}
-                onChangeText={setSearchQuery}
-              />
-            </View>
-            
-            <FlatList
-              data={filteredCustomers}
-              renderItem={renderCustomer}
-              keyExtractor={(item) => item.id.toString()}
-              style={styles.modalList}
-              ListEmptyComponent={
-                <View style={styles.emptyModalContainer}>
-                  <Text style={styles.emptyModalText}>No customers found</Text>
-                  <TouchableOpacity 
-                    style={styles.emptyModalButton}
+            )}
+            ListEmptyComponent={
+              <View style={styles.emptyList}>
+                <Text style={styles.emptyListText}>No customers found</Text>
+              </View>
+            }
+          />
+        </SafeAreaView>
+      </Modal>
+
+      {/* Item Selection Modal */}
+      <Modal
+        visible={showItemModal}
+        animationType="slide"
+        presentationStyle="pageSheet"
+      >
+        <SafeAreaView style={styles.modalContainer}>
+          <View style={styles.modalHeader}>
+            <TouchableOpacity onPress={() => setShowItemModal(false)}>
+              <Text style={styles.modalCloseText}>Cancel</Text>
+            </TouchableOpacity>
+            <Text style={styles.modalTitle}>Add Item</Text>
+            <TouchableOpacity onPress={handleSelectItem}>
+              <Text style={styles.modalSaveText}>Add</Text>
+            </TouchableOpacity>
+          </View>
+
+          {!selectedItem ? (
+            <>
+              <View style={styles.searchContainer}>
+                <TextInput
+                  style={styles.searchInput}
+                  placeholder="Search items..."
+                  value={searchItemQuery}
+                  onChangeText={setSearchItemQuery}
+                />
+              </View>
+
+              <FlatList
+                data={getFilteredInventory()}
+                keyExtractor={(item) => item.id.toString()}
+                renderItem={({ item }) => (
+                  <TouchableOpacity
+                    style={styles.modalItem}
                     onPress={() => {
-                      setShowCustomerModal(false);
-                      navigation.navigate('Parties');
+                      setSelectedItem(item);
+                      setItemPrice(item.selling_price?.toString() || "");
                     }}
                   >
-                    <Text style={styles.emptyModalButtonText}>Add First Customer</Text>
+                    <Text style={styles.modalItemName}>{item.item_name}</Text>
+                    <Text style={styles.modalItemDetail}>
+                      Stock: {item.stock_quantity} | Price: ₹{item.selling_price}
+                    </Text>
                   </TouchableOpacity>
-                </View>
-              }
-            />
-          </SafeAreaView>
-        </Modal>
-
-        {/* Product Selection Modal */}
-        <Modal visible={showProductModal} animationType="slide" presentationStyle="pageSheet">
-          <SafeAreaView style={styles.modalContainer}>
-            <View style={styles.modalHeader}>
-              <TouchableOpacity onPress={() => setShowProductModal(false)}>
-                <Text style={styles.modalCloseText}>Cancel</Text>
-              </TouchableOpacity>
-              <Text style={styles.modalTitle}>Add Product</Text>
-              <TouchableOpacity onPress={() => {
-                setShowProductModal(false);
-                navigation.navigate('Inventory');
-              }}>
-                <Text style={styles.modalAddText}>+ Add</Text>
-              </TouchableOpacity>
-            </View>
-            
-            <View style={styles.searchContainer}>
-              <TextInput
-                style={styles.searchInput}
-                placeholder="Search products..."
-                value={searchQuery}
-                onChangeText={setSearchQuery}
+                )}
+                ListEmptyComponent={
+                  <View style={styles.emptyList}>
+                    <Text style={styles.emptyListText}>No items found</Text>
+                  </View>
+                }
               />
-            </View>
-            
-            <FlatList
-              data={filteredProducts}
-              renderItem={renderProduct}
-              keyExtractor={(item) => item.id.toString()}
-              style={styles.modalList}
-              ListEmptyComponent={
-                <View style={styles.emptyModalContainer}>
-                  <Text style={styles.emptyModalText}>No products found</Text>
-                  <TouchableOpacity 
-                    style={styles.emptyModalButton}
-                    onPress={() => {
-                      setShowProductModal(false);
-                      navigation.navigate('Inventory');
-                    }}
-                  >
-                    <Text style={styles.emptyModalButtonText}>Add First Product</Text>
-                  </TouchableOpacity>
+            </>
+          ) : (
+            <View style={styles.itemForm}>
+              <Text style={styles.selectedItemName}>{selectedItem.item_name}</Text>
+              
+              <View style={styles.formRow}>
+                <View style={[styles.inputGroup, styles.halfWidth]}>
+                  <Text style={styles.inputLabel}>Quantity</Text>
+                  <TextInput
+                    style={styles.input}
+                    value={itemQuantity}
+                    onChangeText={setItemQuantity}
+                    keyboardType="numeric"
+                    placeholder="1"
+                  />
                 </View>
-              }
-            />
-          </SafeAreaView>
-        </Modal>
-      </Animated.View>
+
+                <View style={[styles.inputGroup, styles.halfWidth]}>
+                  <Text style={styles.inputLabel}>Price (₹)</Text>
+                  <TextInput
+                    style={styles.input}
+                    value={itemPrice}
+                    onChangeText={setItemPrice}
+                    keyboardType="numeric"
+                    placeholder="0.00"
+                  />
+                </View>
+              </View>
+
+              <TouchableOpacity
+                style={styles.changeItemButton}
+                onPress={() => setSelectedItem(null)}
+              >
+                <Text style={styles.changeItemButtonText}>Change Item</Text>
+              </TouchableOpacity>
+            </View>
+          )}
+        </SafeAreaView>
+      </Modal>
     </SafeAreaView>
   );
 };
 
-// Add all the styles here (same as before but I'll include them for completeness)
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: '#f8fafc',
-  },
-  content: {
-    flex: 1,
+    backgroundColor: '#F8FAFC',
   },
   loadingContainer: {
     flex: 1,
@@ -507,396 +576,338 @@ const styles = StyleSheet.create({
     alignItems: 'center',
   },
   loadingText: {
-    fontSize: 16,
-    color: '#64748b',
+    fontSize: 18,
+    color: '#64748B',
   },
   header: {
     flexDirection: 'row',
     justifyContent: 'space-between',
     alignItems: 'center',
     paddingHorizontal: 20,
-    paddingVertical: 16,
-    backgroundColor: '#ffffff',
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.04,
-    shadowRadius: 8,
-    elevation: 2,
+    paddingVertical: 15,
+    backgroundColor: '#FFFFFF',
+    borderBottomWidth: 1,
+    borderBottomColor: '#E2E8F0',
   },
   backButton: {
     fontSize: 16,
-    color: '#3b82f6',
-    fontWeight: '600',
+    color: '#3B82F6',
   },
   headerTitle: {
     fontSize: 18,
     fontWeight: 'bold',
-    color: '#0f172a',
+    color: '#1E293B',
   },
-  generateButton: {
-    backgroundColor: '#3b82f6',
-    paddingHorizontal: 16,
-    paddingVertical: 8,
-    borderRadius: 8,
-  },
-  generateButtonText: {
-    color: '#ffffff',
-    fontSize: 14,
+  saveButton: {
+    fontSize: 16,
+    color: '#3B82F6',
     fontWeight: '600',
   },
-  scrollContent: {
+  saveButtonDisabled: {
+    color: '#9CA3AF',
+  },
+  content: {
     flex: 1,
   },
   section: {
-    marginBottom: 24,
+    backgroundColor: '#FFFFFF',
+    marginHorizontal: 16,
+    marginVertical: 8,
+    borderRadius: 12,
+    padding: 16,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 1 },
+    shadowOpacity: 0.1,
+    shadowRadius: 3,
+    elevation: 2,
   },
   sectionHeader: {
     flexDirection: 'row',
     justifyContent: 'space-between',
     alignItems: 'center',
-    marginBottom: 12,
-    paddingHorizontal: 20,
+    marginBottom: 16,
   },
   sectionTitle: {
-    fontSize: 16,
-    fontWeight: 'bold',
-    color: '#374151',
-    marginBottom: 12,
-    marginHorizontal: 20,
-  },
-  sectionCard: {
-    backgroundColor: '#ffffff',
-    marginHorizontal: 20,
-    borderRadius: 16,
-    padding: 16,
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 1 },
-    shadowOpacity: 0.05,
-    shadowRadius: 8,
-    elevation: 2,
-  },
-  invoiceRow: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-    paddingVertical: 8,
-  },
-  invoiceLabel: {
-    fontSize: 14,
-    color: '#64748b',
-  },
-  invoiceValue: {
-    fontSize: 14,
-    fontWeight: '600',
-    color: '#0f172a',
-  },
-  customerSelector: {
-    marginHorizontal: 20,
-  },
-  selectedCustomer: {
-    backgroundColor: '#ffffff',
-    borderRadius: 16,
-    padding: 16,
-    flexDirection: 'row',
-    alignItems: 'center',
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 1 },
-    shadowOpacity: 0.05,
-    shadowRadius: 8,
-    elevation: 2,
-  },
-  selectCustomerPlaceholder: {
-    backgroundColor: '#ffffff',
-    borderRadius: 16,
-    padding: 16,
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
-    borderWidth: 2,
-    borderColor: '#e2e8f0',
-    borderStyle: 'dashed',
-  },
-  selectCustomerIcon: {
-    fontSize: 24,
-    marginRight: 12,
-  },
-  selectCustomerText: {
-    flex: 1,
-    fontSize: 16,
-    color: '#64748b',
-  },
-  chevron: {
-    fontSize: 24,
-    color: '#cbd5e1',
-  },
-  customerAvatar: {
-    width: 48,
-    height: 48,
-    borderRadius: 24,
-    backgroundColor: '#3b82f6',
-    alignItems: 'center',
-    justifyContent: 'center',
-    marginRight: 12,
-  },
-  customerAvatarText: {
-    color: '#ffffff',
     fontSize: 18,
     fontWeight: 'bold',
+    color: '#1E293B',
+    marginBottom: 16,
   },
-  customerInfo: {
-    flex: 1,
+  row: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+  },
+  inputGroup: {
+    marginBottom: 16,
+  },
+  halfWidth: {
+    width: '48%',
+  },
+  inputLabel: {
+    fontSize: 14,
+    fontWeight: '500',
+    color: '#374151',
+    marginBottom: 8,
+  },
+  input: {
+    backgroundColor: '#F9FAFB',
+    borderWidth: 1,
+    borderColor: '#D1D5DB',
+    borderRadius: 8,
+    paddingHorizontal: 12,
+    paddingVertical: 12,
+    fontSize: 16,
+    color: '#1E293B',
+  },
+  disabledInput: {
+    backgroundColor: '#F3F4F6',
+    color: '#6B7280',
+  },
+  textArea: {
+    height: 80,
+    textAlignVertical: 'top',
+  },
+  selectButton: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    backgroundColor: '#F9FAFB',
+    borderWidth: 1,
+    borderColor: '#D1D5DB',
+    borderRadius: 8,
+    paddingHorizontal: 12,
+    paddingVertical: 16,
+  },
+  selectedText: {
+    fontSize: 16,
+    color: '#1E293B',
+  },
+  placeholderText: {
+    fontSize: 16,
+    color: '#9CA3AF',
+  },
+  selectArrow: {
+    fontSize: 20,
+    color: '#6B7280',
+  },
+  customerDetails: {
+    marginTop: 12,
+    padding: 12,
+    backgroundColor: '#F0F9FF',
+    borderRadius: 8,
   },
   customerName: {
     fontSize: 16,
     fontWeight: '600',
-    color: '#0f172a',
+    color: '#1E293B',
+    marginBottom: 4,
+  },
+  customerInfo: {
+    fontSize: 14,
+    color: '#64748B',
     marginBottom: 2,
   },
-  customerPhone: {
-    fontSize: 14,
-    color: '#64748b',
+  addButton: {
+    backgroundColor: '#3B82F6',
+    paddingHorizontal: 16,
+    paddingVertical: 8,
+    borderRadius: 8,
   },
-  changeText: {
-    fontSize: 14,
-    color: '#3b82f6',
+  addButtonText: {
+    color: '#FFFFFF',
     fontWeight: '600',
+    fontSize: 14,
   },
-  addItemButton: {
-    backgroundColor: '#3b82f6',
-    paddingHorizontal: 12,
-    paddingVertical: 6,
-    borderRadius: 6,
+  itemsList: {
+    marginTop: 8,
   },
-  addItemText: {
-    color: '#ffffff',
-    fontSize: 12,
+  itemCard: {
+    backgroundColor: '#F8FAFC',
+    borderRadius: 8,
+    padding: 12,
+    marginBottom: 8,
+    borderWidth: 1,
+    borderColor: '#E2E8F0',
+  },
+  itemHeader: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    marginBottom: 8,
+  },
+  itemName: {
+    fontSize: 16,
     fontWeight: '600',
+    color: '#1E293B',
+    flex: 1,
+  },
+  removeButton: {
+    width: 24,
+    height: 24,
+    borderRadius: 12,
+    backgroundColor: '#FEE2E2',
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  removeButtonText: {
+    fontSize: 16,
+    color: '#DC2626',
+    fontWeight: 'bold',
+  },
+  itemDetails: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+  },
+  itemDetail: {
+    fontSize: 14,
+    color: '#64748B',
   },
   emptyItems: {
-    backgroundColor: '#ffffff',
-    marginHorizontal: 20,
-    borderRadius: 16,
-    padding: 40,
+    padding: 32,
     alignItems: 'center',
-    borderWidth: 2,
-    borderColor: '#e2e8f0',
-    borderStyle: 'dashed',
-  },
-  emptyItemsIcon: {
-    fontSize: 48,
-    marginBottom: 12,
   },
   emptyItemsText: {
     fontSize: 16,
-    fontWeight: '600',
-    color: '#374151',
-    marginBottom: 4,
+    color: '#9CA3AF',
   },
-  emptyItemsSubtext: {
-    fontSize: 14,
-    color: '#64748b',
-  },
-  invoiceItem: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    paddingVertical: 12,
-    borderBottomWidth: 1,
-    borderBottomColor: '#f1f5f9',
-  },
-  itemInfo: {
-    flex: 1,
-  },
-  itemName: {
-    fontSize: 14,
-    fontWeight: '600',
-    color: '#0f172a',
-    marginBottom: 2,
-  },
-  itemPrice: {
-    fontSize: 12,
-    color: '#64748b',
-  },
-  quantityControls: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    marginHorizontal: 16,
-  },
-  quantityButton: {
-    width: 32,
-    height: 32,
-    borderRadius: 16,
-    backgroundColor: '#f8fafc',
-    alignItems: 'center',
-    justifyContent: 'center',
-    borderWidth: 1,
-    borderColor: '#e2e8f0',
-  },
-  quantityButtonText: {
-    fontSize: 16,
-    fontWeight: 'bold',
-    color: '#3b82f6',
-  },
-  quantityText: {
-    fontSize: 16,
-    fontWeight: '600',
-    color: '#0f172a',
-    marginHorizontal: 16,
-    minWidth: 24,
-    textAlign: 'center',
-  },
-  itemTotal: {
-    fontSize: 14,
-    fontWeight: 'bold',
-    color: '#0f172a',
-    minWidth: 80,
-    textAlign: 'right',
-  },
-  summaryRow: {
+  totalRow: {
     flexDirection: 'row',
     justifyContent: 'space-between',
     alignItems: 'center',
     paddingVertical: 8,
-  },
-  summaryLabel: {
-    fontSize: 14,
-    color: '#64748b',
-  },
-  summaryValue: {
-    fontSize: 14,
-    fontWeight: '600',
-    color: '#0f172a',
-  },
-  totalRow: {
-    borderTopWidth: 1,
-    borderTopColor: '#e2e8f0',
-    marginTop: 8,
-    paddingTop: 16,
+    borderBottomWidth: 1,
+    borderBottomColor: '#F1F5F9',
   },
   totalLabel: {
     fontSize: 16,
-    fontWeight: 'bold',
-    color: '#0f172a',
+    color: '#64748B',
   },
   totalValue: {
+    fontSize: 16,
+    color: '#1E293B',
+    fontWeight: '500',
+  },
+  discountInput: {
+    backgroundColor: '#F9FAFB',
+    borderWidth: 1,
+    borderColor: '#D1D5DB',
+    borderRadius: 6,
+    paddingHorizontal: 8,
+    paddingVertical: 4,
+    fontSize: 16,
+    color: '#1E293B',
+    width: 80,
+    textAlign: 'right',
+  },
+  grandTotalRow: {
+    borderBottomWidth: 0,
+    borderTopWidth: 2,
+    borderTopColor: '#3B82F6',
+    paddingTop: 12,
+    marginTop: 8,
+  },
+  grandTotalLabel: {
     fontSize: 18,
     fontWeight: 'bold',
-    color: '#3b82f6',
+    color: '#1E293B',
+  },
+  grandTotalValue: {
+    fontSize: 18,
+    fontWeight: 'bold',
+    color: '#3B82F6',
   },
   modalContainer: {
     flex: 1,
-    backgroundColor: '#ffffff',
+    backgroundColor: '#F8FAFC',
   },
   modalHeader: {
     flexDirection: 'row',
     justifyContent: 'space-between',
     alignItems: 'center',
     paddingHorizontal: 20,
-    paddingVertical: 16,
+    paddingVertical: 15,
+    backgroundColor: '#FFFFFF',
     borderBottomWidth: 1,
-    borderBottomColor: '#e2e8f0',
+    borderBottomColor: '#E2E8F0',
   },
   modalCloseText: {
     fontSize: 16,
-    color: '#64748b',
+    color: '#64748B',
   },
   modalTitle: {
     fontSize: 18,
     fontWeight: 'bold',
-    color: '#0f172a',
+    color: '#1E293B',
   },
-  modalAddText: {
+  modalSaveText: {
     fontSize: 16,
+    color: '#3B82F6',
     fontWeight: '600',
-    color: '#3b82f6',
   },
   searchContainer: {
     paddingHorizontal: 20,
-    paddingVertical: 16,
+    paddingVertical: 12,
+    backgroundColor: '#FFFFFF',
+    borderBottomWidth: 1,
+    borderBottomColor: '#E2E8F0',
   },
   searchInput: {
-    backgroundColor: '#f8fafc',
+    backgroundColor: '#F9FAFB',
+    borderRadius: 8,
+    paddingHorizontal: 12,
+    paddingVertical: 10,
+    fontSize: 16,
     borderWidth: 1,
-    borderColor: '#e2e8f0',
-    borderRadius: 12,
-    paddingHorizontal: 16,
-    paddingVertical: 12,
-    fontSize: 16,
+    borderColor: '#E5E7EB',
   },
-  modalList: {
-    flex: 1,
-  },
-  customerItem: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    paddingHorizontal: 20,
-    paddingVertical: 16,
+  modalItem: {
+    padding: 16,
     borderBottomWidth: 1,
-    borderBottomColor: '#f1f5f9',
+    borderBottomColor: '#F1F5F9',
+    backgroundColor: '#FFFFFF',
   },
-  selectText: {
-    fontSize: 14,
-    color: '#3b82f6',
-    fontWeight: '600',
-  },
-  productItem: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
-    paddingHorizontal: 20,
-    paddingVertical: 16,
-    borderBottomWidth: 1,
-    borderBottomColor: '#f1f5f9',
-  },
-  productInfo: {
-    flex: 1,
-  },
-  productName: {
+  modalItemName: {
     fontSize: 16,
     fontWeight: '600',
-    color: '#0f172a',
+    color: '#1E293B',
     marginBottom: 4,
   },
-  productPrice: {
+  modalItemDetail: {
     fontSize: 14,
-    color: '#3b82f6',
-    fontWeight: '600',
-    marginBottom: 2,
+    color: '#64748B',
   },
-  productStock: {
-    fontSize: 12,
-    color: '#64748b',
-  },
-  addButton: {
-    backgroundColor: '#3b82f6',
-    paddingHorizontal: 16,
-    paddingVertical: 8,
-    borderRadius: 8,
-  },
-  addButtonText: {
-    color: '#ffffff',
-    fontSize: 14,
-    fontWeight: '600',
-  },
-  emptyModalContainer: {
-    flex: 1,
+  emptyList: {
+    padding: 32,
     alignItems: 'center',
-    justifyContent: 'center',
-    paddingVertical: 60,
   },
-  emptyModalText: {
+  emptyListText: {
     fontSize: 16,
-    color: '#64748b',
+    color: '#9CA3AF',
+  },
+  itemForm: {
+    padding: 20,
+  },
+  selectedItemName: {
+    fontSize: 20,
+    fontWeight: 'bold',
+    color: '#1E293B',
+    marginBottom: 20,
+    textAlign: 'center',
+  },
+  formRow: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
     marginBottom: 20,
   },
-  emptyModalButton: {
-    backgroundColor: '#3b82f6',
-    paddingHorizontal: 24,
+  changeItemButton: {
+    backgroundColor: '#F3F4F6',
     paddingVertical: 12,
+    paddingHorizontal: 24,
     borderRadius: 8,
+    alignItems: 'center',
   },
-  emptyModalButtonText: {
-    color: '#ffffff',
-    fontSize: 14,
+  changeItemButtonText: {
+    color: '#374151',
     fontWeight: '600',
   },
 });
