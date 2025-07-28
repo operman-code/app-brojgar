@@ -2,194 +2,320 @@
 import DatabaseService from '../../../database/DatabaseService';
 
 class NotificationService {
-  static async getAllNotifications(limit = 50) {
+  // Initialize the notification service
+  static async init() {
     try {
-      await DatabaseService.init();
-      
+      // Service is ready, database is already initialized
+      console.log('✅ Notification service initialized');
+      return true;
+    } catch (error) {
+      console.error('❌ Error initializing notification service:', error);
+      throw error;
+    }
+  }
+
+  // Get all notifications
+  static async getAllNotifications() {
+    try {
       const query = `
         SELECT * FROM notifications 
-        WHERE (deleted_at IS NULL OR deleted_at = '') 
-        ORDER BY created_at DESC 
-        LIMIT ?
+        WHERE deleted_at IS NULL 
+        ORDER BY created_at DESC
       `;
       
-      const result = await DatabaseService.executeQuery(query, [limit]);
-      return result.rows._array.map(this.formatNotification);
+      const result = await DatabaseService.executeQuery(query);
+      return result || [];
     } catch (error) {
-      console.error('Error fetching notifications:', error);
+      console.error('❌ Error fetching notifications:', error);
       return [];
     }
   }
 
-  static async checkLowStockAlerts() {
+  // Get notifications by type
+  static async getNotificationsByType(type) {
     try {
-      await DatabaseService.init();
-      
       const query = `
-        SELECT * FROM inventory_items 
-        WHERE current_stock <= min_stock 
-        AND current_stock > 0
-        AND (deleted_at IS NULL OR deleted_at = '')
-        AND id NOT IN (
-          SELECT COALESCE(CAST(action_url AS INTEGER), 0) FROM notifications 
-          WHERE type = 'stock_alert' 
-          AND created_at > date('now', '-1 day')
-          AND (deleted_at IS NULL OR deleted_at = '')
-        )
+        SELECT * FROM notifications 
+        WHERE deleted_at IS NULL 
+          AND type = ?
+        ORDER BY created_at DESC
+      `;
+      
+      const result = await DatabaseService.executeQuery(query, [type]);
+      return result || [];
+    } catch (error) {
+      console.error('❌ Error fetching notifications by type:', error);
+      return [];
+    }
+  }
+
+  // Get unread notifications
+  static async getUnreadNotifications() {
+    try {
+      const query = `
+        SELECT * FROM notifications 
+        WHERE deleted_at IS NULL 
+          AND read_at IS NULL
+        ORDER BY created_at DESC
       `;
       
       const result = await DatabaseService.executeQuery(query);
-      
-      for (const item of result.rows._array) {
-        await this.createLowStockAlert(item);
-      }
+      return result || [];
     } catch (error) {
-      console.error('Error checking low stock alerts:', error);
+      console.error('❌ Error fetching unread notifications:', error);
+      return [];
+    }
+  }
+
+  // Get unread count
+  static async getUnreadCount() {
+    try {
+      const query = `
+        SELECT COUNT(*) as count 
+        FROM notifications 
+        WHERE deleted_at IS NULL 
+          AND read_at IS NULL
+      `;
+      
+      const result = await DatabaseService.executeQuery(query);
+      return result[0]?.count || 0;
+    } catch (error) {
+      console.error('❌ Error getting unread count:', error);
+      return 0;
+    }
+  }
+
+  // Mark notification as read
+  static async markAsRead(notificationId) {
+    try {
+      const query = `
+        UPDATE notifications 
+        SET read_at = CURRENT_TIMESTAMP 
+        WHERE id = ? AND deleted_at IS NULL
+      `;
+      
+      await DatabaseService.executeQuery(query, [notificationId]);
+      console.log('✅ Notification marked as read');
+      return true;
+    } catch (error) {
+      console.error('❌ Error marking notification as read:', error);
+      return false;
+    }
+  }
+
+  // Mark all notifications as read
+  static async markAllAsRead() {
+    try {
+      const query = `
+        UPDATE notifications 
+        SET read_at = CURRENT_TIMESTAMP 
+        WHERE deleted_at IS NULL 
+          AND read_at IS NULL
+      `;
+      
+      await DatabaseService.executeQuery(query);
+      console.log('✅ All notifications marked as read');
+      return true;
+    } catch (error) {
+      console.error('❌ Error marking all notifications as read:', error);
+      return false;
+    }
+  }
+
+  // Delete notification
+  static async deleteNotification(notificationId) {
+    try {
+      const query = `
+        UPDATE notifications 
+        SET deleted_at = CURRENT_TIMESTAMP 
+        WHERE id = ?
+      `;
+      
+      await DatabaseService.executeQuery(query, [notificationId]);
+      console.log('✅ Notification deleted');
+      return true;
+    } catch (error) {
+      console.error('❌ Error deleting notification:', error);
+      return false;
+    }
+  }
+
+  // Clear all notifications
+  static async clearAllNotifications() {
+    try {
+      const query = `
+        UPDATE notifications 
+        SET deleted_at = CURRENT_TIMESTAMP 
+        WHERE deleted_at IS NULL
+      `;
+      
+      await DatabaseService.executeQuery(query);
+      console.log('✅ All notifications cleared');
+      return true;
+    } catch (error) {
+      console.error('❌ Error clearing notifications:', error);
+      return false;
+    }
+  }
+
+  // Create new notification
+  static async createNotification(notificationData) {
+    try {
+      const query = `
+        INSERT INTO notifications (title, message, type, action_url, related_id, related_type) 
+        VALUES (?, ?, ?, ?, ?, ?)
+      `;
+      
+      const params = [
+        notificationData.title,
+        notificationData.message || '',
+        notificationData.type || 'info',
+        notificationData.action_url || null,
+        notificationData.related_id || null,
+        notificationData.related_type || null
+      ];
+      
+      await DatabaseService.executeQuery(query, params);
+      console.log('✅ Notification created');
+      return true;
+    } catch (error) {
+      console.error('❌ Error creating notification:', error);
+      return false;
+    }
+  }
+
+  // Create specific notification types
+  static async createPaymentReminderNotification(invoiceId, customerName, amount) {
+    return this.createNotification({
+      title: 'Payment Reminder',
+      message: `Payment due from ${customerName} - ₹${amount}`,
+      type: 'payment_reminder',
+      related_id: invoiceId,
+      related_type: 'invoice'
+    });
+  }
+
+  static async createLowStockAlert(itemId, itemName, currentStock) {
+    return this.createNotification({
+      title: 'Low Stock Alert',
+      message: `${itemName} is running low (${currentStock} remaining)`,
+      type: 'low_stock',
+      related_id: itemId,
+      related_type: 'inventory_item'
+    });
+  }
+
+  static async createGSTFilingReminder() {
+    return this.createNotification({
+      title: 'GST Filing Due',
+      message: 'Monthly GST return filing is due soon',
+      type: 'gst_filing'
+    });
+  }
+
+  static async createBackupReminder() {
+    return this.createNotification({
+      title: 'Backup Reminder',
+      message: 'Time to backup your business data',
+      type: 'backup_reminder'
+    });
+  }
+
+  // Check and create automatic notifications
+  static async checkAndCreateAutomaticNotifications() {
+    try {
+      await Promise.all([
+        this.checkPaymentDueReminders(),
+        this.checkLowStockAlerts(),
+        this.checkGSTFilingReminders(),
+        this.checkBackupReminders()
+      ]);
+    } catch (error) {
+      console.error('❌ Error checking automatic notifications:', error);
     }
   }
 
   static async checkPaymentDueReminders() {
     try {
-      await DatabaseService.init();
-      
+      // Check for overdue invoices
       const query = `
         SELECT i.*, p.name as customer_name
         FROM invoices i
         LEFT JOIN parties p ON i.party_id = p.id
-        WHERE i.status = 'pending' 
-        AND date(i.due_date) <= date('now', '+7 days')
-        AND (i.deleted_at IS NULL OR i.deleted_at = '')
-        AND i.id NOT IN (
-          SELECT COALESCE(CAST(action_url AS INTEGER), 0) FROM notifications 
-          WHERE type = 'payment_reminder' 
-          AND created_at > date('now', '-1 day')
-          AND (deleted_at IS NULL OR deleted_at = '')
-        )
+        WHERE i.deleted_at IS NULL 
+          AND i.due_date < date('now')
+          AND i.total > COALESCE(i.paid_amount, 0)
       `;
       
-      const result = await DatabaseService.executeQuery(query);
+      const overdueInvoices = await DatabaseService.executeQuery(query);
       
-      for (const invoice of result.rows._array) {
-        await this.createPaymentReminderNotification(invoice);
+      for (const invoice of overdueInvoices) {
+        await this.createPaymentReminderNotification(
+          invoice.id,
+          invoice.customer_name || 'Customer',
+          invoice.total - (invoice.paid_amount || 0)
+        );
       }
     } catch (error) {
       console.error('Error checking payment due reminders:', error);
     }
   }
 
-  static async createNotification(notificationData) {
+  static async checkLowStockAlerts() {
     try {
-      await DatabaseService.init();
-      
-      const {
-        title,
-        message,
-        type = 'info',
-        priority = 'medium',
-        actionUrl = null
-      } = notificationData;
-      
       const query = `
-        INSERT INTO notifications (
-          title, message, type, priority, action_url, created_at, updated_at
-        ) VALUES (?, ?, ?, ?, ?, datetime('now'), datetime('now'))
+        SELECT * FROM inventory_items 
+        WHERE deleted_at IS NULL 
+          AND stock_quantity <= min_stock_level
       `;
       
-      const result = await DatabaseService.executeQuery(query, [
-        title, message, type, priority, actionUrl
-      ]);
+      const lowStockItems = await DatabaseService.executeQuery(query);
       
-      return result.insertId;
+      for (const item of lowStockItems) {
+        await this.createLowStockAlert(
+          item.id,
+          item.item_name,
+          item.stock_quantity
+        );
+      }
     } catch (error) {
-      console.error('Error creating notification:', error);
-      return null;
+      console.error('Error checking low stock alerts:', error);
     }
   }
 
-  static async createLowStockAlert(itemData) {
-    return await this.createNotification({
-      title: `Low Stock Alert - ${itemData.name}`,
-      message: `Only ${itemData.current_stock} units left. Minimum required: ${itemData.min_stock}`,
-      type: 'stock_alert',
-      priority: 'high',
-      actionUrl: itemData.id.toString()
-    });
-  }
-
-  static async createPaymentReminderNotification(invoiceData) {
-    const daysOverdue = this.calculateDaysOverdue(invoiceData.due_date);
-    
-    return await this.createNotification({
-      title: `Payment Overdue - ${invoiceData.customer_name}`,
-      message: `Invoice ${invoiceData.invoice_number} is ${daysOverdue} days overdue. Amount: ₹${invoiceData.total}`,
-      type: 'payment_reminder',
-      priority: daysOverdue > 30 ? 'high' : 'medium',
-      actionUrl: invoiceData.id.toString()
-    });
-  }
-
-  static async checkAndCreateAutomaticNotifications() {
+  static async checkGSTFilingReminders() {
     try {
-      await Promise.all([
-        this.checkPaymentDueReminders(),
-        this.checkLowStockAlerts()
-      ]);
+      const today = new Date();
+      const isFilingTime = today.getDate() >= 18 && today.getDate() <= 20;
+      
+      if (isFilingTime) {
+        await this.createGSTFilingReminder();
+      }
     } catch (error) {
-      console.error('Error checking automatic notifications:', error);
+      console.error('Error checking GST filing reminders:', error);
     }
   }
 
-  static formatNotification(notification) {
-    return {
-      ...notification,
-      timeAgo: this.getTimeAgo(notification.created_at),
-      isRead: !!notification.read_at,
-      icon: this.getNotificationIcon(notification.type),
-      color: this.getNotificationColor(notification.type)
-    };
-  }
-
-  static getNotificationIcon(type) {
-    const icons = {
-      'payment_reminder': '💰',
-      'stock_alert': '📦',
-      'info': 'ℹ️',
-      'warning': '⚠️',
-      'success': '✅',
-      'error': '❌'
-    };
-    return icons[type] || 'ℹ️';
-  }
-
-  static getNotificationColor(type) {
-    const colors = {
-      'payment_reminder': '#f59e0b',
-      'stock_alert': '#ef4444',
-      'info': '#3b82f6',
-      'warning': '#f59e0b',
-      'success': '#10b981',
-      'error': '#ef4444'
-    };
-    return colors[type] || '#3b82f6';
-  }
-
-  static getTimeAgo(timestamp) {
-    const now = new Date();
-    const time = new Date(timestamp);
-    const diffInSeconds = Math.floor((now - time) / 1000);
-    
-    if (diffInSeconds < 60) return 'Just now';
-    if (diffInSeconds < 3600) return `${Math.floor(diffInSeconds / 60)}m ago`;
-    if (diffInSeconds < 86400) return `${Math.floor(diffInSeconds / 3600)}h ago`;
-    if (diffInSeconds < 2592000) return `${Math.floor(diffInSeconds / 86400)}d ago`;
-    return time.toLocaleDateString();
-  }
-
-  static calculateDaysOverdue(dueDate) {
-    const now = new Date();
-    const due = new Date(dueDate);
-    const diffTime = now - due;
-    return Math.ceil(diffTime / (1000 * 60 * 60 * 24));
+  static async checkBackupReminders() {
+    try {
+      // Check if backup is due (every 7 days)
+      const lastBackup = await DatabaseService.executeQuery(
+        'SELECT MAX(created_at) as last_backup FROM backups WHERE deleted_at IS NULL'
+      );
+      
+      if (!lastBackup[0]?.last_backup) {
+        await this.createBackupReminder();
+      } else {
+        const lastBackupDate = new Date(lastBackup[0].last_backup);
+        const daysSinceBackup = (new Date() - lastBackupDate) / (1000 * 60 * 60 * 24);
+        
+        if (daysSinceBackup >= 7) {
+          await this.createBackupReminder();
+        }
+      }
+    } catch (error) {
+      console.error('Error checking backup reminders:', error);
+    }
   }
 }
 
