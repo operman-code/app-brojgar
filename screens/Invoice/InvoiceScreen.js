@@ -151,63 +151,76 @@ const InvoiceScreen = ({ navigation, route }) => {
   };
 
   const handleSaveInvoice = async () => {
-    if (!invoiceData.partyId) {
-      Alert.alert("Error", "Please select a customer");
-      return;
-    }
+  if (!invoiceData.partyId) {
+    Alert.alert("Error", "Please select a customer");
+    return;
+  }
 
-    if (invoiceData.items.length === 0) {
-      Alert.alert("Error", "Please add at least one item");
-      return;
-    }
+  if (invoiceData.items.length === 0) {
+    Alert.alert("Error", "Please add at least one item");
+    return;
+  }
 
-    try {
-      setSaving(true);
-      
-      const invoicePayload = {
-        invoice_number: invoiceData.invoiceNumber,
-        party_id: invoiceData.partyId,
-        date: invoiceData.date,
-        due_date: invoiceData.dueDate || null,
-        subtotal: invoiceData.subtotal,
-        tax_amount: invoiceData.taxAmount,
-        discount_amount: invoiceData.discountAmount,
-        total: invoiceData.total,
-        notes: invoiceData.notes,
-        terms: invoiceData.terms,
-        items: invoiceData.items.map(item => ({
-          item_id: item.itemId,
-          item_name: item.itemName,
-          quantity: item.quantity,
-          rate: item.rate,
-          tax_rate: item.taxRate,
-          tax_amount: item.taxAmount,
-          total: item.total
-        }))
-      };
+  try {
+    setSaving(true);
+    
+    const invoicePayload = {
+      invoice_number: invoiceData.invoiceNumber,
+      party_id: invoiceData.partyId,
+      date: invoiceData.date,
+      due_date: invoiceData.dueDate || null,
+      subtotal: invoiceData.subtotal,
+      tax_amount: invoiceData.taxAmount,
+      discount_amount: invoiceData.discountAmount,
+      total: invoiceData.total,
+      notes: invoiceData.notes,
+      terms: invoiceData.terms,
+      items: invoiceData.items.map(item => ({
+        item_id: item.itemId,
+        item_name: item.itemName,
+        quantity: item.quantity,
+        rate: item.rate,
+        tax_rate: item.taxRate,
+        tax_amount: item.taxAmount,
+        total: item.total
+      }))
+    };
 
-      await InvoiceService.createInvoice(invoicePayload);
-      
+    const result = await InvoiceService.createInvoiceWithTemplate(invoicePayload);
+    
+    if (result.success) {
       Alert.alert(
         "Success", 
         "Invoice created successfully!",
         [
           {
-            text: "OK",
+            text: "Select Template",
             onPress: () => {
-              // Reset form
+              navigation.navigate('InvoiceTemplate', {
+                invoiceData: {
+                  invoiceId: result.invoiceId,
+                  invoiceNumber: result.invoiceNumber
+                }
+              });
+            }
+          },
+          {
+            text: "Create Another",
+            style: "cancel",
+            onPress: () => {
               loadInvoiceData();
             }
           }
         ]
       );
-    } catch (error) {
-      console.error('❌ Error saving invoice:', error);
-      Alert.alert("Error", "Failed to save invoice");
-    } finally {
-      setSaving(false);
     }
-  };
+  } catch (error) {
+    console.error('❌ Error saving invoice:', error);
+    Alert.alert("Error", "Failed to save invoice");
+  } finally {
+    setSaving(false);
+  }
+};
 
   const getFilteredParties = () => {
     if (!searchPartyQuery.trim()) return parties;
