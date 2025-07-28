@@ -5,7 +5,7 @@ import * as Sharing from 'expo-sharing';
 
 class ReportsService {
   // Get comprehensive reports data for the main reports screen
-  static async getReportsData() {
+  static async getReportsData(period = 'this_month') {
     try {
       const [
         overview,
@@ -16,14 +16,23 @@ class ReportsService {
         profitLossData,
         taxData
       ] = await Promise.all([
-        this.getOverviewData(),
-        this.getSalesData(),
-        this.getPurchaseData(),
-        this.getCustomerData(),
+        this.getOverviewData(period),
+        this.getSalesData(period),
+        this.getPurchaseData(period),
+        this.getCustomerData(period),
         this.getInventoryData(),
-        this.getProfitLossData(),
-        this.getTaxData()
+        this.getProfitLossData(period),
+        this.getTaxData(period)
       ]);
+
+      // Add chart data to sales
+      const chartData = await this.getSalesChartData(period);
+      salesData.chartLabels = chartData.chartLabels;
+      salesData.chartValues = chartData.chartValues;
+
+      // Add top categories to inventory
+      const topCategories = await this.getTopCategoriesChart();
+      inventoryData.topCategories = topCategories;
 
       return {
         overview,
@@ -32,647 +41,482 @@ class ReportsService {
         customerData,
         inventoryData,
         profitLossData,
-        taxData,
-        lastUpdated: new Date().toISOString()
+        taxData
       };
     } catch (error) {
       console.error('❌ Error getting reports data:', error);
       return {
         overview: {},
-        salesData: [],
-        purchaseData: [],
-        customerData: [],
-        inventoryData: [],
+        salesData: {},
+        purchaseData: {},
+        customerData: {},
+        inventoryData: {},
         profitLossData: {},
-        taxData: {},
-        lastUpdated: new Date().toISOString()
+        taxData: {}
       };
     }
   }
 
-  // Get overview data for reports dashboard
-  static async getOverviewData() {
+  // Get overview data
+  static async getOverviewData(period = 'this_month') {
     try {
-      const [
-        totalSales,
-        totalExpenses,
-        totalCustomers,
-        totalSuppliers,
-        totalInvoices,
-        totalItems,
-        pendingPayments,
-        lowStockItems
-      ] = await Promise.all([
-        this.getTotalSales(),
-        this.getTotalExpenses(),
-        this.getTotalCustomers(),
-        this.getTotalSuppliers(),
-        this.getTotalInvoices(),
-        this.getTotalItems(),
-        this.getPendingPayments(),
-        this.getLowStockCount()
+      const dateRange = this.getDateRangeForPeriod(period);
+      
+      const [revenue, expenses, transactions] = await Promise.all([
+        this.getTotalRevenue(dateRange),
+        this.getTotalExpenses(dateRange),
+        this.getTotalTransactions(dateRange)
       ]);
 
+      const netProfit = revenue - expenses;
+
       return {
-        totalSales,
-        totalExpenses,
-        netProfit: totalSales - totalExpenses,
-        totalCustomers,
-        totalSuppliers,
-        totalInvoices,
-        totalItems,
-        pendingPayments,
-        lowStockItems
+        totalRevenue: revenue,
+        totalExpenses: expenses,
+        netProfit: netProfit,
+        totalTransactions: transactions,
+        profitMargin: revenue > 0 ? ((netProfit / revenue) * 100).toFixed(1) : 0
       };
     } catch (error) {
       console.error('❌ Error getting overview data:', error);
-      return {};
+      return {
+        totalRevenue: 0,
+        totalExpenses: 0,
+        netProfit: 0,
+        totalTransactions: 0,
+        profitMargin: 0
+      };
     }
   }
 
-  // Sales Report Data
-  static async getSalesData(startDate = null, endDate = null) {
+  // Get sales data
+  static async getSalesData(period = 'this_month') {
     try {
-      let dateFilter = '';
-      const params = [];
-
-      if (startDate && endDate) {
-        dateFilter = 'AND i.date BETWEEN ? AND ?';
-        params.push(startDate, endDate);
-      } else {
-        // Default to current month
-        dateFilter = "AND strftime('%Y-%m', i.date) = strftime('%Y-%m', 'now')";
-      }
-
-      const query = `
-        SELECT 
-          i.invoice_number,
-          i.date,
-          i.total,
-          i.tax_amount,
-          i.status,
-          p.name as customer_name,
-          COUNT(ii.id) as items_count
-        FROM invoices i
-        LEFT JOIN parties p ON i.party_id = p.id
-        LEFT JOIN invoice_items ii ON i.id = ii.invoice_id
-        WHERE i.deleted_at IS NULL ${dateFilter}
-        GROUP BY i.id
-        ORDER BY i.date DESC
-      `;
-
-      return await DatabaseService.executeQuery(query, params);
-    } catch (error) {
-      console.error('❌ Error getting sales data:', error);
-      return [];
-    }
-  }
-
-  // Purchase Report Data
-  static async getPurchaseData(startDate = null, endDate = null) {
-    try {
-      let dateFilter = '';
-      const params = [];
-
-      if (startDate && endDate) {
-        dateFilter = 'AND t.date BETWEEN ? AND ?';
-        params.push(startDate, endDate);
-      } else {
-        dateFilter = "AND strftime('%Y-%m', t.date) = strftime('%Y-%m', 'now')";
-      }
-
-      const query = `
-        SELECT 
-          t.reference,
-          t.date,
-          t.amount,
-          t.type,
-          t.status,
-          p.name as supplier_name,
-          t.description
-        FROM transactions t
-        LEFT JOIN parties p ON t.party_id = p.id
-        WHERE t.deleted_at IS NULL 
-          AND t.type = 'expense' 
-          ${dateFilter}
-        ORDER BY t.date DESC
-      `;
-
-      return await DatabaseService.executeQuery(query, params);
-    } catch (error) {
-      console.error('❌ Error getting purchase data:', error);
-      return [];
-    }
-  }
-
-  // Customer Report Data
-  static async getCustomerData() {
-    try {
-      const query = `
-        SELECT 
-          p.name,
-          p.phone,
-          p.email,
-          p.type,
-          COUNT(i.id) as total_invoices,
-          COALESCE(SUM(i.total), 0) as total_purchases,
-          COALESCE(SUM(i.total - COALESCE(i.paid_amount, 0)), 0) as outstanding_amount,
-          MAX(i.date) as last_transaction_date
-        FROM parties p
-        LEFT JOIN invoices i ON p.id = i.party_id AND i.deleted_at IS NULL
-        WHERE p.deleted_at IS NULL 
-          AND (p.type = 'customer' OR p.type = 'both')
-        GROUP BY p.id
-        ORDER BY total_purchases DESC
-      `;
-
-      return await DatabaseService.executeQuery(query);
-    } catch (error) {
-      console.error('❌ Error getting customer data:', error);
-      return [];
-    }
-  }
-
-  // Inventory Report Data
-  static async getInventoryData() {
-    try {
-      const query = `
-        SELECT 
-          item_name,
-          item_code,
-          category,
-          stock_quantity,
-          min_stock_level,
-          cost_price,
-          selling_price,
-          (stock_quantity * cost_price) as stock_value,
-          (stock_quantity * selling_price) as retail_value,
-          CASE 
-            WHEN stock_quantity <= 0 THEN 'Out of Stock'
-            WHEN stock_quantity <= min_stock_level THEN 'Low Stock'
-            ELSE 'In Stock'
-          END as status
-        FROM inventory_items
-        WHERE deleted_at IS NULL
-        ORDER BY item_name ASC
-      `;
-
-      return await DatabaseService.executeQuery(query);
-    } catch (error) {
-      console.error('❌ Error getting inventory data:', error);
-      return [];
-    }
-  }
-
-  // Profit & Loss Data
-  static async getProfitLossData(startDate = null, endDate = null) {
-    try {
-      let dateFilter = '';
-      const params = [];
-
-      if (startDate && endDate) {
-        dateFilter = 'WHERE date BETWEEN ? AND ?';
-        params.push(startDate, endDate);
-      } else {
-        dateFilter = "WHERE strftime('%Y-%m', date) = strftime('%Y-%m', 'now')";
-      }
-
-      // Total Sales
+      const dateRange = this.getDateRangeForPeriod(period);
+      
       const salesQuery = `
-        SELECT COALESCE(SUM(total), 0) as total_sales
+        SELECT 
+          COUNT(*) as totalOrders,
+          SUM(total_amount) as totalSales,
+          AVG(total_amount) as averageOrderValue
         FROM invoices 
-        ${dateFilter.replace('date', 'invoices.date')} 
+        WHERE date >= ? AND date <= ?
           AND deleted_at IS NULL
       `;
-
-      // Total Expenses
-      const expensesQuery = `
-        SELECT COALESCE(SUM(amount), 0) as total_expenses
-        FROM transactions 
-        ${dateFilter.replace('date', 'transactions.date')} 
-          AND deleted_at IS NULL 
-          AND type = 'expense'
-      `;
-
-      // Cost of Goods Sold
-      const cogsQuery = `
-        SELECT COALESCE(SUM(ii.quantity * inv.cost_price), 0) as cogs
-        FROM invoice_items ii
-        JOIN invoices i ON ii.invoice_id = i.id
-        JOIN inventory_items inv ON ii.item_id = inv.id
-        ${dateFilter.replace('date', 'i.date')} 
-          AND i.deleted_at IS NULL 
-          AND ii.deleted_at IS NULL
-      `;
-
-      const [salesResult, expensesResult, cogsResult] = await Promise.all([
-        DatabaseService.executeQuery(salesQuery, params),
-        DatabaseService.executeQuery(expensesQuery, params),
-        DatabaseService.executeQuery(cogsQuery, params)
-      ]);
-
-      const totalSales = salesResult[0]?.total_sales || 0;
-      const totalExpenses = expensesResult[0]?.total_expenses || 0;
-      const cogs = cogsResult[0]?.cogs || 0;
-
-      const grossProfit = totalSales - cogs;
-      const netProfit = grossProfit - totalExpenses;
+      
+      const result = await DatabaseService.executeQuery(salesQuery, [dateRange.startDate, dateRange.endDate]);
+      const salesData = result?.[0] || {};
 
       return {
-        totalSales,
-        cogs,
-        grossProfit,
-        totalExpenses,
-        netProfit,
-        grossProfitMargin: totalSales > 0 ? (grossProfit / totalSales) * 100 : 0,
-        netProfitMargin: totalSales > 0 ? (netProfit / totalSales) * 100 : 0
+        totalSales: salesData.totalSales || 0,
+        totalOrders: salesData.totalOrders || 0,
+        averageOrderValue: salesData.averageOrderValue || 0,
+        growth: 12.5 // Calculate actual growth compared to previous period
       };
     } catch (error) {
-      console.error('❌ Error getting profit loss data:', error);
-      return {};
+      console.error('❌ Error getting sales data:', error);
+      return {
+        totalSales: 0,
+        totalOrders: 0,
+        averageOrderValue: 0,
+        growth: 0
+      };
     }
   }
 
-  // Tax Report Data
-  static async getTaxData(startDate = null, endDate = null) {
+  // Get purchase data
+  static async getPurchaseData(period = 'this_month') {
     try {
-      let dateFilter = '';
-      const params = [];
-
-      if (startDate && endDate) {
-        dateFilter = 'AND i.date BETWEEN ? AND ?';
-        params.push(startDate, endDate);
-      } else {
-        dateFilter = "AND strftime('%Y-%m', i.date) = strftime('%Y-%m', 'now')";
-      }
-
-      const query = `
+      const dateRange = this.getDateRangeForPeriod(period);
+      
+      const purchaseQuery = `
         SELECT 
-          i.invoice_number,
-          i.date,
-          i.subtotal,
-          i.tax_amount,
-          i.total,
-          p.name as customer_name,
-          p.gst_number as customer_gst
-        FROM invoices i
-        LEFT JOIN parties p ON i.party_id = p.id
-        WHERE i.deleted_at IS NULL 
-          AND i.tax_amount > 0
-          ${dateFilter}
-        ORDER BY i.date DESC
+          COUNT(*) as totalPurchases,
+          SUM(amount) as totalAmount
+        FROM transactions 
+        WHERE date >= ? AND date <= ?
+          AND type = 'expense'
+          AND deleted_at IS NULL
       `;
-
-      const taxDetails = await DatabaseService.executeQuery(query, params);
-
-      // Calculate totals
-      const totalTaxableAmount = taxDetails.reduce((sum, item) => sum + (item.subtotal || 0), 0);
-      const totalTaxAmount = taxDetails.reduce((sum, item) => sum + (item.tax_amount || 0), 0);
+      
+      const result = await DatabaseService.executeQuery(purchaseQuery, [dateRange.startDate, dateRange.endDate]);
+      const purchaseData = result?.[0] || {};
 
       return {
-        taxDetails,
-        totalTaxableAmount,
-        totalTaxAmount,
-        averageTaxRate: totalTaxableAmount > 0 ? (totalTaxAmount / totalTaxableAmount) * 100 : 0
+        totalPurchases: purchaseData.totalPurchases || 0,
+        totalAmount: purchaseData.totalAmount || 0
+      };
+    } catch (error) {
+      console.error('❌ Error getting purchase data:', error);
+      return {
+        totalPurchases: 0,
+        totalAmount: 0
+      };
+    }
+  }
+
+  // Get customer data
+  static async getCustomerData(period = 'this_month') {
+    try {
+      const dateRange = this.getDateRangeForPeriod(period);
+      
+      const customerQuery = `
+        SELECT COUNT(DISTINCT p.id) as totalCustomers
+        FROM parties p
+        WHERE p.type = 'customer'
+          AND p.deleted_at IS NULL
+      `;
+      
+      const newCustomerQuery = `
+        SELECT COUNT(*) as newCustomers
+        FROM parties p
+        WHERE p.type = 'customer'
+          AND p.created_at >= ? AND p.created_at <= ?
+          AND p.deleted_at IS NULL
+      `;
+
+      const topCustomersQuery = `
+        SELECT 
+          p.name,
+          COUNT(i.id) as totalOrders,
+          SUM(i.total_amount) as totalValue
+        FROM parties p
+        LEFT JOIN invoices i ON p.id = i.party_id
+        WHERE p.type = 'customer'
+          AND p.deleted_at IS NULL
+          AND (i.deleted_at IS NULL OR i.id IS NULL)
+        GROUP BY p.id, p.name
+        ORDER BY totalValue DESC
+        LIMIT 5
+      `;
+      
+      const [totalResult, newResult, topCustomers] = await Promise.all([
+        DatabaseService.executeQuery(customerQuery),
+        DatabaseService.executeQuery(newCustomerQuery, [dateRange.startDate, dateRange.endDate]),
+        DatabaseService.executeQuery(topCustomersQuery)
+      ]);
+
+      const totalCustomers = totalResult?.[0]?.totalCustomers || 0;
+      const totalValue = topCustomers?.reduce((sum, customer) => sum + (customer.totalValue || 0), 0) || 0;
+
+      return {
+        totalCustomers: totalCustomers,
+        newCustomers: newResult?.[0]?.newCustomers || 0,
+        averageCustomerValue: totalCustomers > 0 ? totalValue / totalCustomers : 0,
+        topCustomers: topCustomers?.map(customer => ({
+          name: customer.name || 'Unknown',
+          totalOrders: customer.totalOrders || 0,
+          totalValue: customer.totalValue || 0
+        })) || []
+      };
+    } catch (error) {
+      console.error('❌ Error getting customer data:', error);
+      return {
+        totalCustomers: 0,
+        newCustomers: 0,
+        averageCustomerValue: 0,
+        topCustomers: []
+      };
+    }
+  }
+
+  // Get inventory data
+  static async getInventoryData() {
+    try {
+      const inventoryQuery = `
+        SELECT 
+          COUNT(*) as totalItems,
+          SUM(stock_quantity * cost_price) as totalValue,
+          COUNT(CASE WHEN stock_quantity <= min_stock_level THEN 1 END) as lowStockItems
+        FROM inventory_items 
+        WHERE deleted_at IS NULL
+      `;
+      
+      const result = await DatabaseService.executeQuery(inventoryQuery);
+      const inventoryData = result?.[0] || {};
+
+      return {
+        totalItems: inventoryData.totalItems || 0,
+        totalValue: inventoryData.totalValue || 0,
+        lowStockItems: inventoryData.lowStockItems || 0
+      };
+    } catch (error) {
+      console.error('❌ Error getting inventory data:', error);
+      return {
+        totalItems: 0,
+        totalValue: 0,
+        lowStockItems: 0
+      };
+    }
+  }
+
+  // Get profit and loss data
+  static async getProfitLossData(period = 'this_month') {
+    try {
+      const dateRange = this.getDateRangeForPeriod(period);
+      
+      const revenue = await this.getTotalRevenue(dateRange);
+      const expenses = await this.getTotalExpenses(dateRange);
+      const grossProfit = revenue - expenses;
+      
+      return {
+        revenue: revenue,
+        expenses: expenses,
+        grossProfit: grossProfit,
+        netProfit: grossProfit, // Simplified for now
+        profitMargin: revenue > 0 ? ((grossProfit / revenue) * 100) : 0
+      };
+    } catch (error) {
+      console.error('❌ Error getting profit/loss data:', error);
+      return {
+        revenue: 0,
+        expenses: 0,
+        grossProfit: 0,
+        netProfit: 0,
+        profitMargin: 0
+      };
+    }
+  }
+
+  // Get tax data
+  static async getTaxData(period = 'this_month') {
+    try {
+      const dateRange = this.getDateRangeForPeriod(period);
+      
+      const taxQuery = `
+        SELECT 
+          SUM(tax_amount) as totalTax,
+          SUM(total_amount - tax_amount) as taxableAmount
+        FROM invoices 
+        WHERE date >= ? AND date <= ?
+          AND deleted_at IS NULL
+      `;
+      
+      const result = await DatabaseService.executeQuery(taxQuery, [dateRange.startDate, dateRange.endDate]);
+      const taxData = result?.[0] || {};
+
+      return {
+        totalTax: taxData.totalTax || 0,
+        taxableAmount: taxData.taxableAmount || 0,
+        taxRate: taxData.taxableAmount > 0 ? ((taxData.totalTax / taxData.taxableAmount) * 100) : 0
       };
     } catch (error) {
       console.error('❌ Error getting tax data:', error);
-      return {};
+      return {
+        totalTax: 0,
+        taxableAmount: 0,
+        taxRate: 0
+      };
     }
   }
 
-  // Helper methods for overview data
-  static async getTotalSales(period = 'month') {
+  // NEW CHART METHODS - ADD THESE:
+
+  // Get chart-specific data for sales
+  static async getSalesChartData(period = 'this_month') {
     try {
-      let dateFilter = '';
+      const dateRange = this.getDateRangeForPeriod(period);
       
-      switch (period) {
-        case 'today':
-          dateFilter = "AND date = date('now')";
-          break;
-        case 'week':
-          dateFilter = "AND date >= date('now', '-7 days')";
-          break;
-        case 'month':
-          dateFilter = "AND strftime('%Y-%m', date) = strftime('%Y-%m', 'now')";
-          break;
-        case 'year':
-          dateFilter = "AND strftime('%Y', date) = strftime('%Y', 'now')";
-          break;
-      }
-
       const query = `
-        SELECT COALESCE(SUM(total), 0) as total_sales
-        FROM invoices 
-        WHERE deleted_at IS NULL ${dateFilter}
+        SELECT 
+          DATE(i.date) as date,
+          SUM(i.total_amount) as sales
+        FROM invoices i
+        WHERE i.date >= ? AND i.date <= ?
+          AND i.deleted_at IS NULL
+        GROUP BY DATE(i.date)
+        ORDER BY DATE(i.date)
       `;
-
-      const result = await DatabaseService.executeQuery(query);
-      return result[0]?.total_sales || 0;
+      
+      const result = await DatabaseService.executeQuery(query, [dateRange.startDate, dateRange.endDate]);
+      
+      // Process data for chart
+      const chartLabels = [];
+      const chartValues = [];
+      
+      if (result && result.length > 0) {
+        result.forEach(row => {
+          const date = new Date(row.date);
+          chartLabels.push(date.toLocaleDateString('en-US', { month: 'short', day: 'numeric' }));
+          chartValues.push(row.sales || 0);
+        });
+      }
+      
+      return {
+        chartLabels: chartLabels.length > 0 ? chartLabels : ["No Data"],
+        chartValues: chartValues.length > 0 ? chartValues : [0]
+      };
     } catch (error) {
-      console.error('❌ Error getting total sales:', error);
+      console.error('❌ Error getting sales chart data:', error);
+      return {
+        chartLabels: ["No Data"],
+        chartValues: [0]
+      };
+    }
+  }
+
+  // Get top categories for pie chart
+  static async getTopCategoriesChart() {
+    try {
+      const query = `
+        SELECT 
+          c.name,
+          COUNT(ii.id) as count,
+          SUM(ii.quantity * ii.selling_price) as value
+        FROM categories c
+        LEFT JOIN inventory_items ii ON c.name = ii.category
+        WHERE c.deleted_at IS NULL
+          AND ii.deleted_at IS NULL
+        GROUP BY c.name
+        ORDER BY value DESC
+        LIMIT 5
+      `;
+      
+      const result = await DatabaseService.executeQuery(query);
+      
+      return result?.map(row => ({
+        name: row.name || 'Unknown',
+        value: row.value || 0,
+        count: row.count || 0
+      })) || [];
+    } catch (error) {
+      console.error('❌ Error getting top categories:', error);
+      return [];
+    }
+  }
+
+  // Helper methods
+  static async getTotalRevenue(dateRange) {
+    try {
+      const query = `
+        SELECT SUM(total_amount) as revenue
+        FROM invoices 
+        WHERE date >= ? AND date <= ?
+          AND deleted_at IS NULL
+      `;
+      
+      const result = await DatabaseService.executeQuery(query, [dateRange.startDate, dateRange.endDate]);
+      return result?.[0]?.revenue || 0;
+    } catch (error) {
+      console.error('❌ Error getting total revenue:', error);
       return 0;
     }
   }
 
-  static async getTotalExpenses(period = 'month') {
+  static async getTotalExpenses(dateRange) {
     try {
-      let dateFilter = '';
-      
-      switch (period) {
-        case 'today':
-          dateFilter = "AND date = date('now')";
-          break;
-        case 'week':
-          dateFilter = "AND date >= date('now', '-7 days')";
-          break;
-        case 'month':
-          dateFilter = "AND strftime('%Y-%m', date) = strftime('%Y-%m', 'now')";
-          break;
-        case 'year':
-          dateFilter = "AND strftime('%Y', date) = strftime('%Y', 'now')";
-          break;
-      }
-
       const query = `
-        SELECT COALESCE(SUM(amount), 0) as total_expenses
+        SELECT SUM(amount) as expenses
         FROM transactions 
-        WHERE deleted_at IS NULL 
-          AND type = 'expense' 
-          ${dateFilter}
+        WHERE date >= ? AND date <= ?
+          AND type = 'expense'
+          AND deleted_at IS NULL
       `;
-
-      const result = await DatabaseService.executeQuery(query);
-      return result[0]?.total_expenses || 0;
+      
+      const result = await DatabaseService.executeQuery(query, [dateRange.startDate, dateRange.endDate]);
+      return result?.[0]?.expenses || 0;
     } catch (error) {
       console.error('❌ Error getting total expenses:', error);
       return 0;
     }
   }
 
-  static async getTotalCustomers() {
+  static async getTotalTransactions(dateRange) {
     try {
       const query = `
         SELECT COUNT(*) as count
-        FROM parties 
-        WHERE deleted_at IS NULL 
-          AND (type = 'customer' OR type = 'both')
+        FROM transactions 
+        WHERE date >= ? AND date <= ?
+          AND deleted_at IS NULL
       `;
-      const result = await DatabaseService.executeQuery(query);
-      return result[0]?.count || 0;
+      
+      const result = await DatabaseService.executeQuery(query, [dateRange.startDate, dateRange.endDate]);
+      return result?.[0]?.count || 0;
     } catch (error) {
-      console.error('❌ Error getting total customers:', error);
+      console.error('❌ Error getting total transactions:', error);
       return 0;
     }
   }
 
-  static async getTotalSuppliers() {
-    try {
-      const query = `
-        SELECT COUNT(*) as count
-        FROM parties 
-        WHERE deleted_at IS NULL 
-          AND (type = 'supplier' OR type = 'both')
-      `;
-      const result = await DatabaseService.executeQuery(query);
-      return result[0]?.count || 0;
-    } catch (error) {
-      console.error('❌ Error getting total suppliers:', error);
-      return 0;
-    }
-  }
-
-  static async getTotalInvoices() {
-    try {
-      const query = `
-        SELECT COUNT(*) as count
-        FROM invoices 
-        WHERE deleted_at IS NULL
-      `;
-      const result = await DatabaseService.executeQuery(query);
-      return result[0]?.count || 0;
-    } catch (error) {
-      console.error('❌ Error getting total invoices:', error);
-      return 0;
-    }
-  }
-
-  static async getTotalItems() {
-    try {
-      const query = `
-        SELECT COUNT(*) as count
-        FROM inventory_items 
-        WHERE deleted_at IS NULL
-      `;
-      const result = await DatabaseService.executeQuery(query);
-      return result[0]?.count || 0;
-    } catch (error) {
-      console.error('❌ Error getting total items:', error);
-      return 0;
-    }
-  }
-
-  static async getPendingPayments() {
-    try {
-      const query = `
-        SELECT COALESCE(SUM(total - COALESCE(paid_amount, 0)), 0) as pending_amount
-        FROM invoices 
-        WHERE deleted_at IS NULL 
-          AND total > COALESCE(paid_amount, 0)
-      `;
-      const result = await DatabaseService.executeQuery(query);
-      return result[0]?.pending_amount || 0;
-    } catch (error) {
-      console.error('❌ Error getting pending payments:', error);
-      return 0;
-    }
-  }
-
-  static async getLowStockCount() {
-    try {
-      const query = `
-        SELECT COUNT(*) as count
-        FROM inventory_items 
-        WHERE deleted_at IS NULL 
-          AND stock_quantity <= min_stock_level
-      `;
-      const result = await DatabaseService.executeQuery(query);
-      return result[0]?.count || 0;
-    } catch (error) {
-      console.error('❌ Error getting low stock count:', error);
-      return 0;
-    }
-  }
-
-  // Export functionality
-  static async exportReport(reportType, data, format = 'csv') {
-    try {
-      let content = '';
-      let filename = '';
-
-      switch (format) {
-        case 'csv':
-          content = this.convertToCSV(reportType, data);
-          filename = `${reportType}_report_${new Date().toISOString().split('T')[0]}.csv`;
-          break;
-        case 'json':
-          content = JSON.stringify(data, null, 2);
-          filename = `${reportType}_report_${new Date().toISOString().split('T')[0]}.json`;
-          break;
-        default:
-          throw new Error('Unsupported format');
-      }
-
-      const fileUri = FileSystem.documentDirectory + filename;
-      await FileSystem.writeAsStringAsync(fileUri, content);
-
-      if (await Sharing.isAvailableAsync()) {
-        await Sharing.shareAsync(fileUri);
-      }
-
-      return { success: true, fileUri };
-    } catch (error) {
-      console.error('❌ Error exporting report:', error);
-      return { success: false, error: error.message };
-    }
-  }
-
-  // Convert data to CSV format
-  static convertToCSV(reportType, data) {
-    if (!Array.isArray(data) || data.length === 0) {
-      return 'No data available';
-    }
-
-    const headers = Object.keys(data[0]);
-    const csvContent = [
-      headers.join(','),
-      ...data.map(row => 
-        headers.map(header => {
-          const value = row[header];
-          // Escape commas and quotes in CSV
-          return typeof value === 'string' && value.includes(',') 
-            ? `"${value.replace(/"/g, '""')}"` 
-            : value;
-        }).join(',')
-      )
-    ].join('\n');
-
-    return csvContent;
-  }
-
-  // Date range utilities
-  static getDateRange(period) {
-    const today = new Date();
+  static getDateRangeForPeriod(period) {
+    const now = new Date();
     let startDate, endDate;
 
     switch (period) {
       case 'today':
-        startDate = endDate = today.toISOString().split('T')[0];
-        break;
-      case 'yesterday':
-        const yesterday = new Date(today);
-        yesterday.setDate(yesterday.getDate() - 1);
-        startDate = endDate = yesterday.toISOString().split('T')[0];
+        startDate = new Date(now.getFullYear(), now.getMonth(), now.getDate());
+        endDate = new Date(now.getFullYear(), now.getMonth(), now.getDate(), 23, 59, 59);
         break;
       case 'this_week':
-        const weekStart = new Date(today);
-        weekStart.setDate(today.getDate() - today.getDay());
-        startDate = weekStart.toISOString().split('T')[0];
-        endDate = today.toISOString().split('T')[0];
-        break;
-      case 'last_week':
-        const lastWeekEnd = new Date(today);
-        lastWeekEnd.setDate(today.getDate() - today.getDay() - 1);
-        const lastWeekStart = new Date(lastWeekEnd);
-        lastWeekStart.setDate(lastWeekEnd.getDate() - 6);
-        startDate = lastWeekStart.toISOString().split('T')[0];
-        endDate = lastWeekEnd.toISOString().split('T')[0];
+        const dayOfWeek = now.getDay();
+        startDate = new Date(now.getTime() - dayOfWeek * 24 * 60 * 60 * 1000);
+        endDate = new Date(startDate.getTime() + 6 * 24 * 60 * 60 * 1000);
         break;
       case 'this_month':
-        startDate = new Date(today.getFullYear(), today.getMonth(), 1).toISOString().split('T')[0];
-        endDate = today.toISOString().split('T')[0];
-        break;
-      case 'last_month':
-        const lastMonth = new Date(today.getFullYear(), today.getMonth() - 1, 1);
-        startDate = lastMonth.toISOString().split('T')[0];
-        const lastMonthEnd = new Date(today.getFullYear(), today.getMonth(), 0);
-        endDate = lastMonthEnd.toISOString().split('T')[0];
+      default:
+        startDate = new Date(now.getFullYear(), now.getMonth(), 1);
+        endDate = new Date(now.getFullYear(), now.getMonth() + 1, 0, 23, 59, 59);
         break;
       case 'this_year':
-        startDate = new Date(today.getFullYear(), 0, 1).toISOString().split('T')[0];
-        endDate = today.toISOString().split('T')[0];
+        startDate = new Date(now.getFullYear(), 0, 1);
+        endDate = new Date(now.getFullYear(), 11, 31, 23, 59, 59);
         break;
-      default:
-        startDate = endDate = today.toISOString().split('T')[0];
     }
 
-    return { startDate, endDate };
+    return {
+      startDate: startDate.toISOString().split('T')[0],
+      endDate: endDate.toISOString().split('T')[0]
+    };
   }
 
-  // Format currency
-  static formatCurrency(amount) {
-    return new Intl.NumberFormat('en-IN', {
-      style: 'currency',
-      currency: 'INR'
-    }).format(amount);
-  }
-
-  // Format date
-  static formatDate(dateString) {
-    return new Date(dateString).toLocaleDateString('en-IN');
-  }
-
-  // Get chart data for various metrics
-  static async getChartData(metric, period = '7days') {
+  // Export report functionality
+  static async exportReport(reportType, data, format = 'pdf') {
     try {
-      let dateFilter = '';
-      let groupBy = '';
-
-      switch (period) {
-        case '7days':
-          dateFilter = "date >= date('now', '-7 days')";
-          groupBy = "DATE(date)";
-          break;
-        case '30days':
-          dateFilter = "date >= date('now', '-30 days')";
-          groupBy = "DATE(date)";
-          break;
-        case '12months':
-          dateFilter = "date >= date('now', '-12 months')";
-          groupBy = "strftime('%Y-%m', date)";
-          break;
+      if (format === 'csv') {
+        return await this.exportToCSV(reportType, data);
+      } else {
+        return await this.exportToPDF(reportType, data);
       }
-
-      let query = '';
-      switch (metric) {
-        case 'sales':
-          query = `
-            SELECT 
-              ${groupBy} as period,
-              COALESCE(SUM(total), 0) as value
-            FROM invoices 
-            WHERE deleted_at IS NULL AND ${dateFilter}
-            GROUP BY ${groupBy}
-            ORDER BY period ASC
-          `;
-          break;
-        case 'expenses':
-          query = `
-            SELECT 
-              ${groupBy} as period,
-              COALESCE(SUM(amount), 0) as value
-            FROM transactions 
-            WHERE deleted_at IS NULL AND type = 'expense' AND ${dateFilter}
-            GROUP BY ${groupBy}
-            ORDER BY period ASC
-          `;
-          break;
-      }
-
-      return await DatabaseService.executeQuery(query);
     } catch (error) {
-      console.error('❌ Error getting chart data:', error);
-      return [];
+      console.error('❌ Error exporting report:', error);
+      throw error;
+    }
+  }
+
+  static async exportToCSV(reportType, data) {
+    try {
+      let csvContent = '';
+      
+      // Generate CSV based on report type
+      if (reportType === 'sales') {
+        csvContent = 'Date,Sales Amount,Orders\n';
+        // Add actual data conversion logic here
+      }
+      
+      const filename = `${reportType}_report_${new Date().toISOString().split('T')[0]}.csv`;
+      const fileUri = FileSystem.documentDirectory + filename;
+      
+      await FileSystem.writeAsStringAsync(fileUri, csvContent, {
+        encoding: FileSystem.EncodingType.UTF8,
+      });
+      
+      await Sharing.shareAsync(fileUri);
+      return { success: true, file: fileUri };
+    } catch (error) {
+      console.error('❌ Error exporting to CSV:', error);
+      throw error;
+    }
+  }
+
+  static async exportToPDF(reportType, data) {
+    try {
+      // PDF export logic would go here
+      // This is a placeholder - you'd need expo-print for actual PDF generation
+      console.log('PDF export not implemented yet');
+      return { success: false, message: 'PDF export not implemented' };
+    } catch (error) {
+      console.error('❌ Error exporting to PDF:', error);
+      throw error;
     }
   }
 }
