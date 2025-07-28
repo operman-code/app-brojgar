@@ -97,8 +97,8 @@ class ReportsService {
       const salesQuery = `
         SELECT 
           COUNT(*) as totalOrders,
-          SUM(total_amount) as totalSales,
-          AVG(total_amount) as averageOrderValue
+          SUM(total) as totalSales,
+          AVG(total) as averageOrderValue
         FROM invoices 
         WHERE date >= ? AND date <= ?
           AND deleted_at IS NULL
@@ -179,7 +179,7 @@ class ReportsService {
         SELECT 
           p.name,
           COUNT(i.id) as totalOrders,
-          SUM(i.total_amount) as totalValue
+          SUM(i.total) as totalValue
         FROM parties p
         LEFT JOIN invoices i ON p.id = i.party_id
         WHERE p.type = 'customer'
@@ -286,7 +286,7 @@ class ReportsService {
       const taxQuery = `
         SELECT 
           SUM(tax_amount) as totalTax,
-          SUM(total_amount - tax_amount) as taxableAmount
+          SUM(total - tax_amount) as taxableAmount
         FROM invoices 
         WHERE date >= ? AND date <= ?
           AND deleted_at IS NULL
@@ -320,7 +320,7 @@ class ReportsService {
       const query = `
         SELECT 
           DATE(i.date) as date,
-          SUM(i.total_amount) as sales
+          SUM(i.total) as sales
         FROM invoices i
         WHERE i.date >= ? AND i.date <= ?
           AND i.deleted_at IS NULL
@@ -362,11 +362,11 @@ class ReportsService {
         SELECT 
           c.name,
           COUNT(ii.id) as count,
-          SUM(ii.quantity * ii.selling_price) as value
+          SUM(ii.stock_quantity * ii.selling_price) as value
         FROM categories c
         LEFT JOIN inventory_items ii ON c.name = ii.category
         WHERE c.deleted_at IS NULL
-          AND ii.deleted_at IS NULL
+          AND (ii.deleted_at IS NULL OR ii.id IS NULL)
         GROUP BY c.name
         ORDER BY value DESC
         LIMIT 5
@@ -389,7 +389,7 @@ class ReportsService {
   static async getTotalRevenue(dateRange) {
     try {
       const query = `
-        SELECT SUM(total_amount) as revenue
+        SELECT SUM(total) as revenue
         FROM invoices 
         WHERE date >= ? AND date <= ?
           AND deleted_at IS NULL
