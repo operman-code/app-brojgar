@@ -15,8 +15,10 @@ import {
   RefreshControl,
 } from 'react-native';
 import SettingsService from './services/SettingsService';
+import { useTheme } from '../../context/ThemeContext';
 
 const SettingsScreen = ({ navigation }) => {
+  const { theme, isDarkMode, toggleTheme } = useTheme();
   const [fadeAnim] = useState(new Animated.Value(0));
   const [settings, setSettings] = useState({});
   const [businessProfile, setBusinessProfile] = useState({});
@@ -27,7 +29,6 @@ const SettingsScreen = ({ navigation }) => {
 
   // App preferences state
   const [notificationsEnabled, setNotificationsEnabled] = useState(true);
-  const [darkModeEnabled, setDarkModeEnabled] = useState(false);
   const [autoBackupEnabled, setAutoBackupEnabled] = useState(true);
   const [biometricEnabled, setBiometricEnabled] = useState(false);
 
@@ -91,7 +92,7 @@ const SettingsScreen = ({ navigation }) => {
           setNotificationsEnabled(value);
           break;
         case 'dark_mode_enabled':
-          setDarkModeEnabled(value);
+          toggleTheme();
           break;
         case 'auto_backup_enabled':
           setAutoBackupEnabled(value);
@@ -147,7 +148,7 @@ const SettingsScreen = ({ navigation }) => {
           subtitle: 'App appearance', 
           icon: '🌙', 
           toggle: true,
-          value: darkModeEnabled,
+          value: isDarkMode,
           onToggle: (value) => toggleSetting('dark_mode_enabled', value)
         },
         { 
@@ -315,15 +316,15 @@ const SettingsScreen = ({ navigation }) => {
   );
 
   return (
-    <SafeAreaView style={styles.container}>
-      <StatusBar barStyle="dark-content" backgroundColor="#ffffff" />
+    <SafeAreaView style={[styles.container, { backgroundColor: theme.background }]}>
+      <StatusBar barStyle={theme.statusBar === 'dark' ? 'dark-content' : 'light-content'} backgroundColor={theme.surface} />
       
       <Animated.View style={[styles.content, { opacity: fadeAnim }]}>
         {/* Header */}
-        <View style={styles.header}>
+        <View style={[styles.header, { backgroundColor: theme.surface, borderBottomColor: theme.border }]}>
           <View style={styles.headerLeft}>
-            <Text style={styles.headerTitle}>Settings</Text>
-            <Text style={styles.headerSubtitle}>Manage your app preferences</Text>
+            <Text style={[styles.headerTitle, { color: theme.text }]}>Settings</Text>
+            <Text style={[styles.headerSubtitle, { color: theme.textSecondary }]}>Manage your app preferences</Text>
           </View>
           <TouchableOpacity 
             style={styles.notificationButton} 
