@@ -1,216 +1,304 @@
+// screens/Invoice/InvoiceTemplateScreen.js
 import React, { useState, useEffect } from 'react';
 import {
   View,
   Text,
   StyleSheet,
   ScrollView,
-  SafeAreaView,
   TouchableOpacity,
+  SafeAreaView,
   StatusBar,
-  Animated,
   Alert,
-  Share,
+  Dimensions,
 } from 'react-native';
 
+import InvoiceTemplateService from './services/InvoiceTemplateService';
+import * as Sharing from 'expo-sharing';
+
+const { width } = Dimensions.get('window');
+
 const InvoiceTemplateScreen = ({ navigation, route }) => {
-  const [fadeAnim] = useState(new Animated.Value(0));
-  const { invoiceData } = route.params;
+  const [selectedTemplate, setSelectedTemplate] = useState('classic');
+  const [invoiceData, setInvoiceData] = useState(null);
+  const [businessProfile, setBusinessProfile] = useState({});
+  const [loading, setLoading] = useState(true);
+
+  const templates = [
+    {
+      id: 'classic',
+      name: 'Classic',
+      description: 'Clean and professional design',
+      preview: '📄',
+      color: '#3B82F6'
+    },
+    {
+      id: 'modern',
+      name: 'Modern',
+      description: 'Contemporary layout with bold headers',
+      preview: '🎨',
+      color: '#10B981'
+    },
+    {
+      id: 'minimal',
+      name: 'Minimal',
+      description: 'Simple and elegant design',
+      preview: '📋',
+      color: '#8B5CF6'
+    },
+    {
+      id: 'corporate',
+      name: 'Corporate',
+      description: 'Professional business template',
+      preview: '🏢',
+      color: '#F59E0B'
+    }
+  ];
 
   useEffect(() => {
-    Animated.timing(fadeAnim, {
-      toValue: 1,
-      duration: 600,
-      useNativeDriver: true,
-    }).start();
+    loadData();
   }, []);
 
-  const calculateSubtotal = () => {
-    return invoiceData.items.reduce((sum, item) => sum + (item.quantity * item.price), 0);
-  };
-
-  const calculateDiscount = () => {
-    const subtotal = calculateSubtotal();
-    return (subtotal * (invoiceData.discount || 0)) / 100;
-  };
-
-  const calculateTax = () => {
-    const subtotal = calculateSubtotal();
-    const discount = calculateDiscount();
-    return ((subtotal - discount) * (invoiceData.tax || 18)) / 100;
-  };
-
-  const calculateTotal = () => {
-    const subtotal = calculateSubtotal();
-    const discount = calculateDiscount();
-    const tax = calculateTax();
-    return subtotal - discount + tax;
-  };
-
-  const handleShare = async () => {
+  const loadData = async () => {
     try {
-      const result = await Share.share({
-        message: `Invoice ${invoiceData.invoiceNumber} for ${invoiceData.customer.name} - Total: ₹${calculateTotal().toLocaleString()}`,
-        title: 'Invoice Share',
-      });
+      setLoading(true);
+      
+      // Get invoice data from navigation params
+      const passedInvoiceData = route.params?.invoiceData;
+      if (!passedInvoiceData) {
+        Alert.alert('Error', 'No invoice data found');
+        navigation.goBack();
+        return;
+      }
+
+      // Load business profile and invoice details
+      const [profile, invoiceDetails] = await Promise.all([
+        InvoiceTemplateService.getBusinessProfile(),
+        InvoiceTemplateService.getInvoiceById(passedInvoiceData.invoiceId)
+      ]);
+
+      setBusinessProfile(profile);
+      setInvoiceData(invoiceDetails);
     } catch (error) {
-      Alert.alert('Error', 'Failed to share invoice');
+      console.error('❌ Error loading data:', error);
+      Alert.alert('Error', 'Failed to load invoice data');
+    } finally {
+      setLoading(false);
     }
   };
 
-  const handleDownload = () => {
-    Alert.alert('Download', 'Invoice will be downloaded as PDF');
+  const handleGenerateInvoice = async () => {
+    try {
+      Alert.alert(
+        'Generate Invoice',
+        'Choose an option:',
+        [
+          { text: 'Cancel', style: 'cancel' },
+          {
+            text: 'Preview',
+            onPress: () => handlePreview()
+          },
+          {
+            text: 'Share PDF',
+            onPress: () => handleSharePDF()
+          }
+        ]
+      );
+    } catch (error) {
+      console.error('❌ Error generating invoice:', error);
+      Alert.alert('Error', 'Failed to generate invoice');
+    }
   };
 
-  const handlePrint = () => {
-    Alert.alert('Print', 'Invoice will be sent to printer');
+  const handlePreview = () => {
+    navigation.navigate('InvoicePreview', {
+      invoiceData,
+      businessProfile,
+      template: selectedTemplate
+    });
   };
 
-  const handleSave = () => {
-    Alert.alert('Success', 'Invoice saved successfully!');
-    navigation.goBack();
+  const handleSharePDF = async () => {
+    try {
+      const result = await InvoiceTemplateService.generatePDF(
+        invoiceData,
+        businessProfile,
+        selectedTemplate
+      );
+
+      if (result.success) {
+        if (await Sharing.isAvailableAsync()) {
+          await Sharing.shareAsync(result.fileUri);
+        } else {
+          Alert.alert('Success', 'PDF generated successfully');
+        }
+      } else {
+        Alert.alert('Error', 'Failed to generate PDF');
+      }
+    } catch (error) {
+      console.error('❌ Error sharing PDF:', error);
+      Alert.alert('Error', 'Failed to generate PDF');
+    }
   };
+
+  const renderTemplateCard = (template) => (
+    <TouchableOpacity
+      key={template.id}
+      style={[
+        styles.templateCard,
+        selectedTemplate === template.id && styles.selectedTemplateCard
+      ]}
+      onPress={() => setSelectedTemplate(template.id)}
+    >
+      <View style={[styles.templatePreview, { backgroundColor: template.color + '20' }]}>
+        <Text style={[styles.templateIcon, { color: template.color }]}>
+          {template.preview}
+        </Text>
+      </View>
+      <View style={styles.templateInfo}>
+        <Text style={styles.templateName}>{template.name}</Text>
+        <Text style={styles.templateDescription}>{template.description}</Text>
+      </View>
+      {selectedTemplate === template.id && (
+        <View style={styles.selectedIndicator}>
+          <Text style={styles.checkmark}>✓</Text>
+        </View>
+      )}
+    </TouchableOpacity>
+  );
+
+  if (loading) {
+    return (
+      <SafeAreaView style={styles.container}>
+        <StatusBar barStyle="dark-content" />
+        <View style={styles.loadingContainer}>
+          <Text style={styles.loadingText}>Loading Templates...</Text>
+        </View>
+      </SafeAreaView>
+    );
+  }
 
   return (
     <SafeAreaView style={styles.container}>
-      <StatusBar barStyle="dark-content" backgroundColor="#ffffff" />
-      
-      <Animated.View style={[styles.content, { opacity: fadeAnim }]}>
-        {/* Header */}
-        <View style={styles.header}>
-          <TouchableOpacity onPress={() => navigation.goBack()}>
-            <Text style={styles.backButton}>← Back</Text>
-          </TouchableOpacity>
-          <Text style={styles.headerTitle}>Invoice Preview</Text>
-          <TouchableOpacity onPress={handleSave} style={styles.saveButton}>
-            <Text style={styles.saveButtonText}>Save</Text>
-          </TouchableOpacity>
+      <StatusBar barStyle="dark-content" />
+
+      {/* Header */}
+      <View style={styles.header}>
+        <TouchableOpacity onPress={() => navigation.goBack()}>
+          <Text style={styles.backButton}>← Back</Text>
+        </TouchableOpacity>
+        <Text style={styles.headerTitle}>Invoice Templates</Text>
+        <View />
+      </View>
+
+      <ScrollView style={styles.content} showsVerticalScrollIndicator={false}>
+        {/* Invoice Summary */}
+        <View style={styles.section}>
+          <Text style={styles.sectionTitle}>Invoice Summary</Text>
+          
+          {invoiceData && (
+            <View style={styles.summaryCard}>
+              <View style={styles.summaryRow}>
+                <Text style={styles.summaryLabel}>Invoice Number:</Text>
+                <Text style={styles.summaryValue}>{invoiceData.invoice_number}</Text>
+              </View>
+              <View style={styles.summaryRow}>
+                <Text style={styles.summaryLabel}>Customer:</Text>
+                <Text style={styles.summaryValue}>{invoiceData.customer_name}</Text>
+              </View>
+              <View style={styles.summaryRow}>
+                <Text style={styles.summaryLabel}>Date:</Text>
+                <Text style={styles.summaryValue}>{invoiceData.date}</Text>
+              </View>
+              <View style={styles.summaryRow}>
+                <Text style={styles.summaryLabel}>Amount:</Text>
+                <Text style={[styles.summaryValue, styles.totalAmount]}>
+                  ₹{parseFloat(invoiceData.total).toLocaleString('en-IN')}
+                </Text>
+              </View>
+              <View style={styles.summaryRow}>
+                <Text style={styles.summaryLabel}>Items:</Text>
+                <Text style={styles.summaryValue}>{invoiceData.items?.length || 0}</Text>
+              </View>
+            </View>
+          )}
         </View>
 
-        <ScrollView style={styles.scrollContent} showsVerticalScrollIndicator={false}>
-          {/* Invoice Document */}
-          <View style={styles.invoiceDocument}>
-            {/* Business Header */}
-            <View style={styles.businessHeader}>
-              <View style={styles.businessLogo}>
-                <Text style={styles.businessLogoText}>📱</Text>
-              </View>
-              <View style={styles.businessInfo}>
-                <Text style={styles.businessName}>Your Business Name</Text>
-                <Text style={styles.businessAddress}>123 Business Street</Text>
-                <Text style={styles.businessAddress}>City, State 12345</Text>
-                <Text style={styles.businessContact}>Phone: +91 99999 99999</Text>
-                <Text style={styles.businessContact}>Email: info@yourbusiness.com</Text>
-              </View>
-            </View>
+        {/* Template Selection */}
+        <View style={styles.section}>
+          <Text style={styles.sectionTitle}>Choose Template</Text>
+          
+          <View style={styles.templatesGrid}>
+            {templates.map(renderTemplateCard)}
+          </View>
+        </View>
 
-            {/* Invoice Title */}
-            <View style={styles.invoiceTitle}>
-              <Text style={styles.invoiceTitleText}>INVOICE</Text>
-              <Text style={styles.invoiceNumber}>{invoiceData.invoiceNumber}</Text>
-            </View>
-
-            {/* Invoice Details */}
-            <View style={styles.invoiceDetails}>
-              <View style={styles.detailsLeft}>
-                <Text style={styles.detailLabel}>Bill To:</Text>
-                <Text style={styles.customerName}>{invoiceData.customer.name}</Text>
-                <Text style={styles.customerDetails}>{invoiceData.customer.phone}</Text>
-                <Text style={styles.customerDetails}>{invoiceData.customer.email}</Text>
-              </View>
-              <View style={styles.detailsRight}>
-                <View style={styles.detailRow}>
-                  <Text style={styles.detailLabel}>Invoice Date:</Text>
-                  <Text style={styles.detailValue}>{invoiceData.date}</Text>
-                </View>
-                <View style={styles.detailRow}>
-                  <Text style={styles.detailLabel}>Due Date:</Text>
-                  <Text style={styles.detailValue}>{invoiceData.dueDate || 'Upon Receipt'}</Text>
-                </View>
-              </View>
-            </View>
-
-            {/* Items Table */}
-            <View style={styles.itemsTable}>
-              {/* Table Header */}
-              <View style={styles.tableHeader}>
-                <Text style={[styles.tableHeaderText, styles.itemColumn]}>Item</Text>
-                <Text style={[styles.tableHeaderText, styles.qtyColumn]}>Qty</Text>
-                <Text style={[styles.tableHeaderText, styles.priceColumn]}>Price</Text>
-                <Text style={[styles.tableHeaderText, styles.totalColumn]}>Total</Text>
-              </View>
-              
-              {/* Table Rows */}
-              {invoiceData.items.map((item, index) => (
-                <View key={index} style={styles.tableRow}>
-                  <Text style={[styles.tableText, styles.itemColumn]}>{item.name}</Text>
-                  <Text style={[styles.tableText, styles.qtyColumn]}>{item.quantity}</Text>
-                  <Text style={[styles.tableText, styles.priceColumn]}>₹{item.price.toLocaleString()}</Text>
-                  <Text style={[styles.tableText, styles.totalColumn]}>₹{(item.quantity * item.price).toLocaleString()}</Text>
-                </View>
-              ))}
-            </View>
-
-            {/* Invoice Summary */}
-            <View style={styles.invoiceSummary}>
-              <View style={styles.summaryRow}>
-                <Text style={styles.summaryLabel}>Subtotal:</Text>
-                <Text style={styles.summaryValue}>₹{calculateSubtotal().toLocaleString()}</Text>
-              </View>
-              {invoiceData.discount > 0 && (
-                <View style={styles.summaryRow}>
-                  <Text style={styles.summaryLabel}>Discount ({invoiceData.discount}%):</Text>
-                  <Text style={styles.summaryValue}>-₹{calculateDiscount().toLocaleString()}</Text>
-                </View>
-              )}
-              <View style={styles.summaryRow}>
-                <Text style={styles.summaryLabel}>Tax ({invoiceData.tax || 18}%):</Text>
-                <Text style={styles.summaryValue}>₹{calculateTax().toLocaleString()}</Text>
-              </View>
-              <View style={[styles.summaryRow, styles.totalRow]}>
-                <Text style={styles.totalLabel}>Total Amount:</Text>
-                <Text style={styles.totalValue}>₹{calculateTotal().toLocaleString()}</Text>
-              </View>
-            </View>
-
-            {/* Notes */}
-            {invoiceData.notes && (
-              <View style={styles.notesSection}>
-                <Text style={styles.notesTitle}>Notes:</Text>
-                <Text style={styles.notesText}>{invoiceData.notes}</Text>
-              </View>
-            )}
-
-            {/* Terms */}
-            <View style={styles.termsSection}>
-              <Text style={styles.termsTitle}>Terms & Conditions:</Text>
-              <Text style={styles.termsText}>
-                {invoiceData.terms || 'Payment is due within 30 days. Late payments may incur additional charges.'}
+        {/* Template Preview */}
+        <View style={styles.section}>
+          <Text style={styles.sectionTitle}>Preview</Text>
+          
+          <View style={styles.previewContainer}>
+            <View style={styles.previewCard}>
+              <Text style={styles.previewTitle}>
+                {templates.find(t => t.id === selectedTemplate)?.name} Template
               </Text>
-            </View>
-
-            {/* Footer */}
-            <View style={styles.invoiceFooter}>
-              <Text style={styles.footerText}>Thank you for your business!</Text>
+              <Text style={styles.previewDescription}>
+                {templates.find(t => t.id === selectedTemplate)?.description}
+              </Text>
+              
+              <View style={styles.previewMockup}>
+                <View style={styles.mockupHeader}>
+                  <View style={styles.mockupLine} />
+                  <View style={[styles.mockupLine, styles.mockupLineShort]} />
+                </View>
+                <View style={styles.mockupBody}>
+                  <View style={styles.mockupLine} />
+                  <View style={styles.mockupLine} />
+                  <View style={[styles.mockupLine, styles.mockupLineShort]} />
+                </View>
+                <View style={styles.mockupFooter}>
+                  <View style={[styles.mockupLine, styles.mockupLineShort]} />
+                </View>
+              </View>
             </View>
           </View>
-        </ScrollView>
-
-        {/* Action Buttons */}
-        <View style={styles.actionButtons}>
-          <TouchableOpacity style={styles.actionButton} onPress={handleShare}>
-            <Text style={styles.actionIcon}>📤</Text>
-            <Text style={styles.actionText}>Share</Text>
-          </TouchableOpacity>
-          <TouchableOpacity style={styles.actionButton} onPress={handleDownload}>
-            <Text style={styles.actionIcon}>📄</Text>
-            <Text style={styles.actionText}>Download</Text>
-          </TouchableOpacity>
-          <TouchableOpacity style={styles.actionButton} onPress={handlePrint}>
-            <Text style={styles.actionIcon}>🖨️</Text>
-            <Text style={styles.actionText}>Print</Text>
-          </TouchableOpacity>
         </View>
-      </Animated.View>
+
+        {/* Features */}
+        <View style={styles.section}>
+          <Text style={styles.sectionTitle}>Template Features</Text>
+          
+          <View style={styles.featuresList}>
+            <View style={styles.featureItem}>
+              <Text style={styles.featureIcon}>📄</Text>
+              <Text style={styles.featureText}>Professional PDF generation</Text>
+            </View>
+            <View style={styles.featureItem}>
+              <Text style={styles.featureIcon}>🎨</Text>
+              <Text style={styles.featureText}>Customizable branding</Text>
+            </View>
+            <View style={styles.featureItem}>
+              <Text style={styles.featureIcon}>📱</Text>
+              <Text style={styles.featureText}>Mobile-friendly design</Text>
+            </View>
+            <View style={styles.featureItem}>
+              <Text style={styles.featureIcon}>🔗</Text>
+              <Text style={styles.featureText}>Easy sharing options</Text>
+            </View>
+          </View>
+        </View>
+
+        <View style={{ height: 100 }} />
+      </ScrollView>
+
+      {/* Generate Button */}
+      <View style={styles.bottomContainer}>
+        <TouchableOpacity
+          style={styles.generateButton}
+          onPress={handleGenerateInvoice}
+        >
+          <Text style={styles.generateButtonText}>Generate Invoice</Text>
+        </TouchableOpacity>
+      </View>
     </SafeAreaView>
   );
 };
@@ -218,302 +306,221 @@ const InvoiceTemplateScreen = ({ navigation, route }) => {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: '#f8fafc',
+    backgroundColor: '#F8FAFC',
   },
-  content: {
+  loadingContainer: {
     flex: 1,
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  loadingText: {
+    fontSize: 18,
+    color: '#64748B',
   },
   header: {
     flexDirection: 'row',
     justifyContent: 'space-between',
     alignItems: 'center',
     paddingHorizontal: 20,
-    paddingVertical: 16,
-    backgroundColor: '#ffffff',
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.04,
-    shadowRadius: 8,
-    elevation: 2,
+    paddingVertical: 15,
+    backgroundColor: '#FFFFFF',
+    borderBottomWidth: 1,
+    borderBottomColor: '#E2E8F0',
   },
   backButton: {
     fontSize: 16,
-    color: '#3b82f6',
-    fontWeight: '600',
+    color: '#3B82F6',
   },
   headerTitle: {
     fontSize: 18,
     fontWeight: 'bold',
-    color: '#0f172a',
+    color: '#1E293B',
   },
-  saveButton: {
-    backgroundColor: '#3b82f6',
-    paddingHorizontal: 16,
-    paddingVertical: 8,
-    borderRadius: 8,
-  },
-  saveButtonText: {
-    color: '#ffffff',
-    fontSize: 14,
-    fontWeight: '600',
-  },
-  scrollContent: {
+  content: {
     flex: 1,
   },
-  invoiceDocument: {
-    backgroundColor: '#ffffff',
-    margin: 20,
-    borderRadius: 16,
-    padding: 24,
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.1,
-    shadowRadius: 12,
-    elevation: 4,
-  },
-  businessHeader: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    marginBottom: 32,
-    paddingBottom: 16,
-    borderBottomWidth: 1,
-    borderBottomColor: '#e2e8f0',
-  },
-  businessLogo: {
-    width: 60,
-    height: 60,
+  section: {
+    backgroundColor: '#FFFFFF',
+    marginHorizontal: 16,
+    marginVertical: 8,
     borderRadius: 12,
-    backgroundColor: '#3b82f6',
-    alignItems: 'center',
-    justifyContent: 'center',
-    marginRight: 16,
+    padding: 16,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 1 },
+    shadowOpacity: 0.1,
+    shadowRadius: 3,
+    elevation: 2,
   },
-  businessLogoText: {
-    fontSize: 28,
-  },
-  businessInfo: {
-    flex: 1,
-  },
-  businessName: {
-    fontSize: 20,
+  sectionTitle: {
+    fontSize: 18,
     fontWeight: 'bold',
-    color: '#0f172a',
-    marginBottom: 4,
+    color: '#1E293B',
+    marginBottom: 16,
   },
-  businessAddress: {
-    fontSize: 14,
-    color: '#64748b',
-    lineHeight: 20,
-  },
-  businessContact: {
-    fontSize: 14,
-    color: '#64748b',
-    lineHeight: 20,
-  },
-  invoiceTitle: {
-    alignItems: 'center',
-    marginBottom: 32,
-  },
-  invoiceTitleText: {
-    fontSize: 28,
-    fontWeight: 'bold',
-    color: '#0f172a',
-    letterSpacing: 2,
-  },
-  invoiceNumber: {
-    fontSize: 16,
-    color: '#3b82f6',
-    fontWeight: '600',
-    marginTop: 4,
-  },
-  invoiceDetails: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    marginBottom: 32,
-  },
-  detailsLeft: {
-    flex: 1,
-  },
-  detailsRight: {
-    flex: 1,
-    alignItems: 'flex-end',
-  },
-  detailLabel: {
-    fontSize: 12,
-    fontWeight: '600',
-    color: '#64748b',
-    textTransform: 'uppercase',
-    letterSpacing: 1,
-    marginBottom: 8,
-  },
-  customerName: {
-    fontSize: 16,
-    fontWeight: 'bold',
-    color: '#0f172a',
-    marginBottom: 4,
-  },
-  customerDetails: {
-    fontSize: 14,
-    color: '#64748b',
-    lineHeight: 20,
-  },
-  detailRow: {
-    alignItems: 'flex-end',
-    marginBottom: 8,
-  },
-  detailValue: {
-    fontSize: 14,
-    color: '#0f172a',
-    fontWeight: '600',
-  },
-  itemsTable: {
-    marginBottom: 24,
-  },
-  tableHeader: {
-    flexDirection: 'row',
-    backgroundColor: '#f8fafc',
-    paddingVertical: 12,
-    paddingHorizontal: 16,
+  summaryCard: {
+    backgroundColor: '#F8FAFC',
     borderRadius: 8,
-    marginBottom: 1,
-  },
-  tableHeaderText: {
-    fontSize: 12,
-    fontWeight: 'bold',
-    color: '#374151',
-    textTransform: 'uppercase',
-    letterSpacing: 1,
-  },
-  tableRow: {
-    flexDirection: 'row',
-    paddingVertical: 12,
-    paddingHorizontal: 16,
-    borderBottomWidth: 1,
-    borderBottomColor: '#f1f5f9',
-  },
-  tableText: {
-    fontSize: 14,
-    color: '#0f172a',
-  },
-  itemColumn: {
-    flex: 2,
-  },
-  qtyColumn: {
-    flex: 0.5,
-    textAlign: 'center',
-  },
-  priceColumn: {
-    flex: 1,
-    textAlign: 'right',
-  },
-  totalColumn: {
-    flex: 1,
-    textAlign: 'right',
-    fontWeight: '600',
-  },
-  invoiceSummary: {
-    alignItems: 'flex-end',
-    paddingTop: 16,
-    borderTopWidth: 2,
-    borderTopColor: '#e2e8f0',
-    marginBottom: 32,
+    padding: 16,
   },
   summaryRow: {
     flexDirection: 'row',
     justifyContent: 'space-between',
-    width: 200,
-    paddingVertical: 4,
+    alignItems: 'center',
+    marginBottom: 8,
   },
   summaryLabel: {
     fontSize: 14,
-    color: '#64748b',
+    color: '#64748B',
   },
   summaryValue: {
     fontSize: 14,
     fontWeight: '600',
-    color: '#0f172a',
+    color: '#1E293B',
   },
-  totalRow: {
-    borderTopWidth: 1,
-    borderTopColor: '#e2e8f0',
-    marginTop: 8,
-    paddingTop: 8,
-  },
-  totalLabel: {
+  totalAmount: {
     fontSize: 16,
-    fontWeight: 'bold',
-    color: '#0f172a',
+    color: '#3B82F6',
   },
-  totalValue: {
-    fontSize: 18,
-    fontWeight: 'bold',
-    color: '#3b82f6',
+  templatesGrid: {
+    gap: 12,
   },
-  notesSection: {
-    marginBottom: 24,
-  },
-  notesTitle: {
-    fontSize: 14,
-    fontWeight: 'bold',
-    color: '#374151',
-    marginBottom: 8,
-  },
-  notesText: {
-    fontSize: 14,
-    color: '#64748b',
-    lineHeight: 20,
-  },
-  termsSection: {
-    marginBottom: 32,
-  },
-  termsTitle: {
-    fontSize: 14,
-    fontWeight: 'bold',
-    color: '#374151',
-    marginBottom: 8,
-  },
-  termsText: {
-    fontSize: 12,
-    color: '#64748b',
-    lineHeight: 18,
-  },
-  invoiceFooter: {
-    alignItems: 'center',
-    paddingTop: 24,
-    borderTopWidth: 1,
-    borderTopColor: '#e2e8f0',
-  },
-  footerText: {
-    fontSize: 16,
-    fontWeight: '600',
-    color: '#3b82f6',
-  },
-  actionButtons: {
+  templateCard: {
     flexDirection: 'row',
-    backgroundColor: '#ffffff',
-    paddingHorizontal: 20,
-    paddingVertical: 16,
-    borderTopWidth: 1,
-    borderTopColor: '#e2e8f0',
-  },
-  actionButton: {
-    flex: 1,
     alignItems: 'center',
-    paddingVertical: 12,
-    marginHorizontal: 8,
-    backgroundColor: '#f8fafc',
+    backgroundColor: '#F8FAFC',
     borderRadius: 12,
-    borderWidth: 1,
-    borderColor: '#e2e8f0',
+    padding: 16,
+    borderWidth: 2,
+    borderColor: 'transparent',
+    marginBottom: 12,
   },
-  actionIcon: {
-    fontSize: 20,
+  selectedTemplateCard: {
+    borderColor: '#3B82F6',
+    backgroundColor: '#EFF6FF',
+  },
+  templatePreview: {
+    width: 60,
+    height: 60,
+    borderRadius: 30,
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginRight: 16,
+  },
+  templateIcon: {
+    fontSize: 28,
+  },
+  templateInfo: {
+    flex: 1,
+  },
+  templateName: {
+    fontSize: 16,
+    fontWeight: 'bold',
+    color: '#1E293B',
     marginBottom: 4,
   },
-  actionText: {
-    fontSize: 12,
-    fontWeight: '600',
-    color: '#64748b',
+  templateDescription: {
+    fontSize: 14,
+    color: '#64748B',
+  },
+  selectedIndicator: {
+    width: 24,
+    height: 24,
+    borderRadius: 12,
+    backgroundColor: '#3B82F6',
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  checkmark: {
+    color: '#FFFFFF',
+    fontSize: 16,
+    fontWeight: 'bold',
+  },
+  previewContainer: {
+    alignItems: 'center',
+  },
+  previewCard: {
+    width: width - 64,
+    backgroundColor: '#FFFFFF',
+    borderRadius: 12,
+    padding: 20,
+    borderWidth: 1,
+    borderColor: '#E2E8F0',
+  },
+  previewTitle: {
+    fontSize: 18,
+    fontWeight: 'bold',
+    color: '#1E293B',
+    marginBottom: 8,
+    textAlign: 'center',
+  },
+  previewDescription: {
+    fontSize: 14,
+    color: '#64748B',
+    textAlign: 'center',
+    marginBottom: 20,
+  },
+  previewMockup: {
+    borderWidth: 1,
+    borderColor: '#E2E8F0',
+    borderRadius: 8,
+    padding: 16,
+  },
+  mockupHeader: {
+    marginBottom: 16,
+  },
+  mockupBody: {
+    marginBottom: 16,
+  },
+  mockupFooter: {
+    marginBottom: 0,
+  },
+  mockupLine: {
+    height: 8,
+    backgroundColor: '#E2E8F0',
+    borderRadius: 4,
+    marginBottom: 8,
+  },
+  mockupLineShort: {
+    width: '60%',
+  },
+  featuresList: {
+    gap: 12,
+  },
+  featureItem: {
+    flexDirection: 'row',
+    alignItems: 'center',
+  },
+  featureIcon: {
+    fontSize: 20,
+    marginRight: 12,
+    width: 30,
+  },
+  featureText: {
+    fontSize: 16,
+    color: '#374151',
+    flex: 1,
+  },
+  bottomContainer: {
+    padding: 20,
+    backgroundColor: '#FFFFFF',
+    borderTopWidth: 1,
+    borderTopColor: '#E2E8F0',
+  },
+  generateButton: {
+    backgroundColor: '#3B82F6',
+    paddingVertical: 16,
+    borderRadius: 12,
+    alignItems: 'center',
+    shadowColor: '#3B82F6',
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.3,
+    shadowRadius: 8,
+    elevation: 8,
+  },
+  generateButtonText: {
+    color: '#FFFFFF',
+    fontSize: 18,
+    fontWeight: 'bold',
   },
 });
 
