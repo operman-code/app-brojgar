@@ -1,42 +1,53 @@
-import React, { useState, useEffect } from 'react';
+// screens/Invoice/InvoiceScreen.js
+import React, { useState, useEffect } from "react";
 import {
   View,
   Text,
+  TouchableOpacity,
   StyleSheet,
   ScrollView,
   SafeAreaView,
-  TouchableOpacity,
-  StatusBar,
-  Animated,
   TextInput,
-  FlatList,
   Alert,
   Modal,
-} from 'react-native';
-import InvoiceService from './services/InvoiceService';
-import PartiesService from '../Parties/services/PartiesService';
-import InventoryService from '../Inventory/services/InventoryService';
+  FlatList,
+  StatusBar,
+} from "react-native";
 
-const InvoiceScreen = ({ navigation }) => {
-  const [fadeAnim] = useState(new Animated.Value(0));
+// Import services
+import InvoiceService from "./services/InvoiceService";
+import PartiesService from "../Parties/services/PartiesService";
+import InventoryService from "../Inventory/services/InventoryService";
+
+const InvoiceScreen = ({ navigation, route }) => {
   const [invoiceData, setInvoiceData] = useState({
-    invoiceNumber: '',
+    invoiceNumber: "",
     date: new Date().toISOString().split('T')[0],
-    dueDate: '',
-    customer: null,
+    dueDate: "",
+    partyId: "",
+    partyName: "",
+    partyDetails: {},
     items: [],
-    notes: '',
-    terms: '',
-    discount: 0,
-    tax: 18,
+    subtotal: 0,
+    taxRate: 18,
+    taxAmount: 0,
+    discountAmount: 0,
+    total: 0,
+    notes: "",
+    terms: "Payment due within 30 days",
   });
 
-  const [customers, setCustomers] = useState([]);
-  const [products, setProducts] = useState([]);
-  const [showCustomerModal, setShowCustomerModal] = useState(false);
-  const [showProductModal, setShowProductModal] = useState(false);
-  const [searchQuery, setSearchQuery] = useState('');
+  const [parties, setParties] = useState([]);
+  const [inventory, setInventory] = useState([]);
   const [loading, setLoading] = useState(true);
+  const [saving, setSaving] = useState(false);
+  const [showPartyModal, setShowPartyModal] = useState(false);
+  const [showItemModal, setShowItemModal] = useState(false);
+  const [searchPartyQuery, setSearchPartyQuery] = useState("");
+  const [searchItemQuery, setSearchItemQuery] = useState("");
+  const [selectedItem, setSelectedItem] = useState(null);
+  const [itemQuantity, setItemQuantity] = useState("1");
+  const [itemPrice, setItemPrice] = useState("");
 
   useEffect(() => {
     loadInitialData();
