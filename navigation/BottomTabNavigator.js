@@ -113,7 +113,16 @@ const BottomTabNavigator = () => {
       />
     );
   }
-
+  
+if (currentScreen === 'reports') {
+    return (
+      <ReportsScreen 
+        navigation={navigation} 
+        route={createRoute('Reports', routeParams)}
+      />
+    );
+  }
+  
   return (
     <Tab.Navigator
       screenOptions={({ route }) => ({
