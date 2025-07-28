@@ -41,6 +41,23 @@ class SettingsService {
     }
   }
 
+  // Get single setting
+  static async getSetting(key) {
+    try {
+      const query = `
+        SELECT value 
+        FROM business_settings 
+        WHERE key = ? AND deleted_at IS NULL
+      `;
+      
+      const result = await DatabaseService.executeQuery(query, [key]);
+      return result.length > 0 ? result[0].value : null;
+    } catch (error) {
+      console.error(`❌ Error getting setting ${key}:`, error);
+      return null;
+    }
+  }
+  
   // Update setting
   static async updateSetting(key, value) {
     try {
