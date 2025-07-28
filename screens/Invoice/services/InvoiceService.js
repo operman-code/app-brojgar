@@ -110,6 +110,27 @@ class InvoiceService {
     }
   }
 
+  // Create invoice and return data for template selection
+static async createInvoiceWithTemplate(invoiceData) {
+  try {
+    const result = await this.createInvoice(invoiceData);
+    
+    if (result.success) {
+      return {
+        success: true,
+        invoiceId: result.invoiceId,
+        invoiceNumber: invoiceData.invoice_number,
+        shouldNavigateToTemplate: true
+      };
+    }
+    
+    return result;
+  } catch (error) {
+    console.error('❌ Error creating invoice with template:', error);
+    throw error;
+  }
+}
+
   // Get invoice by ID
   static async getInvoiceById(invoiceId) {
     try {
