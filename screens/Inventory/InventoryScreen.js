@@ -1,405 +1,631 @@
-import React, { useState, useEffect } from 'react';
+// screens/Inventory/InventoryScreen.js
+import React, { useState, useEffect } from "react";
 import {
   View,
   Text,
+  TouchableOpacity,
   StyleSheet,
   ScrollView,
   SafeAreaView,
-  TouchableOpacity,
-  StatusBar,
-  Animated,
   FlatList,
-  TextInput,
-  Modal,
   Alert,
+  Modal,
+  TextInput,
+  StatusBar,
   RefreshControl,
-} from 'react-native';
-import InventoryService from './services/InventoryService';
+} from "react-native";
 
-const InventoryScreen = ({ navigation }) => {
-  const [fadeAnim] = useState(new Animated.Value(0));
-  const [selectedTab, setSelectedTab] = useState('all');
-  const [searchQuery, setSearchQuery] = useState('');
-  const [modalVisible, setModalVisible] = useState(false);
+// Import service
+import InventoryService from "./services/InventoryService";
+
+const InventoryScreen = ({ route }) => {
   const [items, setItems] = useState([]);
   const [categories, setCategories] = useState([]);
-  const [loading, setLoading] = useState(true);
+  const [filteredItems, setFilteredItems] = useState([]);
+  const [searchQuery, setSearchQuery] = useState("");
   const [refreshing, setRefreshing] = useState(false);
-  const [summary, setSummary] = useState({});
+  const [loading, setLoading] = useState(true);
+  const [selectedTab, setSelectedTab] = useState("all"); // all, low_stock, categories
+  const [modalVisible, setModalVisible] = useState(false);
+  const [categoryModalVisible, setCategoryModalVisible] = useState(false);
+  const [editingItem, setEditingItem] = useState(null);
+  const [statistics, setStatistics] = useState({});
+  
+  const [formData, setFormData] = useState({
+    item_name: "",
+    item_code: "",
+    category: "",
+    description: "",
+    stock_quantity: "",
+    min_stock_level: "",
+    cost_price: "",
+    selling_price: "",
+    tax_rate: "18",
+    unit: "pcs",
+    hsn_code: "",
+  });
 
-  const [newItem, setNewItem] = useState({
-    name: '',
-    category_id: null,
-    cost_price: '',
-    selling_price: '',
-    current_stock: '',
-    minimum_stock: '',
-    unit: 'pcs',
+  const [categoryFormData, setCategoryFormData] = useState({
+    name: "",
+    description: "",
   });
 
   useEffect(() => {
-    loadInventory();
-    loadCategories();
-    loadSummary();
-    
-    Animated.timing(fadeAnim, {
-      toValue: 1,
-      duration: 600,
-      useNativeDriver: true,
-    }).start();
-  }, [selectedTab, searchQuery]);
+    loadInventoryData();
+  }, []);
 
-  const loadInventory = async () => {
+  useEffect(() => {
+    // Handle navigation params
+    if (route?.params?.action === 'add') {
+      openAddModal();
+    }
+  }, [route?.params]);
+
+  useEffect(() => {
+    filterItems();
+  }, [items, searchQuery, selectedTab]);
+
+  const loadInventoryData = async () => {
+    setLoading(true);
     try {
-      setLoading(true);
-      const data = await InventoryService.getAllItems(null, searchQuery, selectedTab);
-      setItems(data);
+      const [itemsData, categoriesData, stats] = await Promise.all([
+        InventoryService.getAllItems(),
+        InventoryService.getCategories(),
+        InventoryService.getInventorySummary()
+      ]);
+      
+      setItems(itemsData);
+      setCategories(categoriesData);
+      setStatistics(stats);
     } catch (error) {
-      console.error('Error loading inventory:', error);
-      Alert.alert('Error', 'Failed to load inventory');
+      console.error('❌ Error loading inventory:', error);
+      Alert.alert("Error", "Failed to load inventory data");
     } finally {
       setLoading(false);
     }
   };
 
-  const loadCategories = async () => {
-    try {
-      const data = await InventoryService.getCategories();
-      setCategories(data);
-    } catch (error) {
-      console.error('Error loading categories:', error);
+  const filterItems = () => {
+    let filtered = items;
+
+    // Filter by tab
+    if (selectedTab === "low_stock") {
+      filtered = filtered.filter(item => 
+        item.stock_quantity <= item.min_stock_level
+      );
+    } else if (selectedTab === "categories" && searchQuery) {
+      filtered = filtered.filter(item => 
+        item.category && item.category.toLowerCase().includes(searchQuery.toLowerCase())
+      );
     }
+
+    // Filter by search query
+    if (searchQuery.trim() && selectedTab !== "categories") {
+      const query = searchQuery.toLowerCase();
+      filtered = filtered.filter(item =>
+        item.item_name.toLowerCase().includes(query) ||
+        (item.item_code && item.item_code.toLowerCase().includes(query)) ||
+        (item.category && item.category.toLowerCase().includes(query)) ||
+        (item.description && item.description.toLowerCase().includes(query))
+      );
+    }
+
+    setFilteredItems(filtered);
   };
 
-  const loadSummary = async () => {
-    try {
-      const summaryData = await InventoryService.getInventorySummary();
-      setSummary(summaryData);
-    } catch (error) {
-      console.error('Error loading summary:', error);
-    }
-  };
-
-  const onRefresh = async () => {
+  const handleRefresh = async () => {
     setRefreshing(true);
-    await Promise.all([loadInventory(), loadCategories(), loadSummary()]);
+    await loadInventoryData();
     setRefreshing(false);
   };
 
-  const tabs = [
-    { key: 'all', label: 'All Items', count: summary.totalItems || 0 },
-    { key: 'low_stock', label: 'Low Stock', count: summary.lowStockCount || 0 },
-    { key: 'out_of_stock', label: 'Out of Stock', count: 0 },
-  ];
+  const openAddModal = () => {
+    setEditingItem(null);
+    setFormData({
+      item_name: "",
+      item_code: "",
+      category: "",
+      description: "",
+      stock_quantity: "",
+      min_stock_level: "5",
+      cost_price: "",
+      selling_price: "",
+      tax_rate: "18",
+      unit: "pcs",
+      hsn_code: "",
+    });
+    setModalVisible(true);
+  };
 
-  const addItem = async () => {
+  const openEditModal = (item) => {
+    setEditingItem(item);
+    setFormData({
+      item_name: item.item_name || "",
+      item_code: item.item_code || "",
+      category: item.category || "",
+      description: item.description || "",
+      stock_quantity: item.stock_quantity?.toString() || "",
+      min_stock_level: item.min_stock_level?.toString() || "5",
+      cost_price: item.cost_price?.toString() || "",
+      selling_price: item.selling_price?.toString() || "",
+      tax_rate: item.tax_rate?.toString() || "18",
+      unit: item.unit || "pcs",
+      hsn_code: item.hsn_code || "",
+    });
+    setModalVisible(true);
+  };
+
+  const handleSaveItem = async () => {
+    if (!formData.item_name.trim()) {
+      Alert.alert("Error", "Item name is required");
+      return;
+    }
+
     try {
-      const validation = InventoryService.validateItemData(newItem);
-      if (!validation.isValid) {
-        Alert.alert('Validation Error', Object.values(validation.errors).join('\n'));
-        return;
+      const itemData = {
+        ...formData,
+        stock_quantity: parseInt(formData.stock_quantity) || 0,
+        min_stock_level: parseInt(formData.min_stock_level) || 5,
+        cost_price: parseFloat(formData.cost_price) || 0,
+        selling_price: parseFloat(formData.selling_price) || 0,
+        tax_rate: parseFloat(formData.tax_rate) || 18,
+      };
+
+      if (editingItem) {
+        await InventoryService.updateItem(editingItem.id, itemData);
+        Alert.alert("Success", "Item updated successfully");
+      } else {
+        await InventoryService.createItem(itemData);
+        Alert.alert("Success", "Item added successfully");
       }
 
-      await InventoryService.createItem({
-        ...newItem,
-        cost_price: parseFloat(newItem.cost_price) || 0,
-        selling_price: parseFloat(newItem.selling_price) || 0,
-        current_stock: parseFloat(newItem.current_stock) || 0,
-        minimum_stock: parseFloat(newItem.minimum_stock) || 0,
-      });
-      
-      setNewItem({
-        name: '',
-        category_id: null,
-        cost_price: '',
-        selling_price: '',
-        current_stock: '',
-        minimum_stock: '',
-        unit: 'pcs',
-      });
       setModalVisible(false);
-      Alert.alert('Success', 'Item added successfully!');
-      loadInventory();
-      loadSummary();
+      await loadInventoryData();
     } catch (error) {
-      console.error('Error adding item:', error);
-      Alert.alert('Error', 'Failed to add item');
+      console.error('❌ Error saving item:', error);
+      Alert.alert("Error", "Failed to save item");
     }
   };
 
-  const deleteItem = async (itemId, itemName) => {
+  const handleDeleteItem = async (itemId) => {
     Alert.alert(
-      'Delete Item',
-      `Are you sure you want to delete ${itemName}?`,
+      "Delete Item",
+      "Are you sure you want to delete this item?",
       [
-        { text: 'Cancel', style: 'cancel' },
+        { text: "Cancel", style: "cancel" },
         {
-          text: 'Delete',
-          style: 'destructive',
+          text: "Delete",
+          style: "destructive",
           onPress: async () => {
             try {
               await InventoryService.deleteItem(itemId);
-              Alert.alert('Success', 'Item deleted successfully');
-              loadInventory();
-              loadSummary();
+              Alert.alert("Success", "Item deleted successfully");
+              await loadInventoryData();
             } catch (error) {
-              console.error('Error deleting item:', error);
-              Alert.alert('Error', 'Failed to delete item');
+              console.error('❌ Error deleting item:', error);
+              Alert.alert("Error", "Failed to delete item");
             }
-          }
-        }
+          },
+        },
       ]
     );
   };
 
-  const renderTab = (tab) => (
-    <TouchableOpacity
-      key={tab.key}
-      style={[styles.tab, selectedTab === tab.key && styles.activeTab]}
-      onPress={() => setSelectedTab(tab.key)}
-    >
-      <Text style={[styles.tabText, selectedTab === tab.key && styles.activeTabText]}>
-        {tab.label}
-      </Text>
-      <View style={[styles.tabBadge, selectedTab === tab.key && styles.activeTabBadge]}>
-        <Text style={[styles.tabBadgeText, selectedTab === tab.key && styles.activeTabBadgeText]}>
-          {tab.count}
-        </Text>
-      </View>
-    </TouchableOpacity>
-  );
+  const handleSaveCategory = async () => {
+    if (!categoryFormData.name.trim()) {
+      Alert.alert("Error", "Category name is required");
+      return;
+    }
 
-  const renderItem = ({ item }) => {
-    const stockInfo = InventoryService.getStockStatus(item.currentStock, item.minimumStock);
+    try {
+      await InventoryService.createCategory(categoryFormData);
+      Alert.alert("Success", "Category added successfully");
+      setCategoryModalVisible(false);
+      setCategoryFormData({ name: "", description: "" });
+      await loadInventoryData();
+    } catch (error) {
+      console.error('❌ Error saving category:', error);
+      Alert.alert("Error", "Failed to save category");
+    }
+  };
 
+  const getStockStatus = (item) => {
+    if (item.stock_quantity <= 0) return { text: "Out of Stock", color: "#ef4444" };
+    if (item.stock_quantity <= item.min_stock_level) return { text: "Low Stock", color: "#f59e0b" };
+    return { text: "In Stock", color: "#10b981" };
+  };
+
+  const renderItemCard = ({ item }) => {
+    const stockStatus = getStockStatus(item);
+    
     return (
-      <TouchableOpacity style={styles.itemCard}>
+      <TouchableOpacity
+        style={styles.itemCard}
+        onPress={() => openEditModal(item)}
+      >
         <View style={styles.itemHeader}>
-          <View style={styles.itemIcon}>
-            <Text style={styles.itemIconText}>{item.categoryIcon}</Text>
-          </View>
           <View style={styles.itemInfo}>
-            <Text style={styles.itemName}>{item.name}</Text>
-            <Text style={styles.itemCategory}>{item.category}</Text>
-            <View style={styles.stockInfo}>
-              <View style={[styles.stockBadge, { backgroundColor: stockInfo.color }]}>
-                <Text style={styles.stockBadgeText}>{stockInfo.text}</Text>
-              </View>
-              <Text style={styles.stockQuantity}>Stock: {item.currentStock}</Text>
-            </View>
+            <Text style={styles.itemName}>{item.item_name}</Text>
+            <Text style={styles.itemCode}>{item.item_code}</Text>
+            {item.category && (
+              <Text style={styles.itemCategory}>📂 {item.category}</Text>
+            )}
           </View>
-          <View style={styles.itemPricing}>
-            <Text style={styles.itemPrice}>₹{item.sellingPrice.toLocaleString()}</Text>
-            <Text style={styles.profitMargin}>+{item.profitMargin}% margin</Text>
-          </View>
-        </View>
-        
-        <View style={styles.itemDetails}>
-          <View style={styles.detailItem}>
-            <Text style={styles.detailLabel}>Cost</Text>
-            <Text style={styles.detailValue}>₹{item.costPrice.toLocaleString()}</Text>
-          </View>
-          <View style={styles.detailItem}>
-            <Text style={styles.detailLabel}>Min Stock</Text>
-            <Text style={styles.detailValue}>{item.minimumStock}</Text>
-          </View>
-          <View style={styles.detailItem}>
-            <Text style={styles.detailLabel}>Value</Text>
-            <Text style={styles.detailValue}>₹{item.stockValue.toLocaleString()}</Text>
+          <View style={styles.itemActions}>
+            <TouchableOpacity
+              style={styles.editButton}
+              onPress={() => openEditModal(item)}
+            >
+              <Text style={styles.editButtonText}>✏️</Text>
+            </TouchableOpacity>
+            <TouchableOpacity
+              style={styles.deleteButton}
+              onPress={() => handleDeleteItem(item.id)}
+            >
+              <Text style={styles.deleteButtonText}>🗑️</Text>
+            </TouchableOpacity>
           </View>
         </View>
 
-        <View style={styles.itemActions}>
-          <TouchableOpacity style={styles.actionButton}>
-            <Text style={styles.actionButtonText}>📝 Edit</Text>
-          </TouchableOpacity>
-          <TouchableOpacity style={styles.actionButton}>
-            <Text style={styles.actionButtonText}>📊 Report</Text>
-          </TouchableOpacity>
-          <TouchableOpacity 
-            style={[styles.actionButton, styles.primaryActionButton]} 
-            onPress={() => navigation.navigate('Invoice')}
-          >
-            <Text style={[styles.actionButtonText, styles.primaryActionButtonText]}>💰 Sell</Text>
-          </TouchableOpacity>
-          <TouchableOpacity 
-            style={[styles.actionButton, styles.dangerActionButton]}
-            onPress={() => deleteItem(item.id, item.name)}
-          >
-            <Text style={[styles.actionButtonText, styles.dangerActionButtonText]}>🗑️</Text>
-          </TouchableOpacity>
+        {item.description && (
+          <Text style={styles.itemDescription}>{item.description}</Text>
+        )}
+
+        <View style={styles.itemDetails}>
+          <View style={styles.stockInfo}>
+            <Text style={styles.stockQuantity}>
+              Stock: {item.stock_quantity} {item.unit}
+            </Text>
+            <Text style={[styles.stockStatus, { color: stockStatus.color }]}>
+              {stockStatus.text}
+            </Text>
+          </View>
+          <View style={styles.priceInfo}>
+            <Text style={styles.costPrice}>
+              Cost: ₹{(item.cost_price || 0).toLocaleString('en-IN')}
+            </Text>
+            <Text style={styles.sellingPrice}>
+              Price: ₹{(item.selling_price || 0).toLocaleString('en-IN')}
+            </Text>
+          </View>
         </View>
       </TouchableOpacity>
     );
   };
 
+  const renderEmptyState = () => (
+    <View style={styles.emptyContainer}>
+      <Text style={styles.emptyIcon}>📦</Text>
+      <Text style={styles.emptyTitle}>No Items Found</Text>
+      <Text style={styles.emptySubtitle}>
+        {searchQuery 
+          ? "No items match your search criteria" 
+          : "Start by adding your first inventory item"
+        }
+      </Text>
+      {!searchQuery && (
+        <TouchableOpacity
+          style={styles.emptyButton}
+          onPress={openAddModal}
+        >
+          <Text style={styles.emptyButtonText}>Add First Item</Text>
+        </TouchableOpacity>
+      )}
+    </View>
+  );
+
+  if (loading) {
+    return (
+      <SafeAreaView style={styles.container}>
+        <StatusBar barStyle="dark-content" />
+        <View style={styles.loadingContainer}>
+          <Text style={styles.loadingText}>Loading Inventory...</Text>
+        </View>
+      </SafeAreaView>
+    );
+  }
+
   return (
     <SafeAreaView style={styles.container}>
-      <StatusBar barStyle="dark-content" backgroundColor="#ffffff" />
-      
-      <Animated.View style={[styles.content, { opacity: fadeAnim }]}>
-        {/* Header */}
-        <View style={styles.header}>
-          <View style={styles.headerLeft}>
-            <Text style={styles.headerTitle}>Inventory</Text>
-            <Text style={styles.headerSubtitle}>
-              {items.length} items • ₹{(summary.totalValue || 0).toLocaleString()} value
-            </Text>
-          </View>
-          <TouchableOpacity style={styles.addButton} onPress={() => setModalVisible(true)}>
-            <Text style={styles.addButtonText}>+ Add</Text>
+      <StatusBar barStyle="dark-content" />
+
+      {/* Header */}
+      <View style={styles.header}>
+        <Text style={styles.headerTitle}>Inventory</Text>
+        <View style={styles.headerActions}>
+          <TouchableOpacity
+            style={styles.categoryButton}
+            onPress={() => setCategoryModalVisible(true)}
+          >
+            <Text style={styles.categoryButtonText}>+ Category</Text>
+          </TouchableOpacity>
+          <TouchableOpacity
+            style={styles.addButton}
+            onPress={openAddModal}
+          >
+            <Text style={styles.addButtonText}>+ Add Item</Text>
           </TouchableOpacity>
         </View>
+      </View>
 
-        {/* Search */}
-        <View style={styles.searchContainer}>
-          <View style={styles.searchInputContainer}>
-            <Text style={styles.searchIcon}>🔍</Text>
-            <TextInput
-              style={styles.searchInput}
-              placeholder="Search items..."
-              value={searchQuery}
-              onChangeText={setSearchQuery}
-            />
-          </View>
+      {/* Statistics */}
+      <View style={styles.statsContainer}>
+        <View style={styles.statCard}>
+          <Text style={styles.statValue}>{statistics.totalItems || 0}</Text>
+          <Text style={styles.statLabel}>Total Items</Text>
         </View>
-
-        {/* Tabs */}
-        <View style={styles.tabsContainer}>
-          <ScrollView horizontal showsHorizontalScrollIndicator={false}>
-            <View style={styles.tabsRow}>
-              {tabs.map(renderTab)}
-            </View>
-          </ScrollView>
+        <View style={styles.statCard}>
+          <Text style={styles.statValue}>{statistics.lowStockItems || 0}</Text>
+          <Text style={styles.statLabel}>Low Stock</Text>
         </View>
+        <View style={styles.statCard}>
+          <Text style={styles.statValue}>
+            ₹{((statistics.totalValue || 0) / 1000).toFixed(0)}K
+          </Text>
+          <Text style={styles.statLabel}>Total Value</Text>
+        </View>
+        <View style={styles.statCard}>
+          <Text style={styles.statValue}>{statistics.categories || 0}</Text>
+          <Text style={styles.statLabel}>Categories</Text>
+        </View>
+      </View>
 
-        {/* Items List */}
-        <FlatList
-          data={items}
-          renderItem={renderItem}
-          keyExtractor={(item) => item.id.toString()}
-          style={styles.itemsList}
-          contentContainerStyle={styles.itemsListContent}
-          showsVerticalScrollIndicator={false}
-          refreshControl={
-            <RefreshControl refreshing={refreshing} onRefresh={onRefresh} />
-          }
-          ListEmptyComponent={
-            <View style={styles.emptyContainer}>
-              <Text style={styles.emptyIcon}>📦</Text>
-              <Text style={styles.emptyTitle}>No items found</Text>
-              <Text style={styles.emptyMessage}>
-                {searchQuery ? 'Try different search terms' : 'Add your first item to get started'}
-              </Text>
-              {!searchQuery && (
-                <TouchableOpacity 
-                  style={styles.emptyActionButton}
-                  onPress={() => setModalVisible(true)}
-                >
-                  <Text style={styles.emptyActionButtonText}>Add First Item</Text>
-                </TouchableOpacity>
-              )}
-            </View>
-          }
+      {/* Search Bar */}
+      <View style={styles.searchContainer}>
+        <TextInput
+          style={styles.searchInput}
+          placeholder="Search items by name, code, or category..."
+          value={searchQuery}
+          onChangeText={setSearchQuery}
         />
-      </Animated.View>
+        <Text style={styles.searchIcon}>🔍</Text>
+      </View>
 
-      {/* Add Item Modal */}
-      <Modal visible={modalVisible} animationType="slide" presentationStyle="pageSheet">
+      {/* Filter Tabs */}
+      <View style={styles.tabContainer}>
+        {[
+          { key: "all", label: "All Items" },
+          { key: "low_stock", label: "Low Stock" },
+          { key: "categories", label: "Categories" },
+        ].map((tab) => (
+          <TouchableOpacity
+            key={tab.key}
+            style={[
+              styles.tab,
+              selectedTab === tab.key && styles.activeTab,
+            ]}
+            onPress={() => setSelectedTab(tab.key)}
+          >
+            <Text
+              style={[
+                styles.tabText,
+                selectedTab === tab.key && styles.activeTabText,
+              ]}
+            >
+              {tab.label}
+            </Text>
+          </TouchableOpacity>
+        ))}
+      </View>
+
+      {/* Items List */}
+      <FlatList
+        data={filteredItems}
+        renderItem={renderItemCard}
+        keyExtractor={(item) => item.id.toString()}
+        refreshControl={
+          <RefreshControl refreshing={refreshing} onRefresh={handleRefresh} />
+        }
+        contentContainerStyle={styles.listContainer}
+        ListEmptyComponent={renderEmptyState}
+        showsVerticalScrollIndicator={false}
+      />
+
+      {/* Add/Edit Item Modal */}
+      <Modal
+        visible={modalVisible}
+        animationType="slide"
+        presentationStyle="pageSheet"
+      >
         <SafeAreaView style={styles.modalContainer}>
           <View style={styles.modalHeader}>
             <TouchableOpacity onPress={() => setModalVisible(false)}>
               <Text style={styles.modalCloseText}>Cancel</Text>
             </TouchableOpacity>
-            <Text style={styles.modalTitle}>Add New Item</Text>
-            <TouchableOpacity onPress={addItem}>
+            <Text style={styles.modalTitle}>
+              {editingItem ? "Edit Item" : "Add Item"}
+            </Text>
+            <TouchableOpacity onPress={handleSaveItem}>
               <Text style={styles.modalSaveText}>Save</Text>
             </TouchableOpacity>
           </View>
-          
+
           <ScrollView style={styles.modalContent}>
-            <View style={styles.formGroup}>
-              <Text style={styles.formLabel}>Item Name *</Text>
-              <TextInput
-                style={styles.formInput}
-                value={newItem.name}
-                onChangeText={(text) => setNewItem({...newItem, name: text})}
-                placeholder="Enter item name"
-              />
-            </View>
-            
-            <View style={styles.formGroup}>
-              <Text style={styles.formLabel}>Category</Text>
-              <View style={styles.categoryButtons}>
-                {categories.map((category) => (
-                  <TouchableOpacity
-                    key={category.id}
-                    style={[
-                      styles.categoryButton, 
-                      newItem.category_id === category.id && styles.activeCategoryButton
-                    ]}
-                    onPress={() => setNewItem({...newItem, category_id: category.id})}
-                  >
-                    <Text style={styles.categoryIcon}>{category.icon}</Text>
-                    <Text style={[
-                      styles.categoryText,
-                      newItem.category_id === category.id && styles.activeCategoryText
-                    ]}>
-                      {category.name}
-                    </Text>
-                  </TouchableOpacity>
-                ))}
-              </View>
-            </View>
-            
-            <View style={styles.formRow}>
-              <View style={styles.formGroupHalf}>
-                <Text style={styles.formLabel}>Stock Quantity</Text>
-                <TextInput
-                  style={styles.formInput}
-                  value={newItem.current_stock}
-                  onChangeText={(text) => setNewItem({...newItem, current_stock: text})}
-                  placeholder="0"
-                  keyboardType="numeric"
-                />
-              </View>
+            {/* Basic Information */}
+            <View style={styles.section}>
+              <Text style={styles.sectionTitle}>Basic Information</Text>
               
-              <View style={styles.formGroupHalf}>
-                <Text style={styles.formLabel}>Min Stock</Text>
+              <View style={styles.inputGroup}>
+                <Text style={styles.inputLabel}>Item Name *</Text>
                 <TextInput
-                  style={styles.formInput}
-                  value={newItem.minimum_stock}
-                  onChangeText={(text) => setNewItem({...newItem, minimum_stock: text})}
-                  placeholder="0"
-                  keyboardType="numeric"
+                  style={styles.input}
+                  value={formData.item_name}
+                  onChangeText={(text) => setFormData({ ...formData, item_name: text })}
+                  placeholder="Enter item name"
+                />
+              </View>
+
+              <View style={styles.inputGroup}>
+                <Text style={styles.inputLabel}>Item Code</Text>
+                <TextInput
+                  style={styles.input}
+                  value={formData.item_code}
+                  onChangeText={(text) => setFormData({ ...formData, item_code: text })}
+                  placeholder="Enter item code (auto-generated if empty)"
+                />
+              </View>
+
+              <View style={styles.inputGroup}>
+                <Text style={styles.inputLabel}>Category</Text>
+                <TextInput
+                  style={styles.input}
+                  value={formData.category}
+                  onChangeText={(text) => setFormData({ ...formData, category: text })}
+                  placeholder="Select or enter category"
+                />
+              </View>
+
+              <View style={styles.inputGroup}>
+                <Text style={styles.inputLabel}>Description</Text>
+                <TextInput
+                  style={[styles.input, styles.textArea]}
+                  value={formData.description}
+                  onChangeText={(text) => setFormData({ ...formData, description: text })}
+                  placeholder="Enter item description"
+                  multiline
+                  numberOfLines={3}
                 />
               </View>
             </View>
-            
-            <View style={styles.formRow}>
-              <View style={styles.formGroupHalf}>
-                <Text style={styles.formLabel}>Cost Price *</Text>
-                <TextInput
-                  style={styles.formInput}
-                  value={newItem.cost_price}
-                  onChangeText={(text) => setNewItem({...newItem, cost_price: text})}
-                  placeholder="0"
-                  keyboardType="numeric"
-                />
-              </View>
+
+            {/* Stock Information */}
+            <View style={styles.section}>
+              <Text style={styles.sectionTitle}>Stock Information</Text>
               
-              <View style={styles.formGroupHalf}>
-                <Text style={styles.formLabel}>Selling Price *</Text>
+              <View style={styles.row}>
+                <View style={[styles.inputGroup, styles.halfWidth]}>
+                  <Text style={styles.inputLabel}>Stock Quantity</Text>
+                  <TextInput
+                    style={styles.input}
+                    value={formData.stock_quantity}
+                    onChangeText={(text) => setFormData({ ...formData, stock_quantity: text })}
+                    placeholder="0"
+                    keyboardType="numeric"
+                  />
+                </View>
+
+                <View style={[styles.inputGroup, styles.halfWidth]}>
+                  <Text style={styles.inputLabel}>Min Stock Level</Text>
+                  <TextInput
+                    style={styles.input}
+                    value={formData.min_stock_level}
+                    onChangeText={(text) => setFormData({ ...formData, min_stock_level: text })}
+                    placeholder="5"
+                    keyboardType="numeric"
+                  />
+                </View>
+              </View>
+
+              <View style={styles.inputGroup}>
+                <Text style={styles.inputLabel}>Unit</Text>
                 <TextInput
-                  style={styles.formInput}
-                  value={newItem.selling_price}
-                  onChangeText={(text) => setNewItem({...newItem, selling_price: text})}
-                  placeholder="0"
-                  keyboardType="numeric"
+                  style={styles.input}
+                  value={formData.unit}
+                  onChangeText={(text) => setFormData({ ...formData, unit: text })}
+                  placeholder="pcs, kg, ltr, etc."
                 />
               </View>
             </View>
+
+            {/* Pricing Information */}
+            <View style={styles.section}>
+              <Text style={styles.sectionTitle}>Pricing Information</Text>
+              
+              <View style={styles.row}>
+                <View style={[styles.inputGroup, styles.halfWidth]}>
+                  <Text style={styles.inputLabel}>Cost Price (₹)</Text>
+                  <TextInput
+                    style={styles.input}
+                    value={formData.cost_price}
+                    onChangeText={(text) => setFormData({ ...formData, cost_price: text })}
+                    placeholder="0.00"
+                    keyboardType="numeric"
+                  />
+                </View>
+
+                <View style={[styles.inputGroup, styles.halfWidth]}>
+                  <Text style={styles.inputLabel}>Selling Price (₹)</Text>
+                  <TextInput
+                    style={styles.input}
+                    value={formData.selling_price}
+                    onChangeText={(text) => setFormData({ ...formData, selling_price: text })}
+                    placeholder="0.00"
+                    keyboardType="numeric"
+                  />
+                </View>
+              </View>
+
+              <View style={styles.row}>
+                <View style={[styles.inputGroup, styles.halfWidth]}>
+                  <Text style={styles.inputLabel}>Tax Rate (%)</Text>
+                  <TextInput
+                    style={styles.input}
+                    value={formData.tax_rate}
+                    onChangeText={(text) => setFormData({ ...formData, tax_rate: text })}
+                    placeholder="18"
+                    keyboardType="numeric"
+                  />
+                </View>
+
+                <View style={[styles.inputGroup, styles.halfWidth]}>
+                  <Text style={styles.inputLabel}>HSN Code</Text>
+                  <TextInput
+                    style={styles.input}
+                    value={formData.hsn_code}
+                    onChangeText={(text) => setFormData({ ...formData, hsn_code: text })}
+                    placeholder="Enter HSN code"
+                  />
+                </View>
+              </View>
+            </View>
+
+            <View style={{ height: 50 }} />
           </ScrollView>
+        </SafeAreaView>
+      </Modal>
+
+      {/* Add Category Modal */}
+      <Modal
+        visible={categoryModalVisible}
+        animationType="slide"
+        presentationStyle="pageSheet"
+      >
+        <SafeAreaView style={styles.modalContainer}>
+          <View style={styles.modalHeader}>
+            <TouchableOpacity onPress={() => setCategoryModalVisible(false)}>
+              <Text style={styles.modalCloseText}>Cancel</Text>
+            </TouchableOpacity>
+            <Text style={styles.modalTitle}>Add Category</Text>
+            <TouchableOpacity onPress={handleSaveCategory}>
+              <Text style={styles.modalSaveText}>Save</Text>
+            </TouchableOpacity>
+          </View>
+
+          <View style={styles.modalContent}>
+            <View style={styles.section}>
+              <View style={styles.inputGroup}>
+                <Text style={styles.inputLabel}>Category Name *</Text>
+                <TextInput
+                  style={styles.input}
+                  value={categoryFormData.name}
+                  onChangeText={(text) => setCategoryFormData({ ...categoryFormData, name: text })}
+                  placeholder="Enter category name"
+                />
+              </View>
+
+              <View style={styles.inputGroup}>
+                <Text style={styles.inputLabel}>Description</Text>
+                <TextInput
+                  style={[styles.input, styles.textArea]}
+                  value={categoryFormData.description}
+                  onChangeText={(text) => setCategoryFormData({ ...categoryFormData, description: text })}
+                  placeholder="Enter category description"
+                  multiline
+                  numberOfLines={3}
+                />
+              </View>
+            </View>
+          </View>
         </SafeAreaView>
       </Modal>
     </SafeAreaView>
@@ -409,375 +635,324 @@ const InventoryScreen = ({ navigation }) => {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: '#f8fafc',
+    backgroundColor: '#F8FAFC',
   },
-  content: {
+  loadingContainer: {
     flex: 1,
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  loadingText: {
+    fontSize: 18,
+    color: '#64748B',
   },
   header: {
     flexDirection: 'row',
     justifyContent: 'space-between',
     alignItems: 'center',
     paddingHorizontal: 20,
-    paddingVertical: 20,
-    backgroundColor: '#ffffff',
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.04,
-    shadowRadius: 8,
-    elevation: 2,
-  },
-  headerLeft: {
-    flex: 1,
+    paddingVertical: 15,
+    backgroundColor: '#FFFFFF',
+    borderBottomWidth: 1,
+    borderBottomColor: '#E2E8F0',
   },
   headerTitle: {
     fontSize: 24,
     fontWeight: 'bold',
-    color: '#0f172a',
+    color: '#1E293B',
   },
-  headerSubtitle: {
-    fontSize: 14,
-    color: '#64748b',
-    marginTop: 2,
+  headerActions: {
+    flexDirection: 'row',
+  },
+  categoryButton: {
+    backgroundColor: '#10b981',
+    paddingHorizontal: 12,
+    paddingVertical: 8,
+    borderRadius: 8,
+    marginRight: 8,
+  },
+  categoryButtonText: {
+    color: '#FFFFFF',
+    fontWeight: '600',
+    fontSize: 12,
   },
   addButton: {
-    backgroundColor: '#3b82f6',
+    backgroundColor: '#3B82F6',
     paddingHorizontal: 16,
-    paddingVertical: 10,
+    paddingVertical: 8,
     borderRadius: 8,
   },
   addButtonText: {
-    color: '#ffffff',
-    fontSize: 14,
+    color: '#FFFFFF',
     fontWeight: '600',
   },
-  searchContainer: {
+  statsContainer: {
+    flexDirection: 'row',
     paddingHorizontal: 20,
-    paddingVertical: 16,
-    backgroundColor: '#ffffff',
+    paddingVertical: 15,
+    backgroundColor: '#FFFFFF',
   },
-  searchInputContainer: {
+  statCard: {
+    flex: 1,
+    alignItems: 'center',
+  },
+  statValue: {
+    fontSize: 18,
+    fontWeight: 'bold',
+    color: '#1E293B',
+  },
+  statLabel: {
+    fontSize: 12,
+    color: '#64748B',
+    marginTop: 2,
+  },
+  searchContainer: {
     flexDirection: 'row',
     alignItems: 'center',
-    backgroundColor: '#f8fafc',
+    marginHorizontal: 20,
+    marginVertical: 15,
+    backgroundColor: '#FFFFFF',
     borderRadius: 12,
     paddingHorizontal: 16,
     paddingVertical: 12,
-    borderWidth: 1,
-    borderColor: '#e2e8f0',
-  },
-  searchIcon: {
-    fontSize: 18,
-    marginRight: 12,
-    color: '#64748b',
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 1 },
+    shadowOpacity: 0.1,
+    shadowRadius: 3,
+    elevation: 2,
   },
   searchInput: {
     flex: 1,
     fontSize: 16,
-    color: '#0f172a',
-    padding: 0,
+    color: '#1E293B',
   },
-  tabsContainer: {
-    backgroundColor: '#ffffff',
-    paddingBottom: 16,
+  searchIcon: {
+    fontSize: 20,
+    marginLeft: 10,
   },
-  tabsRow: {
+  tabContainer: {
     flexDirection: 'row',
-    paddingHorizontal: 20,
+    marginHorizontal: 20,
+    marginBottom: 15,
   },
   tab: {
-    flexDirection: 'row',
-    alignItems: 'center',
+    flex: 1,
+    paddingVertical: 10,
     paddingHorizontal: 16,
-    paddingVertical: 8,
-    borderRadius: 20,
-    marginRight: 12,
-    backgroundColor: '#f8fafc',
+    borderRadius: 8,
+    marginHorizontal: 4,
+    backgroundColor: '#F1F5F9',
+    alignItems: 'center',
   },
   activeTab: {
-    backgroundColor: '#3b82f6',
+    backgroundColor: '#3B82F6',
   },
   tabText: {
     fontSize: 14,
-    fontWeight: '600',
-    color: '#64748b',
+    fontWeight: '500',
+    color: '#64748B',
   },
   activeTabText: {
-    color: '#ffffff',
+    color: '#FFFFFF',
   },
-  tabBadge: {
-    marginLeft: 8,
-    backgroundColor: '#e2e8f0',
-    paddingHorizontal: 8,
-    paddingVertical: 2,
-    borderRadius: 10,
-  },
-  activeTabBadge: {
-    backgroundColor: 'rgba(255, 255, 255, 0.2)',
-  },
-  tabBadgeText: {
-    fontSize: 12,
-    fontWeight: '600',
-    color: '#64748b',
-  },
-  activeTabBadgeText: {
-    color: '#ffffff',
-  },
-  itemsList: {
-    flex: 1,
-  },
-  itemsListContent: {
-    padding: 20,
+  listContainer: {
+    paddingHorizontal: 20,
+    paddingBottom: 20,
   },
   itemCard: {
-    backgroundColor: '#ffffff',
-    borderRadius: 16,
+    backgroundColor: '#FFFFFF',
+    borderRadius: 12,
     padding: 16,
     marginBottom: 12,
     shadowColor: '#000',
     shadowOffset: { width: 0, height: 1 },
-    shadowOpacity: 0.05,
-    shadowRadius: 8,
+    shadowOpacity: 0.1,
+    shadowRadius: 3,
     elevation: 2,
   },
   itemHeader: {
     flexDirection: 'row',
+    justifyContent: 'space-between',
     alignItems: 'flex-start',
-    marginBottom: 12,
-  },
-  itemIcon: {
-    width: 48,
-    height: 48,
-    borderRadius: 12,
-    backgroundColor: '#f1f5f9',
-    alignItems: 'center',
-    justifyContent: 'center',
-    marginRight: 12,
-  },
-  itemIconText: {
-    fontSize: 20,
+    marginBottom: 8,
   },
   itemInfo: {
     flex: 1,
   },
   itemName: {
-    fontSize: 16,
-    fontWeight: '600',
-    color: '#0f172a',
+    fontSize: 18,
+    fontWeight: 'bold',
+    color: '#1E293B',
+    marginBottom: 2,
+  },
+  itemCode: {
+    fontSize: 14,
+    color: '#64748B',
     marginBottom: 4,
   },
   itemCategory: {
-    fontSize: 14,
-    color: '#64748b',
-    marginBottom: 8,
-  },
-  stockInfo: {
-    flexDirection: 'row',
-    alignItems: 'center',
-  },
-  stockBadge: {
-    paddingHorizontal: 8,
-    paddingVertical: 2,
-    borderRadius: 12,
-    marginRight: 8,
-  },
-  stockBadgeText: {
-    fontSize: 11,
-    fontWeight: '600',
-    color: '#ffffff',
-  },
-  stockQuantity: {
     fontSize: 12,
-    color: '#64748b',
-  },
-  itemPricing: {
-    alignItems: 'flex-end',
-  },
-  itemPrice: {
-    fontSize: 16,
-    fontWeight: 'bold',
-    color: '#0f172a',
-    marginBottom: 2,
-  },
-  profitMargin: {
-    fontSize: 12,
-    color: '#10b981',
-    fontWeight: '600',
-  },
-  itemDetails: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    marginBottom: 12,
-    paddingTop: 12,
-    borderTopWidth: 1,
-    borderTopColor: '#f1f5f9',
-  },
-  detailItem: {
-    alignItems: 'center',
-  },
-  detailLabel: {
-    fontSize: 12,
-    color: '#64748b',
-    marginBottom: 2,
-  },
-  detailValue: {
-    fontSize: 14,
-    fontWeight: '600',
-    color: '#0f172a',
+    color: '#3B82F6',
   },
   itemActions: {
     flexDirection: 'row',
+  },
+  editButton: {
+    padding: 8,
+    marginLeft: 8,
+  },
+  editButtonText: {
+    fontSize: 16,
+  },
+  deleteButton: {
+    padding: 8,
+    marginLeft: 8,
+  },
+  deleteButtonText: {
+    fontSize: 16,
+  },
+  itemDescription: {
+    fontSize: 14,
+    color: '#64748B',
+    marginBottom: 12,
+    lineHeight: 20,
+  },
+  itemDetails: {
+    borderTopWidth: 1,
+    borderTopColor: '#F1F5F9',
+    paddingTop: 12,
+  },
+  stockInfo: {
+    flexDirection: 'row',
     justifyContent: 'space-between',
-  },
-  actionButton: {
-    flex: 1,
-    backgroundColor: '#f8fafc',
-    paddingVertical: 10,
-    marginHorizontal: 4,
-    borderRadius: 8,
     alignItems: 'center',
+    marginBottom: 8,
   },
-  primaryActionButton: {
-    backgroundColor: '#3b82f6',
+  stockQuantity: {
+    fontSize: 14,
+    color: '#1E293B',
+    fontWeight: '500',
   },
-  dangerActionButton: {
-    backgroundColor: '#fef2f2',
-    flex: 0.3,
-  },
-  actionButtonText: {
+  stockStatus: {
     fontSize: 12,
     fontWeight: '600',
-    color: '#64748b',
   },
-  primaryActionButtonText: {
-    color: '#ffffff',
+  priceInfo: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
   },
-  dangerActionButtonText: {
-    color: '#ef4444',
+  costPrice: {
+    fontSize: 14,
+    color: '#64748B',
+  },
+  sellingPrice: {
+    fontSize: 14,
+    color: '#1E293B',
+    fontWeight: '600',
   },
   emptyContainer: {
-    flex: 1,
     alignItems: 'center',
     justifyContent: 'center',
     paddingVertical: 60,
   },
   emptyIcon: {
-    fontSize: 48,
+    fontSize: 64,
     marginBottom: 16,
   },
   emptyTitle: {
-    fontSize: 18,
-    fontWeight: '600',
-    color: '#374151',
+    fontSize: 20,
+    fontWeight: 'bold',
+    color: '#1E293B',
     marginBottom: 8,
   },
-  emptyMessage: {
-    fontSize: 14,
-    color: '#64748b',
+  emptySubtitle: {
+    fontSize: 16,
+    color: '#64748B',
     textAlign: 'center',
-    lineHeight: 20,
-    marginBottom: 20,
+    marginBottom: 24,
+    paddingHorizontal: 40,
   },
-  emptyActionButton: {
-    backgroundColor: '#3b82f6',
+  emptyButton: {
+    backgroundColor: '#3B82F6',
     paddingHorizontal: 24,
     paddingVertical: 12,
     borderRadius: 8,
   },
-  emptyActionButtonText: {
-    color: '#ffffff',
-    fontSize: 14,
+  emptyButtonText: {
+    color: '#FFFFFF',
     fontWeight: '600',
   },
   modalContainer: {
     flex: 1,
-    backgroundColor: '#ffffff',
+    backgroundColor: '#F8FAFC',
   },
   modalHeader: {
     flexDirection: 'row',
     justifyContent: 'space-between',
     alignItems: 'center',
     paddingHorizontal: 20,
-    paddingVertical: 16,
+    paddingVertical: 15,
+    backgroundColor: '#FFFFFF',
     borderBottomWidth: 1,
-    borderBottomColor: '#e2e8f0',
+    borderBottomColor: '#E2E8F0',
   },
   modalCloseText: {
     fontSize: 16,
-    color: '#64748b',
+    color: '#64748B',
   },
   modalTitle: {
     fontSize: 18,
     fontWeight: 'bold',
-    color: '#0f172a',
+    color: '#1E293B',
   },
   modalSaveText: {
     fontSize: 16,
+    color: '#3B82F6',
     fontWeight: '600',
-    color: '#3b82f6',
   },
   modalContent: {
     flex: 1,
-    padding: 20,
+    paddingHorizontal: 20,
   },
-  formGroup: {
-    marginBottom: 20,
+  section: {
+    marginTop: 24,
   },
-  formGroupHalf: {
-    flex: 1,
-    marginRight: 10,
+  sectionTitle: {
+    fontSize: 18,
+    fontWeight: 'bold',
+    color: '#1E293B',
+    marginBottom: 16,
   },
-  formRow: {
-    flexDirection: 'row',
-    marginBottom: 20,
+  inputGroup: {
+    marginBottom: 16,
   },
-  formLabel: {
+  inputLabel: {
     fontSize: 14,
-    fontWeight: '600',
+    fontWeight: '500',
     color: '#374151',
     marginBottom: 8,
   },
-  formInput: {
-    backgroundColor: '#f8fafc',
+  input: {
+    backgroundColor: '#FFFFFF',
     borderWidth: 1,
-    borderColor: '#e2e8f0',
-    borderRadius: 12,
-    paddingHorizontal: 16,
+    borderColor: '#D1D5DB',
+    borderRadius: 8,
+    paddingHorizontal: 12,
     paddingVertical: 12,
     fontSize: 16,
-    color: '#0f172a',
+    color: '#1E293B',
   },
-  categoryButtons: {
+  textArea: {
+    height: 80,
+    textAlignVertical: 'top',
+  },
+  row: {
     flexDirection: 'row',
-    flexWrap: 'wrap',
-    gap: 8,
+    justifyContent: 'space-between',
   },
-  categoryButton: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    paddingHorizontal: 12,
-    paddingVertical: 8,
-    backgroundColor: '#f8fafc',
-    borderWidth: 1,
-    borderColor: '#e2e8f0',
-    borderRadius: 8,
-    marginBottom: 8,
-  },
-  activeCategoryButton: {
-    backgroundColor: '#3b82f6',
-    borderColor: '#3b82f6',
-  },
-  categoryIcon: {
-    fontSize: 16,
-    marginRight: 6,
-  },
-  categoryText: {
-    fontSize: 14,
-    fontWeight: '600',
-    color: '#64748b',
-  },
-  activeCategoryText: {
-    color: '#ffffff',
+  halfWidth: {
+    width: '48%',
   },
 });
 
