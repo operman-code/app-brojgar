@@ -25,9 +25,14 @@ import NotificationCard from "./components/NotificationCard";
 // Import service
 import DashboardService from "./services/DashboardService";
 
+// Import theme
+import { useTheme } from "../../context/ThemeContext";
+
 const { width } = Dimensions.get('window');
 
 const DashboardScreen = ({ navigation }) => {
+  const { theme } = useTheme();
+  
   // Enhanced state management
   const [kpiData, setKpiData] = useState({});
   const [recentTransactions, setRecentTransactions] = useState([]);
@@ -340,8 +345,8 @@ const DashboardScreen = ({ navigation }) => {
   }
 
   return (
-    <SafeAreaView style={styles.container}>
-      <StatusBar barStyle="dark-content" backgroundColor="#ffffff" />
+    <SafeAreaView style={[styles.container, { backgroundColor: theme.background }]}>
+      <StatusBar barStyle={theme.statusBar === 'dark' ? 'dark-content' : 'light-content'} backgroundColor={theme.surface} />
       
       <Animated.View 
         style={[
@@ -353,10 +358,10 @@ const DashboardScreen = ({ navigation }) => {
         ]}
       >
         {/* Header */}
-        <View style={styles.header}>
+        <View style={[styles.header, { backgroundColor: theme.surface, borderBottomColor: theme.border }]}>
           <View>
-            <Text style={styles.welcomeText}>Welcome back!</Text>
-            <Text style={styles.businessName}>{businessProfile.businessName || 'Brojgar Business'}</Text>
+            <Text style={[styles.welcomeText, { color: theme.textSecondary }]}>Welcome back!</Text>
+            <Text style={[styles.businessName, { color: theme.text }]}>{businessProfile.businessName || 'Brojgar Business'}</Text>
           </View>
           <View style={styles.headerActions}>
             <TouchableOpacity 

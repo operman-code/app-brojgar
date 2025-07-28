@@ -7,6 +7,9 @@ import * as SQLite from 'expo-sqlite';
 // Import navigation
 import BottomTabNavigator from './navigation/BottomTabNavigator';
 
+// Import theme
+import { ThemeProvider } from './context/ThemeContext';
+
 // Import services
 import DatabaseService from './database/DatabaseService';
 import NotificationService from './screens/Notifications/services/NotificationService';
@@ -109,9 +112,10 @@ export default function App() {
   }
 
   return (
-    <NavigationContainer>
-      <StatusBar style="auto" />
-      <BottomTabNavigator />
-    </NavigationContainer>
+    <ThemeProvider>
+      <NavigationContainer>
+        <BottomTabNavigator />
+      </NavigationContainer>
+    </ThemeProvider>
   );
 }
