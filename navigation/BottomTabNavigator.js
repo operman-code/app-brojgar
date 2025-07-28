@@ -35,6 +35,9 @@ const BottomTabNavigator = () => {
       } else if (screen === "Search") {
         setCurrentScreen('search');
         setRouteParams(params);
+      } else if (screen === "Reports") {
+        setCurrentScreen('reports');
+        setRouteParams(params);
       } else if (screen === "Backup") {
         // Handle backup navigation if needed
         console.log('Backup navigation - implement if needed');
@@ -51,7 +54,7 @@ const BottomTabNavigator = () => {
         setCurrentScreen('invoice');
       } else if (currentScreen === 'invoice') {
         setCurrentScreen('main');
-      } else if (currentScreen === 'notifications' || currentScreen === 'search') {
+      } else if (currentScreen === 'notifications' || currentScreen === 'search' || currentScreen === 'reports') {
         setCurrentScreen('main');
       } else {
         setCurrentScreen('main');
@@ -107,6 +110,15 @@ const BottomTabNavigator = () => {
       <GlobalSearchScreen 
         navigation={navigation} 
         route={createRoute('Search', routeParams)}
+      />
+    );
+  }
+
+  if (currentScreen === 'reports') {
+    return (
+      <ReportsScreen 
+        navigation={navigation} 
+        route={createRoute('Reports', routeParams)}
       />
     );
   }

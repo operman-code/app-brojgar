@@ -188,11 +188,9 @@ const DashboardScreen = ({ navigation }) => {
       </View>
       
       {reminders.length > 0 ? (
-        <FlatList
-          data={reminders.slice(0, 3)}
-          keyExtractor={(item) => item.id.toString()}
-          renderItem={({ item }) => (
-            <View style={styles.reminderCard}>
+        <View>
+          {reminders.slice(0, 3).map((item) => (
+            <View key={item.id.toString()} style={styles.reminderCard}>
               <View style={styles.reminderLeft}>
                 <View style={[styles.reminderIcon, { backgroundColor: item.color }]}>
                   <Text style={styles.reminderIconText}>{item.icon}</Text>
@@ -204,9 +202,8 @@ const DashboardScreen = ({ navigation }) => {
               </View>
               <Text style={styles.reminderAmount}>₹{item.amount?.toLocaleString()}</Text>
             </View>
-          )}
-          showsVerticalScrollIndicator={false}
-        />
+          ))}
+        </View>
       ) : (
         <View style={styles.emptyState}>
           <Text style={styles.emptyStateText}>No pending reminders</Text>
@@ -259,20 +256,18 @@ const DashboardScreen = ({ navigation }) => {
       </View>
 
       {filteredTransactions.length > 0 ? (
-        <FlatList
-          data={filteredTransactions.slice(0, 5)}
-          keyExtractor={(item) => item.id.toString()}
-          renderItem={({ item }) => (
+        <View>
+          {filteredTransactions.slice(0, 5).map((item) => (
             <TransactionItem
+              key={item.id.toString()}
               transaction={item}
               onPress={() => {
                 // Handle transaction press
                 Alert.alert("Transaction", `View ${item.type} details`);
               }}
             />
-          )}
-          showsVerticalScrollIndicator={false}
-        />
+          ))}
+        </View>
       ) : (
         <View style={styles.emptyState}>
           <Text style={styles.emptyStateText}>
