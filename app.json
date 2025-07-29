@@ -29,13 +29,12 @@
     "plugins": [
       "expo-sqlite",
       "expo-file-system",
-      "expo-sharing",
       "expo-print",
       "expo-document-picker"
     ],
     "extra": {
       "eas": {
-        "projectId": "your-project-id-here"
+        "projectId": "cf0c02de-68ec-43f7-8d83-b33bb6c9578b"
       }
     }
   }
