@@ -1,6 +1,5 @@
-// index.js - Main entry point with database initialization
 import { registerRootComponent } from 'expo';
-import AppLoader from './AppLoader';
+import App from './App';
 
-// Register the AppLoader as the main component
-registerRootComponent(AppLoader);
+// Register the main App component
+registerRootComponent(App);
