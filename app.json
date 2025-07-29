@@ -26,15 +26,9 @@
         "READ_EXTERNAL_STORAGE"
       ]
     },
-    "plugins": [
-      "expo-sqlite",
-      "expo-file-system",
-      "expo-print",
-      "expo-document-picker"
-    ],
     "extra": {
       "eas": {
-        "projectId": "cf0c02de-68ec-43f7-8d83-b33bb6c9578b"
+        "projectId": "your-project-id-here"
       }
     }
   }
