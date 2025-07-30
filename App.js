@@ -1,14 +1,16 @@
 import React, { useState, useEffect } from 'react';
 import { NavigationContainer } from '@react-navigation/native';
 import { StatusBar } from 'expo-status-bar';
-import { Alert } from 'react-native';
+import { Alert, View, ActivityIndicator, Text } from 'react-native';
 import * as SQLite from 'expo-sqlite';
 
 // Import navigation
 import BottomTabNavigator from './navigation/BottomTabNavigator';
+import AuthNavigator from './navigation/AuthNavigator';
 
-// Import theme
+// Import contexts
 import { ThemeProvider } from './context/ThemeContext';
+import { AuthProvider, useAuth } from './context/AuthContext';
 
 // Import services
 import DatabaseService from './database/DatabaseService';
@@ -113,9 +115,41 @@ export default function App() {
 
   return (
     <ThemeProvider>
-      <NavigationContainer>
-        <BottomTabNavigator />
-      </NavigationContainer>
+      <AuthProvider>
+        <NavigationContainer>
+          <AppContent />
+        </NavigationContainer>
+      </AuthProvider>
     </ThemeProvider>
   );
+};
+
+// Separate component to access auth context
+const AppContent = () => {
+  const { isAuthenticated, isLoading, isFirstLaunch } = useAuth();
+
+  // Show loading spinner while checking authentication
+  if (isLoading) {
+    return (
+      <View style={{
+        flex: 1,
+        justifyContent: 'center',
+        alignItems: 'center',
+        backgroundColor: '#f8fafc'
+      }}>
+        <ActivityIndicator size="large" color="#3B82F6" />
+        <Text style={{
+          marginTop: 16,
+          fontSize: 16,
+          color: '#64748b',
+          fontWeight: '500'
+        }}>
+          Loading Brojgar...
+        </Text>
+      </View>
+    );
+  }
+
+  // Show appropriate navigator based on auth state
+  return isAuthenticated ? <BottomTabNavigator /> : <AuthNavigator />;
 }
