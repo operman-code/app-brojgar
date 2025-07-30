@@ -140,6 +140,72 @@ const InvoiceTemplateScreen = ({ navigation, route }) => {
     }
   };
 
+  const renderTemplatePreview = (templateId) => {
+    if (!invoiceData || !businessProfile) return null;
+
+    const templateColors = {
+      classic: '#3B82F6',
+      modern: '#10B981', 
+      minimal: '#8B5CF6',
+      corporate: '#F59E0B'
+    };
+
+    const color = templateColors[templateId] || '#3B82F6';
+
+    return (
+      <View style={styles.invoicePreview}>
+        {/* Header */}
+        <View style={[styles.previewHeader, { borderBottomColor: color }]}>
+          <View>
+            <Text style={[styles.previewBusinessName, { color }]}>
+              {businessProfile.business_name || 'Brojgar Business'}
+            </Text>
+            <Text style={styles.previewBusinessDetails}>
+              {businessProfile.business_email || 'info@brojgar.com'}
+            </Text>
+          </View>
+          <View style={styles.previewInvoiceInfo}>
+            <Text style={[styles.previewInvoiceTitle, { color }]}>INVOICE</Text>
+            <Text style={styles.previewInvoiceNumber}>#{invoiceData.invoice_number}</Text>
+          </View>
+        </View>
+
+        {/* Customer Details */}
+        <View style={styles.previewSection}>
+          <Text style={styles.previewSectionTitle}>Bill To:</Text>
+          <Text style={styles.previewCustomerName}>{invoiceData.customer_name}</Text>
+          <Text style={styles.previewDate}>Date: {invoiceData.date}</Text>
+        </View>
+
+        {/* Items */}
+        <View style={styles.previewItems}>
+          <View style={[styles.previewItemsHeader, { backgroundColor: color + '10' }]}>
+            <Text style={[styles.previewItemHeaderText, { color }]}>Item</Text>
+            <Text style={[styles.previewItemHeaderText, { color }]}>Qty</Text>
+            <Text style={[styles.previewItemHeaderText, { color }]}>Amount</Text>
+          </View>
+          {invoiceData.items?.slice(0, 2).map((item, index) => (
+            <View key={index} style={styles.previewItemRow}>
+              <Text style={styles.previewItemName}>{item.item_name?.substring(0, 12)}...</Text>
+              <Text style={styles.previewItemQty}>{item.quantity}</Text>
+              <Text style={styles.previewItemAmount}>₹{item.total}</Text>
+            </View>
+          ))}
+          {invoiceData.items?.length > 2 && (
+            <Text style={styles.previewMoreItems}>+{invoiceData.items.length - 2} more items</Text>
+          )}
+        </View>
+
+        {/* Total */}
+        <View style={[styles.previewTotal, { borderTopColor: color }]}>
+          <Text style={[styles.previewTotalText, { color }]}>
+            Total: ₹{parseFloat(invoiceData.total).toLocaleString('en-IN')}
+          </Text>
+        </View>
+      </View>
+    );
+  };
+
   const renderTemplateCard = (template) => (
     <TouchableOpacity
       key={template.id}
@@ -234,32 +300,15 @@ const InvoiceTemplateScreen = ({ navigation, route }) => {
 
         {/* Template Preview */}
         <View style={styles.section}>
-          <Text style={styles.sectionTitle}>Preview</Text>
+          <View style={styles.previewTitleContainer}>
+            <Text style={styles.sectionTitle}>Live Preview</Text>
+            <Text style={styles.previewSubtitle}>
+              {templates.find(t => t.id === selectedTemplate)?.name} Template
+            </Text>
+          </View>
           
           <View style={styles.previewContainer}>
-            <View style={styles.previewCard}>
-              <Text style={styles.previewTitle}>
-                {templates.find(t => t.id === selectedTemplate)?.name} Template
-              </Text>
-              <Text style={styles.previewDescription}>
-                {templates.find(t => t.id === selectedTemplate)?.description}
-              </Text>
-              
-              <View style={styles.previewMockup}>
-                <View style={styles.mockupHeader}>
-                  <View style={styles.mockupLine} />
-                  <View style={[styles.mockupLine, styles.mockupLineShort]} />
-                </View>
-                <View style={styles.mockupBody}>
-                  <View style={styles.mockupLine} />
-                  <View style={styles.mockupLine} />
-                  <View style={[styles.mockupLine, styles.mockupLineShort]} />
-                </View>
-                <View style={styles.mockupFooter}>
-                  <View style={[styles.mockupLine, styles.mockupLineShort]} />
-                </View>
-              </View>
-            </View>
+            {renderTemplatePreview(selectedTemplate)}
           </View>
         </View>
 
@@ -435,53 +484,131 @@ const styles = StyleSheet.create({
     fontSize: 16,
     fontWeight: 'bold',
   },
+  previewTitleContainer: {
+    marginBottom: 16,
+  },
+  previewSubtitle: {
+    fontSize: 14,
+    color: '#64748B',
+    marginTop: 4,
+  },
   previewContainer: {
     alignItems: 'center',
   },
-  previewCard: {
+  invoicePreview: {
     width: width - 64,
     backgroundColor: '#FFFFFF',
     borderRadius: 12,
-    padding: 20,
+    padding: 16,
     borderWidth: 1,
     borderColor: '#E2E8F0',
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.1,
+    shadowRadius: 4,
+    elevation: 3,
   },
-  previewTitle: {
+  previewHeader: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'flex-start',
+    paddingBottom: 12,
+    borderBottomWidth: 2,
+    marginBottom: 12,
+  },
+  previewBusinessName: {
+    fontSize: 16,
+    fontWeight: 'bold',
+    marginBottom: 2,
+  },
+  previewBusinessDetails: {
+    fontSize: 11,
+    color: '#64748B',
+  },
+  previewInvoiceInfo: {
+    alignItems: 'flex-end',
+  },
+  previewInvoiceTitle: {
     fontSize: 18,
     fontWeight: 'bold',
-    color: '#1E293B',
-    marginBottom: 8,
-    textAlign: 'center',
+    marginBottom: 2,
   },
-  previewDescription: {
-    fontSize: 14,
+  previewInvoiceNumber: {
+    fontSize: 12,
     color: '#64748B',
-    textAlign: 'center',
-    marginBottom: 20,
   },
-  previewMockup: {
-    borderWidth: 1,
-    borderColor: '#E2E8F0',
-    borderRadius: 8,
-    padding: 16,
+  previewSection: {
+    marginBottom: 12,
   },
-  mockupHeader: {
-    marginBottom: 16,
+  previewSectionTitle: {
+    fontSize: 12,
+    fontWeight: 'bold',
+    color: '#374151',
+    marginBottom: 4,
   },
-  mockupBody: {
-    marginBottom: 16,
+  previewCustomerName: {
+    fontSize: 14,
+    fontWeight: '600',
+    color: '#1E293B',
+    marginBottom: 2,
   },
-  mockupFooter: {
-    marginBottom: 0,
+  previewDate: {
+    fontSize: 11,
+    color: '#64748B',
   },
-  mockupLine: {
-    height: 8,
-    backgroundColor: '#E2E8F0',
+  previewItems: {
+    marginBottom: 12,
+  },
+  previewItemsHeader: {
+    flexDirection: 'row',
+    paddingVertical: 6,
+    paddingHorizontal: 8,
     borderRadius: 4,
-    marginBottom: 8,
+    marginBottom: 6,
   },
-  mockupLineShort: {
-    width: '60%',
+  previewItemHeaderText: {
+    fontSize: 11,
+    fontWeight: 'bold',
+    flex: 1,
+    textAlign: 'center',
+  },
+  previewItemRow: {
+    flexDirection: 'row',
+    paddingVertical: 4,
+    paddingHorizontal: 8,
+  },
+  previewItemName: {
+    fontSize: 10,
+    color: '#374151',
+    flex: 1,
+  },
+  previewItemQty: {
+    fontSize: 10,
+    color: '#374151',
+    flex: 1,
+    textAlign: 'center',
+  },
+  previewItemAmount: {
+    fontSize: 10,
+    color: '#374151',
+    flex: 1,
+    textAlign: 'right',
+  },
+  previewMoreItems: {
+    fontSize: 9,
+    color: '#64748B',
+    fontStyle: 'italic',
+    textAlign: 'center',
+    marginTop: 4,
+  },
+  previewTotal: {
+    borderTopWidth: 2,
+    paddingTop: 8,
+    alignItems: 'flex-end',
+  },
+  previewTotalText: {
+    fontSize: 14,
+    fontWeight: 'bold',
   },
   featuresList: {
     gap: 12,
