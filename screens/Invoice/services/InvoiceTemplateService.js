@@ -74,15 +74,32 @@ class InvoiceTemplateService {
     }
   }
 
-  // Generate PDF
+  // Generate PDF with better error handling
   static async generatePDF(invoiceData, businessProfile, templateType = 'classic', theme = 'standard') {
     try {
+      console.log('🔄 Generating PDF...', { templateType, theme });
+      
       const htmlContent = this.generateHTML(invoiceData, businessProfile, templateType, theme);
       
-      const { uri } = await Print.printToFileAsync({
-        html: htmlContent,
-        base64: false
-      });
+      // Validate HTML content
+      if (!htmlContent || htmlContent.length === 0) {
+        throw new Error('Generated HTML content is empty');
+      }
+
+      console.log('📄 HTML content generated, length:', htmlContent.length);
+
+      // Generate PDF with timeout
+      const { uri } = await Promise.race([
+        Print.printToFileAsync({
+          html: htmlContent,
+          base64: false
+        }),
+        new Promise((_, reject) => 
+          setTimeout(() => reject(new Error('PDF generation timeout')), 30000)
+        )
+      ]);
+
+      console.log('✅ PDF generated successfully:', uri);
 
       return {
         success: true,
@@ -93,19 +110,36 @@ class InvoiceTemplateService {
       console.error('❌ Error generating PDF:', error);
       return {
         success: false,
-        error: error.message
+        error: error.message || 'Failed to generate PDF'
       };
     }
   }
 
-  // Generate HTML for different templates and themes
+  // Generate HTML with sanitized content
   static generateHTML(invoiceData, businessProfile, templateType, theme) {
     const formatCurrency = (amount) => {
-      return `₹${parseFloat(amount).toLocaleString('en-IN')}`;
+      try {
+        return `₹${parseFloat(amount || 0).toLocaleString('en-IN')}`;
+      } catch (error) {
+        return `₹${parseFloat(amount || 0).toFixed(2)}`;
+      }
     };
 
     const formatDate = (dateString) => {
-      return new Date(dateString).toLocaleDateString('en-IN');
+      try {
+        return new Date(dateString).toLocaleDateString('en-IN');
+      } catch (error) {
+        return dateString || 'N/A';
+      }
+    };
+
+    const sanitizeText = (text) => {
+      if (!text) return '';
+      return text.toString()
+        .replace(/[<>]/g, '') // Remove potential HTML tags
+        .replace(/&/g, '&amp;')
+        .replace(/"/g, '&quot;')
+        .replace(/'/g, '&#39;');
     };
 
     // Theme configurations
@@ -149,7 +183,7 @@ class InvoiceTemplateService {
 
     const currentTheme = themeConfigs[theme] || themeConfigs.standard;
 
-    // Base styles
+    // Base styles with better CSS
     const baseStyles = `
       <style>
         * {
@@ -163,6 +197,8 @@ class InvoiceTemplateService {
           line-height: 1.6;
           color: ${currentTheme.text};
           background-color: ${currentTheme.background};
+          -webkit-print-color-adjust: exact;
+          print-color-adjust: exact;
         }
         .container {
           max-width: 800px;
@@ -251,6 +287,10 @@ class InvoiceTemplateService {
         .notes h4 {
           margin-bottom: 10px;
           color: ${currentTheme.primary};
+        }
+        @media print {
+          body { margin: 0; }
+          .container { max-width: none; }
         }
       </style>
     `;
@@ -591,7 +631,7 @@ class InvoiceTemplateService {
               padding: 3px;
               border: none;
               border-bottom: 1px dotted ${currentTheme.border};
-              }
+            }
             .items-table th {
               background: none;
               font-weight: bold;
@@ -692,13 +732,13 @@ class InvoiceTemplateService {
         break;
     }
 
-    // Generate the HTML content
+    // Generate the HTML content with sanitized data
     const htmlContent = `
       <!DOCTYPE html>
       <html>
       <head>
         <meta charset="utf-8">
-        <title>Invoice ${invoiceData.invoice_number}</title>
+        <title>Invoice ${sanitizeText(invoiceData.invoice_number)}</title>
         ${baseStyles}
         ${templateStyles}
       </head>
@@ -706,15 +746,15 @@ class InvoiceTemplateService {
         <div class="container">
           <div class="header">
             <div class="business-info">
-              <h1>${businessProfile.name || 'Your Business'}</h1>
-              ${businessProfile.address ? `<p>${businessProfile.address}</p>` : ''}
-              ${businessProfile.phone ? `<p>Phone: ${businessProfile.phone}</p>` : ''}
-              ${businessProfile.email ? `<p>Email: ${businessProfile.email}</p>` : ''}
-              ${businessProfile.gst_number ? `<p>GST: ${businessProfile.gst_number}</p>` : ''}
+              <h1>${sanitizeText(businessProfile.name || 'Your Business')}</h1>
+              ${businessProfile.address ? `<p>${sanitizeText(businessProfile.address)}</p>` : ''}
+              ${businessProfile.phone ? `<p>Phone: ${sanitizeText(businessProfile.phone)}</p>` : ''}
+              ${businessProfile.email ? `<p>Email: ${sanitizeText(businessProfile.email)}</p>` : ''}
+              ${businessProfile.gst_number ? `<p>GST: ${sanitizeText(businessProfile.gst_number)}</p>` : ''}
             </div>
             <div class="invoice-info">
               <h2>${isThermal ? 'RECEIPT' : 'INVOICE'}</h2>
-              <p><strong>#${invoiceData.invoice_number}</strong></p>
+              <p><strong>#${sanitizeText(invoiceData.invoice_number)}</strong></p>
               <p>Date: ${formatDate(invoiceData.date)}</p>
               ${invoiceData.due_date ? `<p>Due: ${formatDate(invoiceData.due_date)}</p>` : ''}
             </div>
@@ -723,11 +763,11 @@ class InvoiceTemplateService {
           <div class="billing-section">
             <div class="billing-info">
               <h3>${isThermal ? 'CUSTOMER' : 'Bill To:'}</h3>
-              <p><strong>${invoiceData.customer_name}</strong></p>
-              ${invoiceData.customer_address ? `<p>${invoiceData.customer_address}</p>` : ''}
-              ${invoiceData.customer_phone ? `<p>Phone: ${invoiceData.customer_phone}</p>` : ''}
-              ${invoiceData.customer_email ? `<p>Email: ${invoiceData.customer_email}</p>` : ''}
-              ${invoiceData.customer_gst ? `<p>GST: ${invoiceData.customer_gst}</p>` : ''}
+              <p><strong>${sanitizeText(invoiceData.customer_name)}</strong></p>
+              ${invoiceData.customer_address ? `<p>${sanitizeText(invoiceData.customer_address)}</p>` : ''}
+              ${invoiceData.customer_phone ? `<p>Phone: ${sanitizeText(invoiceData.customer_phone)}</p>` : ''}
+              ${invoiceData.customer_email ? `<p>Email: ${sanitizeText(invoiceData.customer_email)}</p>` : ''}
+              ${invoiceData.customer_gst ? `<p>GST: ${sanitizeText(invoiceData.customer_gst)}</p>` : ''}
             </div>
           </div>
 
@@ -742,12 +782,12 @@ class InvoiceTemplateService {
               </tr>
             </thead>
             <tbody>
-              ${invoiceData.items.map(item => `
+              ${(invoiceData.items || []).map(item => `
                 <tr>
-                  <td>${item.item_name}</td>
-                  <td class="text-right">${item.quantity}</td>
+                  <td>${sanitizeText(item.item_name)}</td>
+                  <td class="text-right">${item.quantity || 0}</td>
                   <td class="text-right">${formatCurrency(item.rate)}</td>
-                  ${!isThermal ? `<td class="text-right">${item.tax_rate}%</td>` : ''}
+                  ${!isThermal ? `<td class="text-right">${item.tax_rate || 0}%</td>` : ''}
                   <td class="text-right">${formatCurrency(item.total)}</td>
                 </tr>
               `).join('')}
@@ -765,7 +805,7 @@ class InvoiceTemplateService {
                 <span>${formatCurrency(invoiceData.tax_amount)}</span>
               </div>
             ` : ''}
-            ${invoiceData.discount_amount > 0 ? `
+            ${(invoiceData.discount_amount || 0) > 0 ? `
               <div class="total-row">
                 <span>Discount:</span>
                 <span>-${formatCurrency(invoiceData.discount_amount)}</span>
@@ -777,15 +817,15 @@ class InvoiceTemplateService {
             </div>
           </div>
 
-          ${invoiceData.notes || invoiceData.terms ? `
+          ${(invoiceData.notes || invoiceData.terms) ? `
             <div class="notes">
               ${invoiceData.notes ? `
                 <h4>Notes:</h4>
-                <p>${invoiceData.notes}</p>
+                <p>${sanitizeText(invoiceData.notes)}</p>
               ` : ''}
               ${invoiceData.terms ? `
                 <h4>Terms & Conditions:</h4>
-                <p>${invoiceData.terms}</p>
+                <p>${sanitizeText(invoiceData.terms)}</p>
               ` : ''}
             </div>
           ` : ''}
@@ -806,30 +846,6 @@ class InvoiceTemplateService {
     `;
 
     return htmlContent;
-  }
-
-  // Generate thermal receipt for printing
-  static async generateThermalReceipt(invoiceData, businessProfile, templateType = 'thermal-80mm') {
-    try {
-      const htmlContent = this.generateHTML(invoiceData, businessProfile, templateType, 'standard');
-      
-      const { uri } = await Print.printToFileAsync({
-        html: htmlContent,
-        base64: false
-      });
-
-      return {
-        success: true,
-        fileUri: uri,
-        filename: `receipt_${invoiceData.invoice_number}.pdf`
-      };
-    } catch (error) {
-      console.error('❌ Error generating thermal receipt:', error);
-      return {
-        success: false,
-        error: error.message
-      };
-    }
   }
 
   // Get template preview data
