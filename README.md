@@ -29,7 +29,7 @@ brojgar/
 │   └── ...
 ├── tailwind.config.js       # (if using Nativewind)
 └── package.json
-
+working
 
 # 📊 Brojgar – Business Accounting & Inventory App
 
