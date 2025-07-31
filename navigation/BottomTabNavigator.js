@@ -1,6 +1,13 @@
 // navigation/BottomTabNavigator.js
 import React, { useState } from "react";
 import { createBottomTabNavigator } from "@react-navigation/bottom-tabs";
+import { createStackNavigator } from "@react-navigation/stack";
+import { View, Text, StyleSheet, Dimensions, Platform } from "react-native";
+import { SafeAreaView } from "react-native-safe-area-context";
+import { LinearGradient } from "expo-linear-gradient";
+import { BlurView } from "expo-blur";
+
+// Import screens
 import DashboardScreen from "../screens/Dashboard/DashboardScreen";
 import PartiesScreen from "../screens/Parties/PartiesScreen";
 import InventoryScreen from "../screens/Inventory/InventoryScreen";
@@ -11,167 +18,234 @@ import InvoiceTemplateScreen from "../screens/Invoice/InvoiceTemplateScreen";
 import InvoicePreviewScreen from "../screens/Invoice/InvoicePreviewScreen";
 import NotificationScreen from "../screens/Notifications/NotificationScreen";
 import GlobalSearchScreen from "../screens/Search/GlobalSearchScreen";
-import { View, Text, TouchableOpacity } from "react-native";
 
 const Tab = createBottomTabNavigator();
+const Stack = createStackNavigator();
 
-const BottomTabNavigator = () => {
-  const [currentScreen, setCurrentScreen] = useState('main');
-  const [invoiceData, setInvoiceData] = useState(null);
-  const [routeParams, setRouteParams] = useState(null);
-  const [selectedTemplate, setSelectedTemplate] = useState('classic');
-  const [selectedTheme, setSelectedTheme] = useState('standard');
+const { width, height } = Dimensions.get('window');
 
-  const navigation = {
-    navigate: (screen, params) => {
-      console.log('🚀 Navigating to:', screen, params);
-      
-      if (screen === "Invoice") {
-        setCurrentScreen('invoice');
-        setRouteParams(params);
-      } else if (screen === "InvoiceTemplate") {
-        setCurrentScreen('invoiceTemplate');
-        setInvoiceData(params?.invoiceData);
-        setRouteParams(params);
-      } else if (screen === "InvoicePreview") {
-        setCurrentScreen('invoicePreview');
-        setInvoiceData(params?.invoiceData);
-        setSelectedTemplate(params?.selectedTemplate || 'classic');
-        setSelectedTheme(params?.selectedTheme || 'standard');
-        setRouteParams(params);
-      } else if (screen === "Notifications") {
-        setCurrentScreen('notifications');
-        setRouteParams(params);
-      } else if (screen === "Search") {
-        setCurrentScreen('search');
-        setRouteParams(params);
-      } else if (screen === "Reports") {
-        setCurrentScreen('reports');
-        setRouteParams(params);
-      } else if (screen === "Backup") {
-        console.log('Backup navigation - implement if needed');
-      } else {
-        setCurrentScreen('main');
-        setRouteParams(params);
-      }
-    },
-    goBack: () => {
-      console.log('🔙 Going back from:', currentScreen);
-      
-      if (currentScreen === 'invoicePreview') {
-        setCurrentScreen('invoiceTemplate');
-      } else if (currentScreen === 'invoiceTemplate') {
-        setCurrentScreen('invoice');
-      } else if (currentScreen === 'invoice') {
-        setCurrentScreen('main');
-      } else if (currentScreen === 'notifications' || currentScreen === 'search' || currentScreen === 'reports') {
-        setCurrentScreen('main');
-      } else {
-        setCurrentScreen('main');
-      }
-      setRouteParams(null);
-    },
-    push: (screen, params) => navigation.navigate(screen, params),
-    replace: (screen, params) => navigation.navigate(screen, params),
-    reset: () => {
-      setCurrentScreen('main');
-      setRouteParams(null);
-      setInvoiceData(null);
-    }
-  };
+// Custom Tab Bar Component
+const CustomTabBar = ({ state, descriptors, navigation }) => {
+  return (
+    <SafeAreaView style={styles.tabBarContainer}>
+      <View style={styles.tabBarWrapper}>
+        <LinearGradient
+          colors={['rgba(255,255,255,0.95)', 'rgba(255,255,255,0.98)']}
+          style={styles.tabBarGradient}
+        >
+          <BlurView intensity={20} style={styles.blurContainer}>
+            {state.routes.map((route, index) => {
+              const { options } = descriptors[route.key];
+              const label = options.tabBarLabel || options.title || route.name;
+              const isFocused = state.index === index;
 
-  // Create route object that matches React Navigation structure
-  const createRoute = (screenName, params = null) => ({
-    params: params || routeParams,
-    name: screenName,
-    key: `${screenName}-${Date.now()}`
-  });
+              const onPress = () => {
+                const event = navigation.emit({
+                  type: 'tabPress',
+                  target: route.key,
+                  canPreventDefault: true,
+                });
 
-  if (currentScreen === 'invoice') {
-    return (
-      <InvoiceScreen 
-        navigation={navigation} 
-        route={createRoute('Invoice', routeParams)}
+                if (!isFocused && !event.defaultPrevented) {
+                  navigation.navigate(route.name);
+                }
+              };
+
+              return (
+                <View key={route.key} style={styles.tabItem}>
+                  <TouchableOpacity
+                    onPress={onPress}
+                    style={[
+                      styles.tabButton,
+                      isFocused && styles.tabButtonActive
+                    ]}
+                    activeOpacity={0.7}
+                  >
+                    <View style={[
+                      styles.iconContainer,
+                      isFocused && styles.iconContainerActive
+                    ]}>
+                      <Text style={[
+                        styles.tabIcon,
+                        isFocused && styles.tabIconActive
+                      ]}>
+                        {options.tabBarIcon?.({ focused: isFocused, color: isFocused ? '#3B82F6' : '#64748B', size: 24 })}
+                      </Text>
+                    </View>
+                    <Text style={[
+                      styles.tabLabel,
+                      isFocused && styles.tabLabelActive
+                    ]}>
+                      {label}
+                    </Text>
+                    {isFocused && (
+                      <View style={styles.activeIndicator} />
+                    )}
+                  </TouchableOpacity>
+                </View>
+              );
+            })}
+          </BlurView>
+        </LinearGradient>
+      </View>
+    </SafeAreaView>
+  );
+};
+
+// Main Stack Navigator
+const MainStack = () => {
+  return (
+    <Stack.Navigator 
+      screenOptions={{ 
+        headerShown: false,
+        cardStyle: { backgroundColor: '#F8FAFC' },
+        cardShadowEnabled: true,
+        cardOverlayEnabled: true,
+      }}
+    >
+      <Stack.Screen name="MainTabs" component={MainTabs} />
+      <Stack.Screen 
+        name="Invoice" 
+        component={InvoiceScreen}
+        options={{
+          cardStyleInterpolator: ({ current, layouts }) => {
+            return {
+              cardStyle: {
+                transform: [
+                  {
+                    translateX: current.progress.interpolate({
+                      inputRange: [0, 1],
+                      outputRange: [layouts.screen.width, 0],
+                    }),
+                  },
+                ],
+              },
+            };
+          },
+        }}
       />
-    );
-  }
-
-  if (currentScreen === 'invoiceTemplate') {
-    return (
-      <InvoiceTemplateScreen 
-        navigation={navigation} 
-        route={createRoute('InvoiceTemplate', { invoiceData })}
+      <Stack.Screen 
+        name="InvoiceTemplate" 
+        component={InvoiceTemplateScreen}
+        options={{
+          cardStyleInterpolator: ({ current, layouts }) => {
+            return {
+              cardStyle: {
+                transform: [
+                  {
+                    translateY: current.progress.interpolate({
+                      inputRange: [0, 1],
+                      outputRange: [layouts.screen.height, 0],
+                    }),
+                  },
+                ],
+              },
+            };
+          },
+        }}
       />
-    );
-  }
-
-  if (currentScreen === 'invoicePreview') {
-    return (
-      <InvoicePreviewScreen 
-        navigation={navigation} 
-        route={createRoute('InvoicePreview', { 
-          invoiceData,
-          selectedTemplate,
-          selectedTheme
-        })}
+      <Stack.Screen 
+        name="InvoicePreview" 
+        component={InvoicePreviewScreen}
+        options={{
+          cardStyleInterpolator: ({ current, layouts }) => {
+            return {
+              cardStyle: {
+                transform: [
+                  {
+                    translateY: current.progress.interpolate({
+                      inputRange: [0, 1],
+                      outputRange: [layouts.screen.height, 0],
+                    }),
+                  },
+                ],
+              },
+            };
+          },
+        }}
       />
-    );
-  }
-
-  if (currentScreen === 'notifications') {
-    return (
-      <NotificationScreen 
-        navigation={navigation} 
-        route={createRoute('Notifications', routeParams)}
+      <Stack.Screen 
+        name="Notifications" 
+        component={NotificationScreen}
+        options={{
+          cardStyleInterpolator: ({ current, layouts }) => {
+            return {
+              cardStyle: {
+                transform: [
+                  {
+                    translateX: current.progress.interpolate({
+                      inputRange: [0, 1],
+                      outputRange: [-layouts.screen.width, 0],
+                    }),
+                  },
+                ],
+              },
+            };
+          },
+        }}
       />
-    );
-  }
-
-  if (currentScreen === 'search') {
-    return (
-      <GlobalSearchScreen 
-        navigation={navigation} 
-        route={createRoute('Search', routeParams)}
+      <Stack.Screen 
+        name="Search" 
+        component={GlobalSearchScreen}
+        options={{
+          cardStyleInterpolator: ({ current, layouts }) => {
+            return {
+              cardStyle: {
+                transform: [
+                  {
+                    translateY: current.progress.interpolate({
+                      inputRange: [0, 1],
+                      outputRange: [layouts.screen.height, 0],
+                    }),
+                  },
+                ],
+              },
+            };
+          },
+        }}
       />
-    );
-  }
-
-  if (currentScreen === 'reports') {
-    return (
-      <ReportsScreen 
-        navigation={navigation} 
-        route={createRoute('Reports', routeParams)}
+      <Stack.Screen 
+        name="Reports" 
+        component={ReportsScreen}
+        options={{
+          cardStyleInterpolator: ({ current, layouts }) => {
+            return {
+              cardStyle: {
+                transform: [
+                  {
+                    translateX: current.progress.interpolate({
+                      inputRange: [0, 1],
+                      outputRange: [layouts.screen.width, 0],
+                    }),
+                  },
+                ],
+              },
+            };
+          },
+        }}
       />
-    );
-  }
+    </Stack.Navigator>
+  );
+};
 
-  // Main tab navigation
+// Main Tabs Navigator
+const MainTabs = () => {
   return (
     <Tab.Navigator
+      tabBar={props => <CustomTabBar {...props} />}
       screenOptions={{
         headerShown: false,
-        tabBarStyle: {
-          backgroundColor: '#FFFFFF',
-          borderTopWidth: 1,
-          borderTopColor: '#E2E8F0',
-          paddingBottom: 5,
-          paddingTop: 5,
-          height: 60,
-        },
-        tabBarActiveTintColor: '#3B82F6',
-        tabBarInactiveTintColor: '#64748B',
-        tabBarLabelStyle: {
-          fontSize: 12,
-          fontWeight: '600',
-        },
       }}
     >
       <Tab.Screen
         name="Dashboard"
         component={DashboardScreen}
         options={{
-          tabBarIcon: ({ color, size }) => (
-            <Text style={{ color, fontSize: size }}>📊</Text>
+          tabBarLabel: 'Dashboard',
+          tabBarIcon: ({ focused, color, size }) => (
+            <Text style={{ fontSize: size, color }}>
+              {focused ? '📊' : '📊'}
+            </Text>
           ),
         }}
       />
@@ -179,8 +253,11 @@ const BottomTabNavigator = () => {
         name="Parties"
         component={PartiesScreen}
         options={{
-          tabBarIcon: ({ color, size }) => (
-            <Text style={{ color, fontSize: size }}>👥</Text>
+          tabBarLabel: 'Parties',
+          tabBarIcon: ({ focused, color, size }) => (
+            <Text style={{ fontSize: size, color }}>
+              {focused ? '👥' : '👥'}
+            </Text>
           ),
         }}
       />
@@ -188,8 +265,11 @@ const BottomTabNavigator = () => {
         name="Inventory"
         component={InventoryScreen}
         options={{
-          tabBarIcon: ({ color, size }) => (
-            <Text style={{ color, fontSize: size }}>📦</Text>
+          tabBarLabel: 'Inventory',
+          tabBarIcon: ({ focused, color, size }) => (
+            <Text style={{ fontSize: size, color }}>
+              {focused ? '📦' : '📦'}
+            </Text>
           ),
         }}
       />
@@ -197,8 +277,11 @@ const BottomTabNavigator = () => {
         name="Reports"
         component={ReportsScreen}
         options={{
-          tabBarIcon: ({ color, size }) => (
-            <Text style={{ color, fontSize: size }}>📈</Text>
+          tabBarLabel: 'Reports',
+          tabBarIcon: ({ focused, color, size }) => (
+            <Text style={{ fontSize: size, color }}>
+              {focused ? '📈' : '📈'}
+            </Text>
           ),
         }}
       />
@@ -206,13 +289,106 @@ const BottomTabNavigator = () => {
         name="Settings"
         component={SettingsScreen}
         options={{
-          tabBarIcon: ({ color, size }) => (
-            <Text style={{ color, fontSize: size }}>⚙️</Text>
+          tabBarLabel: 'Settings',
+          tabBarIcon: ({ focused, color, size }) => (
+            <Text style={{ fontSize: size, color }}>
+              {focused ? '⚙️' : '⚙️'}
+            </Text>
           ),
         }}
       />
     </Tab.Navigator>
   );
 };
+
+const BottomTabNavigator = () => {
+  return <MainStack />;
+};
+
+const styles = StyleSheet.create({
+  tabBarContainer: {
+    backgroundColor: 'transparent',
+  },
+  tabBarWrapper: {
+    position: 'absolute',
+    bottom: 0,
+    left: 0,
+    right: 0,
+    height: Platform.OS === 'ios' ? 90 : 70,
+    paddingHorizontal: 16,
+    paddingBottom: Platform.OS === 'ios' ? 20 : 10,
+  },
+  tabBarGradient: {
+    borderRadius: 25,
+    overflow: 'hidden',
+    shadowColor: '#000',
+    shadowOffset: {
+      width: 0,
+      height: -2,
+    },
+    shadowOpacity: 0.1,
+    shadowRadius: 8,
+    elevation: 8,
+  },
+  blurContainer: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-around',
+    paddingHorizontal: 8,
+    paddingVertical: 8,
+  },
+  tabItem: {
+    flex: 1,
+    alignItems: 'center',
+  },
+  tabButton: {
+    alignItems: 'center',
+    justifyContent: 'center',
+    paddingVertical: 8,
+    paddingHorizontal: 12,
+    borderRadius: 16,
+    position: 'relative',
+    minHeight: 50,
+  },
+  tabButtonActive: {
+    backgroundColor: 'rgba(59, 130, 246, 0.1)',
+  },
+  iconContainer: {
+    width: 40,
+    height: 40,
+    borderRadius: 20,
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginBottom: 4,
+  },
+  iconContainerActive: {
+    backgroundColor: 'rgba(59, 130, 246, 0.15)',
+  },
+  tabIcon: {
+    fontSize: 20,
+    opacity: 0.7,
+  },
+  tabIconActive: {
+    opacity: 1,
+  },
+  tabLabel: {
+    fontSize: 11,
+    fontWeight: '600',
+    color: '#64748B',
+    textAlign: 'center',
+  },
+  tabLabelActive: {
+    color: '#3B82F6',
+    fontWeight: '700',
+  },
+  activeIndicator: {
+    position: 'absolute',
+    bottom: -2,
+    width: 20,
+    height: 3,
+    backgroundColor: '#3B82F6',
+    borderRadius: 2,
+  },
+});
 
 export default BottomTabNavigator;
