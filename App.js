@@ -10,9 +10,6 @@ import { LinearGradient } from 'expo-linear-gradient';
 // Import navigation
 import BottomTabNavigator from './navigation/BottomTabNavigator';
 
-// Import theme
-import { ThemeProvider } from './context/ThemeContext';
-
 // Import services
 import DatabaseService from './database/DatabaseService';
 import NotificationService from './screens/Notifications/services/NotificationService';
@@ -74,6 +71,7 @@ const LoadingScreen = () => (
 
 export default function App() {
   const [isReady, setIsReady] = useState(false);
+  const [loadingStep, setLoadingStep] = useState(0);
 
   useEffect(() => {
     initializeApp();
@@ -82,6 +80,7 @@ export default function App() {
   const resetDatabase = async () => {
     try {
       console.log('🔄 Resetting database...');
+      setLoadingStep(1);
       
       const db = await SQLite.openDatabaseAsync('brojgar_business.db');
       
@@ -114,12 +113,14 @@ export default function App() {
       await resetDatabase();
       
       // Initialize database
+      setLoadingStep(2);
       await DatabaseService.init();
       
       // Small delay to ensure tables are created
       await new Promise(resolve => setTimeout(resolve, 100));
       
       // Initialize other services with error handling
+      setLoadingStep(3);
       try {
         await NotificationService.init();
         console.log('✅ Notification service initialized');
@@ -170,12 +171,10 @@ export default function App() {
 
   return (
     <SafeAreaProvider>
-      <ThemeProvider>
-        <NavigationContainer>
-          <StatusBar style="dark" />
-          <BottomTabNavigator />
-        </NavigationContainer>
-      </ThemeProvider>
+      <NavigationContainer>
+        <StatusBar style="dark" />
+        <BottomTabNavigator />
+      </NavigationContainer>
     </SafeAreaProvider>
   );
 }
