@@ -207,8 +207,14 @@ const InvoiceTemplateScreen = ({ navigation, route }) => {
   };
 
   const handlePreview = () => {
-    Alert.alert('Preview', 'Invoice preview feature coming soon!');
-  };
+  navigation.navigate('InvoicePreview', {
+    invoiceData: {
+      invoiceId: invoiceData.id
+    },
+    selectedTemplate,
+    selectedTheme
+  });
+};
 
   const handleSharePDF = async () => {
     try {
