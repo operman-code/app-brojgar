@@ -412,28 +412,28 @@ const DashboardScreen = ({ navigation }) => {
   };
 
   if (loading) {
-    return (
-      <SafeAreaView style={styles.loadingContainer}>
-        <StatusBar barStyle="dark-content" />
-        <View style={styles.loadingContent}>
-          <Text style={styles.loadingIcon}>📊</Text>
-          <Text style={styles.loadingText}>Loading Dashboard...</Text>
-        </View>
-      </SafeAreaView>
-    );
-  }
+  return (
+    <SafeAreaView style={styles.loadingContainer}>
+      <StatusBar style="dark" />
+      <View style={styles.loadingContent}>
+        <Text style={styles.loadingIcon}>📊</Text>
+        <Text style={styles.loadingText}>Loading Dashboard...</Text>
+      </View>
+    </SafeAreaView>
+  );
+}
 
   return (
-    <SafeAreaView style={styles.container}>
-      <StatusBar barStyle="dark-content" />
-      
-      {/* Header */}
-      <LinearGradient
-        colors={['#3B82F6', '#1E40AF']}
-        style={styles.header}
-        start={{ x: 0, y: 0 }}
-        end={{ x: 1, y: 1 }}
-      >
+  <SafeAreaView style={styles.container}>
+    <StatusBar style="light" />
+    
+    {/* Header */}
+    <LinearGradient
+      colors={['#3B82F6', '#1E40AF']}
+      style={styles.header}
+      start={{ x: 0, y: 0 }}
+      end={{ x: 1, y: 1 }}
+    >
         <View style={styles.headerContent}>
           <View style={styles.headerLeft}>
             <Text style={styles.greeting}>Good Morning!</Text>
