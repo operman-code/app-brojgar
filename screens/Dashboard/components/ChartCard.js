@@ -1,185 +1,216 @@
-import React from "react";
-import { View, Text, StyleSheet, Dimensions } from "react-native";
+// screens/Dashboard/components/ChartCard.js
+import React from 'react';
+import {
+  View,
+  Text,
+  StyleSheet,
+  Dimensions,
+  Animated,
+} from 'react-native';
+import { LinearGradient } from 'expo-linear-gradient';
+import { BarChart } from 'react-native-chart-kit';
 
 const { width } = Dimensions.get('window');
-const chartWidth = width - 80; // Account for padding
 
-const ChartCard = ({ data }) => {
-  if (!data || !data.length) {
+const ChartCard = ({ 
+  title, 
+  data, 
+  color = '#3B82F6',
+  subtitle,
+  isLoading = false 
+}) => {
+  const fadeAnim = React.useRef(new Animated.Value(0)).current;
+  const scaleAnim = React.useRef(new Animated.Value(0.9)).current;
+
+  React.useEffect(() => {
+    Animated.parallel([
+      Animated.timing(fadeAnim, {
+        toValue: 1,
+        duration: 800,
+        useNativeDriver: true,
+      }),
+      Animated.spring(scaleAnim, {
+        toValue: 1,
+        tension: 100,
+        friction: 8,
+        useNativeDriver: true,
+      }),
+    ]).start();
+  }, []);
+
+  const chartData = {
+    labels: data?.labels || ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'],
+    datasets: [
+      {
+        data: data?.values || [0, 0, 0, 0, 0, 0, 0],
+      },
+    ],
+  };
+
+  const chartConfig = {
+    backgroundColor: 'transparent',
+    backgroundGradientFrom: 'transparent',
+    backgroundGradientTo: 'transparent',
+    decimalPlaces: 0,
+    color: (opacity = 1) => `rgba(59, 130, 246, ${opacity})`,
+    labelColor: (opacity = 1) => `rgba(100, 116, 139, ${opacity})`,
+    style: {
+      borderRadius: 16,
+    },
+    propsForDots: {
+      r: '4',
+      strokeWidth: '2',
+      stroke: color,
+    },
+  };
+
+  if (isLoading) {
     return (
-      <View style={styles.card}>
-        <Text style={styles.noDataText}>No data available</Text>
-      </View>
+      <Animated.View 
+        style={[
+          styles.container,
+          styles.loadingContainer,
+          {
+            opacity: fadeAnim,
+            transform: [{ scale: scaleAnim }]
+          }
+        ]}
+      >
+        <View style={styles.loadingContent}>
+          <View style={styles.loadingTitle} />
+          <View style={styles.loadingChart} />
+          <View style={styles.loadingLegend} />
+        </View>
+      </Animated.View>
     );
   }
 
-  const maxValue = Math.max(...data.map(item => item.sales));
-  const minValue = Math.min(...data.map(item => item.sales));
-  const range = maxValue - minValue || 1;
+  return (
+    <Animated.View
+      style={[
+        styles.container,
+        {
+          opacity: fadeAnim,
+          transform: [{ scale: scaleAnim }]
+        }
+      ]}
+    >
+      <LinearGradient
+        colors={['#FFFFFF', '#F8FAFC']}
+        style={styles.gradientBackground}
+        start={{ x: 0, y: 0 }}
+        end={{ x: 1, y: 1 }}
+      >
+        {/* Header */}
+        <View style={styles.header}>
+          <View style={styles.titleContainer}>
+            <Text style={styles.title}>{title}</Text>
+            {subtitle && (
+              <Text style={styles.subtitle}>{subtitle}</Text>
+            )}
+          </View>
+          <View style={[styles.indicator, { backgroundColor: color }]} />
+        </View>
 
-  const renderBar = (item, index) => {
-    const normalizedHeight = ((item.sales - minValue) / range) * 100 + 20; // Min height of 20
-    const barHeight = Math.max(normalizedHeight, 30); // Ensure minimum visible height
-    
-    return (
-      <View key={index} style={styles.barContainer}>
-        <View style={styles.barWrapper}>
-          <View 
-            style={[
-              styles.bar, 
-              { 
-                height: barHeight,
-                backgroundColor: item.sales >= (maxValue * 0.7) ? "#10b981" : 
-                               item.sales >= (maxValue * 0.4) ? "#f59e0b" : "#ef4444"
-              }
-            ]}
+        {/* Chart */}
+        <View style={styles.chartContainer}>
+          <BarChart
+            data={chartData}
+            width={width - 80}
+            height={180}
+            chartConfig={chartConfig}
+            verticalLabelRotation={0}
+            fromZero
+            showBarTops
+            showValuesOnTopOfBars
+            withInnerLines={false}
+            withVerticalLabels={true}
+            withHorizontalLabels={true}
+            withDots={false}
+            withShadow={false}
+            style={styles.chart}
           />
         </View>
-        <Text style={styles.dayLabel}>{item.day}</Text>
-        <Text style={styles.valueLabel}>₹{item.sales / 1000}k</Text>
-      </View>
-    );
-  };
 
-  const totalSales = data.reduce((sum, item) => sum + item.sales, 0);
-  const averageSales = totalSales / data.length;
-
-  return (
-    <View style={styles.card}>
-      <View style={styles.header}>
-        <View>
-          <Text style={styles.totalLabel}>Total Sales</Text>
-          <Text style={styles.totalValue}>₹{(totalSales / 1000).toFixed(1)}k</Text>
-        </View>
-        <View style={styles.statsContainer}>
-          <View style={styles.statItem}>
-            <Text style={styles.statLabel}>Avg</Text>
-            <Text style={styles.statValue}>₹{(averageSales / 1000).toFixed(1)}k</Text>
+        {/* Legend */}
+        <View style={styles.legend}>
+          <View style={styles.legendItem}>
+            <View style={[styles.legendDot, { backgroundColor: color }]} />
+            <Text style={styles.legendText}>This Week</Text>
           </View>
-          <View style={styles.statItem}>
-            <Text style={styles.statLabel}>Peak</Text>
-            <Text style={styles.statValue}>₹{(maxValue / 1000).toFixed(1)}k</Text>
+          <View style={styles.legendItem}>
+            <View style={[styles.legendDot, { backgroundColor: color + '40' }]} />
+            <Text style={styles.legendText}>Last Week</Text>
           </View>
         </View>
-      </View>
-      
-      <View style={styles.chartContainer}>
-        <View style={styles.chart}>
-          {data.map((item, index) => renderBar(item, index))}
-        </View>
-      </View>
-      
-      <View style={styles.legend}>
-        <View style={styles.legendItem}>
-          <View style={[styles.legendDot, { backgroundColor: "#10b981" }]} />
-          <Text style={styles.legendText}>High</Text>
-        </View>
-        <View style={styles.legendItem}>
-          <View style={[styles.legendDot, { backgroundColor: "#f59e0b" }]} />
-          <Text style={styles.legendText}>Medium</Text>
-        </View>
-        <View style={styles.legendItem}>
-          <View style={[styles.legendDot, { backgroundColor: "#ef4444" }]} />
-          <Text style={styles.legendText}>Low</Text>
-        </View>
-      </View>
-    </View>
+
+        {/* Decorative Elements */}
+        <View style={[styles.decorativeCircle, { backgroundColor: color + '15' }]} />
+      </LinearGradient>
+    </Animated.View>
   );
 };
 
 const styles = StyleSheet.create({
-  card: {
-    backgroundColor: "#ffffff",
-    borderRadius: 12,
-    padding: 16,
-    shadowColor: "#000",
-    shadowOffset: { width: 0, height: 2 },
+  container: {
+    borderRadius: 20,
+    shadowColor: '#000',
+    shadowOffset: {
+      width: 0,
+      height: 4,
+    },
     shadowOpacity: 0.1,
-    shadowRadius: 3.84,
-    elevation: 3,
-  },
-  header: {
-    flexDirection: "row",
-    justifyContent: "space-between",
-    alignItems: "flex-start",
+    shadowRadius: 8,
+    elevation: 8,
+    overflow: 'hidden',
     marginBottom: 20,
   },
-  totalLabel: {
+  loadingContainer: {
+    backgroundColor: '#F1F5F9',
+  },
+  gradientBackground: {
+    padding: 20,
+    position: 'relative',
+  },
+  header: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    marginBottom: 20,
+  },
+  titleContainer: {
+    flex: 1,
+  },
+  title: {
+    fontSize: 18,
+    fontWeight: 'bold',
+    color: '#1E293B',
+    marginBottom: 4,
+  },
+  subtitle: {
     fontSize: 14,
-    color: "#6b7280",
-    fontWeight: "500",
+    color: '#64748B',
   },
-  totalValue: {
-    fontSize: 24,
-    fontWeight: "bold",
-    color: "#111827",
-    marginTop: 4,
-  },
-  statsContainer: {
-    flexDirection: "row",
-    gap: 16,
-  },
-  statItem: {
-    alignItems: "center",
-  },
-  statLabel: {
-    fontSize: 12,
-    color: "#9ca3af",
-    marginBottom: 2,
-  },
-  statValue: {
-    fontSize: 14,
-    fontWeight: "600",
-    color: "#374151",
+  indicator: {
+    width: 4,
+    height: 24,
+    borderRadius: 2,
   },
   chartContainer: {
-    height: 120,
+    alignItems: 'center',
     marginBottom: 16,
   },
   chart: {
-    flexDirection: "row",
-    justifyContent: "space-between",
-    alignItems: "flex-end",
-    height: "100%",
-    paddingHorizontal: 8,
-  },
-  barContainer: {
-    alignItems: "center",
-    flex: 1,
-    marginHorizontal: 2,
-  },
-  barWrapper: {
-    height: 100,
-    justifyContent: "flex-end",
-    alignItems: "center",
-    marginBottom: 8,
-  },
-  bar: {
-    width: 20,
-    borderRadius: 4,
-    minHeight: 20,
-  },
-  dayLabel: {
-    fontSize: 12,
-    color: "#6b7280",
-    fontWeight: "500",
-    marginBottom: 2,
-  },
-  valueLabel: {
-    fontSize: 10,
-    color: "#9ca3af",
+    borderRadius: 16,
   },
   legend: {
-    flexDirection: "row",
-    justifyContent: "center",
+    flexDirection: 'row',
+    justifyContent: 'center',
     gap: 20,
-    paddingTop: 12,
-    borderTopWidth: 1,
-    borderTopColor: "#f3f4f6",
   },
   legendItem: {
-    flexDirection: "row",
-    alignItems: "center",
+    flexDirection: 'row',
+    alignItems: 'center',
   },
   legendDot: {
     width: 8,
@@ -189,13 +220,39 @@ const styles = StyleSheet.create({
   },
   legendText: {
     fontSize: 12,
-    color: "#6b7280",
+    color: '#64748B',
+    fontWeight: '500',
   },
-  noDataText: {
-    textAlign: "center",
-    color: "#9ca3af",
-    fontSize: 16,
-    padding: 40,
+  decorativeCircle: {
+    position: 'absolute',
+    top: -20,
+    right: -20,
+    width: 60,
+    height: 60,
+    borderRadius: 30,
+  },
+  // Loading states
+  loadingContent: {
+    padding: 20,
+  },
+  loadingTitle: {
+    width: '60%',
+    height: 18,
+    backgroundColor: '#E2E8F0',
+    borderRadius: 9,
+    marginBottom: 20,
+  },
+  loadingChart: {
+    width: '100%',
+    height: 180,
+    backgroundColor: '#E2E8F0',
+    borderRadius: 16,
+    marginBottom: 16,
+  },
+  loadingLegend: {
+    flexDirection: 'row',
+    justifyContent: 'center',
+    gap: 20,
   },
 });
 
