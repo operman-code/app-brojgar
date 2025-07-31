@@ -75,9 +75,9 @@ class InvoiceTemplateService {
   }
 
   // Generate PDF
-  static async generatePDF(invoiceData, businessProfile, templateType = 'classic') {
+  static async generatePDF(invoiceData, businessProfile, templateType = 'classic', theme = 'standard') {
     try {
-      const htmlContent = this.generateHTML(invoiceData, businessProfile, templateType);
+      const htmlContent = this.generateHTML(invoiceData, businessProfile, templateType, theme);
       
       const { uri } = await Print.printToFileAsync({
         html: htmlContent,
@@ -98,9 +98,59 @@ class InvoiceTemplateService {
     }
   }
 
-  // Generate HTML for different templates
-  static generateHTML(invoiceData, businessProfile, templateType) {
-    const commonStyles = `
+  // Generate HTML for different templates and themes
+  static generateHTML(invoiceData, businessProfile, templateType, theme) {
+    const formatCurrency = (amount) => {
+      return `₹${parseFloat(amount).toLocaleString('en-IN')}`;
+    };
+
+    const formatDate = (dateString) => {
+      return new Date(dateString).toLocaleDateString('en-IN');
+    };
+
+    // Theme configurations
+    const themeConfigs = {
+      standard: {
+        primary: '#3B82F6',
+        secondary: '#64748B',
+        background: '#FFFFFF',
+        text: '#1E293B',
+        border: '#E2E8F0'
+      },
+      dark: {
+        primary: '#60A5FA',
+        secondary: '#94A3B8',
+        background: '#1F2937',
+        text: '#F1F5F9',
+        border: '#374151'
+      },
+      colorful: {
+        primary: '#EC4899',
+        secondary: '#F472B6',
+        background: '#FFFFFF',
+        text: '#1E293B',
+        border: '#FCE7F3'
+      },
+      monochrome: {
+        primary: '#000000',
+        secondary: '#666666',
+        background: '#FFFFFF',
+        text: '#000000',
+        border: '#CCCCCC'
+      },
+      pastel: {
+        primary: '#F472B6',
+        secondary: '#F9A8D4',
+        background: '#FDF2F8',
+        text: '#581C87',
+        border: '#FCE7F3'
+      }
+    };
+
+    const currentTheme = themeConfigs[theme] || themeConfigs.standard;
+
+    // Base styles
+    const baseStyles = `
       <style>
         * {
           margin: 0;
@@ -111,7 +161,8 @@ class InvoiceTemplateService {
           font-family: 'Helvetica', Arial, sans-serif;
           font-size: 14px;
           line-height: 1.6;
-          color: #333;
+          color: ${currentTheme.text};
+          background-color: ${currentTheme.background};
         }
         .container {
           max-width: 800px;
@@ -123,23 +174,23 @@ class InvoiceTemplateService {
           justify-content: space-between;
           align-items: flex-start;
           margin-bottom: 40px;
-          border-bottom: 2px solid #eee;
+          border-bottom: 2px solid ${currentTheme.border};
           padding-bottom: 20px;
         }
         .business-info h1 {
-          color: #2563eb;
+          color: ${currentTheme.primary};
           font-size: 24px;
           margin-bottom: 10px;
         }
         .business-info p {
           margin: 5px 0;
-          color: #666;
+          color: ${currentTheme.secondary};
         }
         .invoice-info {
           text-align: right;
         }
         .invoice-info h2 {
-          color: #2563eb;
+          color: ${currentTheme.primary};
           font-size: 28px;
           margin-bottom: 10px;
         }
@@ -152,7 +203,7 @@ class InvoiceTemplateService {
           flex: 1;
         }
         .billing-info h3 {
-          color: #2563eb;
+          color: ${currentTheme.primary};
           margin-bottom: 10px;
           font-size: 16px;
         }
@@ -163,14 +214,14 @@ class InvoiceTemplateService {
         }
         .items-table th,
         .items-table td {
-          border: 1px solid #ddd;
+          border: 1px solid ${currentTheme.border};
           padding: 12px;
           text-align: left;
         }
         .items-table th {
-          background-color: #f8f9fa;
+          background-color: ${currentTheme.primary}20;
           font-weight: bold;
-          color: #2563eb;
+          color: ${currentTheme.primary};
         }
         .items-table .text-right {
           text-align: right;
@@ -183,44 +234,37 @@ class InvoiceTemplateService {
           display: flex;
           justify-content: space-between;
           padding: 8px 0;
-          border-bottom: 1px solid #eee;
+          border-bottom: 1px solid ${currentTheme.border};
         }
         .total-row.grand-total {
           font-weight: bold;
           font-size: 16px;
-          border-bottom: 2px solid #2563eb;
-          color: #2563eb;
+          border-bottom: 2px solid ${currentTheme.primary};
+          color: ${currentTheme.primary};
         }
         .notes {
           margin-top: 40px;
           padding: 20px;
-          background-color: #f8f9fa;
+          background-color: ${currentTheme.primary}10;
           border-radius: 8px;
         }
         .notes h4 {
           margin-bottom: 10px;
-          color: #2563eb;
+          color: ${currentTheme.primary};
         }
       </style>
     `;
 
-    const formatCurrency = (amount) => {
-      return `₹${parseFloat(amount).toLocaleString('en-IN')}`;
-    };
+    // Template-specific styles
+    let templateStyles = '';
+    let isThermal = false;
 
-    const formatDate = (dateString) => {
-      return new Date(dateString).toLocaleDateString('en-IN');
-    };
-
-    let templateSpecificStyles = '';
-    
-    // Template-specific styling
     switch (templateType) {
       case 'modern':
-        templateSpecificStyles = `
+        templateStyles = `
           <style>
             .header {
-              background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+              background: linear-gradient(135deg, ${currentTheme.primary} 0%, ${currentTheme.secondary} 100%);
               color: white;
               padding: 30px;
               border-radius: 10px;
@@ -230,74 +274,433 @@ class InvoiceTemplateService {
               color: white;
             }
             .items-table th {
-              background-color: #667eea;
+              background-color: ${currentTheme.primary};
               color: white;
             }
           </style>
         `;
         break;
       case 'minimal':
-        templateSpecificStyles = `
+        templateStyles = `
           <style>
             .header {
-              border-bottom: 1px solid #ccc;
+              border-bottom: 1px solid ${currentTheme.border};
             }
             .business-info h1 {
-              color: #333;
+              color: ${currentTheme.text};
               font-weight: 300;
             }
             .invoice-info h2 {
-              color: #333;
+              color: ${currentTheme.text};
               font-weight: 300;
             }
             .items-table {
               border: none;
             }
             .items-table th {
-              background-color: white;
-              border-bottom: 2px solid #333;
-              color: #333;
+              background-color: ${currentTheme.background};
+              border-bottom: 2px solid ${currentTheme.text};
+              color: ${currentTheme.text};
             }
             .items-table td {
               border: none;
-              border-bottom: 1px solid #eee;
+              border-bottom: 1px solid ${currentTheme.border};
             }
           </style>
         `;
         break;
       case 'corporate':
-        templateSpecificStyles = `
+        templateStyles = `
           <style>
             .header {
-              background-color: #1f2937;
+              background-color: ${currentTheme.text};
               color: white;
               padding: 30px;
               border-radius: 0;
               border-bottom: none;
             }
             .business-info h1, .invoice-info h2 {
-              color: #f59e0b;
+              color: ${currentTheme.primary};
             }
             .items-table th {
-              background-color: #1f2937;
+              background-color: ${currentTheme.text};
               color: white;
             }
             .billing-info h3 {
-              color: #1f2937;
+              color: ${currentTheme.text};
+            }
+          </style>
+        `;
+        break;
+      case 'elegant':
+        templateStyles = `
+          <style>
+            .header {
+              background: linear-gradient(45deg, ${currentTheme.primary}, ${currentTheme.secondary});
+              color: white;
+              padding: 40px;
+              border-radius: 15px;
+              border-bottom: none;
+              box-shadow: 0 10px 30px rgba(0,0,0,0.1);
+            }
+            .business-info h1 {
+              font-family: 'Georgia', serif;
+              font-size: 28px;
+            }
+            .items-table th {
+              background: linear-gradient(45deg, ${currentTheme.primary}, ${currentTheme.secondary});
+              color: white;
+            }
+          </style>
+        `;
+        break;
+      case 'tech':
+        templateStyles = `
+          <style>
+            .header {
+              background: linear-gradient(90deg, ${currentTheme.primary}, ${currentTheme.secondary});
+              color: white;
+              padding: 25px;
+              border-radius: 8px;
+              border-bottom: none;
+            }
+            .business-info h1 {
+              font-family: 'Courier New', monospace;
+              font-weight: bold;
+            }
+            .items-table th {
+              background-color: ${currentTheme.primary};
+              color: white;
+              font-family: 'Courier New', monospace;
+            }
+          </style>
+        `;
+        break;
+      case 'retro':
+        templateStyles = `
+          <style>
+            .header {
+              background-color: ${currentTheme.primary};
+              color: white;
+              padding: 25px;
+              border-radius: 0;
+              border-bottom: 3px solid ${currentTheme.secondary};
+            }
+            .business-info h1 {
+              font-family: 'Times New Roman', serif;
+              text-transform: uppercase;
+              letter-spacing: 2px;
+            }
+            .items-table th {
+              background-color: ${currentTheme.primary};
+              color: white;
+              text-transform: uppercase;
+            }
+          </style>
+        `;
+        break;
+      case 'thermal-80mm':
+        isThermal = true;
+        templateStyles = `
+          <style>
+            .container {
+              max-width: 80mm;
+              margin: 0 auto;
+              padding: 10px;
+              font-family: 'Courier New', monospace;
+              font-size: 12px;
+            }
+            .header {
+              text-align: center;
+              border-bottom: 1px dashed ${currentTheme.text};
+              padding-bottom: 10px;
+              margin-bottom: 15px;
+            }
+            .business-info h1 {
+              font-size: 16px;
+              margin-bottom: 5px;
+            }
+            .business-info p {
+              font-size: 10px;
+              margin: 2px 0;
+            }
+            .invoice-info h2 {
+              font-size: 14px;
+              margin-bottom: 5px;
+            }
+            .billing-section {
+              margin-bottom: 15px;
+            }
+            .billing-info h3 {
+              font-size: 12px;
+              margin-bottom: 5px;
+            }
+            .items-table {
+              width: 100%;
+              font-size: 10px;
+            }
+            .items-table th,
+            .items-table td {
+              padding: 3px;
+              border: none;
+              border-bottom: 1px dotted ${currentTheme.border};
+            }
+            .items-table th {
+              background: none;
+              font-weight: bold;
+              border-bottom: 1px solid ${currentTheme.text};
+            }
+            .totals {
+              width: 100%;
+              margin-top: 10px;
+            }
+            .total-row {
+              padding: 2px 0;
+              border-bottom: 1px dotted ${currentTheme.border};
+            }
+            .total-row.grand-total {
+              border-bottom: 2px solid ${currentTheme.text};
+              font-weight: bold;
+            }
+            .notes {
+              margin-top: 15px;
+              padding: 10px;
+              border: 1px solid ${currentTheme.border};
+              font-size: 10px;
+            }
+          </style>
+        `;
+        break;
+      case 'thermal-58mm':
+        isThermal = true;
+        templateStyles = `
+          <style>
+            .container {
+              max-width: 58mm;
+              margin: 0 auto;
+              padding: 8px;
+              font-family: 'Courier New', monospace;
+              font-size: 10px;
+            }
+            .header {
+              text-align: center;
+              border-bottom: 1px dashed ${currentTheme.text};
+              padding-bottom: 8px;
+              margin-bottom: 12px;
+            }
+            .business-info h1 {
+              font-size: 14px;
+              margin-bottom: 4px;
+            }
+            .business-info p {
+              font-size: 8px;
+              margin: 1px 0;
+            }
+            .invoice-info h2 {
+              font-size: 12px;
+              margin-bottom: 4px;
+            }
+            .billing-section {
+              margin-bottom: 12px;
+            }
+            .billing-info h3 {
+              font-size: 10px;
+              margin-bottom: 4px;
+            }
+            .items-table {
+              width: 100%;
+              font-size: 8px;
+            }
+            .items-table th,
+            .items-table td {
+              padding: 2px;
+              border: none;
+              border-bottom: 1px dotted ${currentTheme.border};
+            }
+            .items-table th {
+              background: none;
+              font-weight: bold;
+              border-bottom: 1px solid ${currentTheme.text};
+            }
+            .totals {
+              width: 100%;
+              margin-top: 8px;
+            }
+            .total-row {
+              padding: 1px 0;
+              border-bottom: 1px dotted ${currentTheme.border};
+            }
+            .total-row.grand-total {
+              border-bottom: 2px solid ${currentTheme.text};
+              font-weight: bold;
+            }
+            .notes {
+              margin-top: 12px;
+              padding: 8px;
+              border: 1px solid ${currentTheme.border};
+              font-size: 8px;
+            }
+          </style>
+        `;
+        break;
+      case 'thermal-receipt':
+        isThermal = true;
+        templateStyles = `
+          <style>
+            .container {
+              max-width: 72mm;
+              margin: 0 auto;
+              padding: 10px;
+              font-family: 'Courier New', monospace;
+              font-size: 11px;
+            }
+            .header {
+              text-align: center;
+              border-bottom: 1px dashed ${currentTheme.text};
+              padding-bottom: 10px;
+              margin-bottom: 15px;
+            }
+            .business-info h1 {
+              font-size: 15px;
+              margin-bottom: 5px;
+              text-transform: uppercase;
+            }
+            .business-info p {
+              font-size: 9px;
+              margin: 2px 0;
+            }
+            .invoice-info h2 {
+              font-size: 13px;
+              margin-bottom: 5px;
+              text-transform: uppercase;
+            }
+            .billing-section {
+              margin-bottom: 15px;
+            }
+            .billing-info h3 {
+              font-size: 11px;
+              margin-bottom: 5px;
+              text-transform: uppercase;
+            }
+            .items-table {
+              width: 100%;
+              font-size: 9px;
+            }
+            .items-table th,
+            .items-table td {
+              padding: 3px;
+              border: none;
+              border-bottom: 1px dotted ${currentTheme.border};
+              }
+            .items-table th {
+              background: none;
+              font-weight: bold;
+              border-bottom: 1px solid ${currentTheme.text};
+            }
+            .totals {
+              width: 100%;
+              margin-top: 10px;
+            }
+            .total-row {
+              padding: 2px 0;
+              border-bottom: 1px dotted ${currentTheme.border};
+            }
+            .total-row.grand-total {
+              border-bottom: 2px solid ${currentTheme.text};
+              font-weight: bold;
+            }
+            .notes {
+              margin-top: 15px;
+              padding: 10px;
+              border: 1px solid ${currentTheme.border};
+              font-size: 9px;
+            }
+          </style>
+        `;
+        break;
+      case 'thermal-compact':
+        isThermal = true;
+        templateStyles = `
+          <style>
+            .container {
+              max-width: 60mm;
+              margin: 0 auto;
+              padding: 8px;
+              font-family: 'Courier New', monospace;
+              font-size: 9px;
+            }
+            .header {
+              text-align: center;
+              border-bottom: 1px dashed ${currentTheme.text};
+              padding-bottom: 8px;
+              margin-bottom: 12px;
+            }
+            .business-info h1 {
+              font-size: 13px;
+              margin-bottom: 4px;
+            }
+            .business-info p {
+              font-size: 7px;
+              margin: 1px 0;
+            }
+            .invoice-info h2 {
+              font-size: 11px;
+              margin-bottom: 4px;
+            }
+            .billing-section {
+              margin-bottom: 12px;
+            }
+            .billing-info h3 {
+              font-size: 9px;
+              margin-bottom: 4px;
+            }
+            .items-table {
+              width: 100%;
+              font-size: 7px;
+            }
+            .items-table th,
+            .items-table td {
+              padding: 2px;
+              border: none;
+              border-bottom: 1px dotted ${currentTheme.border};
+            }
+            .items-table th {
+              background: none;
+              font-weight: bold;
+              border-bottom: 1px solid ${currentTheme.text};
+            }
+            .totals {
+              width: 100%;
+              margin-top: 8px;
+            }
+            .total-row {
+              padding: 1px 0;
+              border-bottom: 1px dotted ${currentTheme.border};
+            }
+            .total-row.grand-total {
+              border-bottom: 2px solid ${currentTheme.text};
+              font-weight: bold;
+            }
+            .notes {
+              margin-top: 12px;
+              padding: 8px;
+              border: 1px solid ${currentTheme.border};
+              font-size: 7px;
             }
           </style>
         `;
         break;
     }
 
-    return `
+    // Generate the HTML content
+    const htmlContent = `
       <!DOCTYPE html>
       <html>
       <head>
         <meta charset="utf-8">
         <title>Invoice ${invoiceData.invoice_number}</title>
-        ${commonStyles}
-        ${templateSpecificStyles}
+        ${baseStyles}
+        ${templateStyles}
       </head>
       <body>
         <div class="container">
@@ -310,7 +713,7 @@ class InvoiceTemplateService {
               ${businessProfile.gst_number ? `<p>GST: ${businessProfile.gst_number}</p>` : ''}
             </div>
             <div class="invoice-info">
-              <h2>INVOICE</h2>
+              <h2>${isThermal ? 'RECEIPT' : 'INVOICE'}</h2>
               <p><strong>#${invoiceData.invoice_number}</strong></p>
               <p>Date: ${formatDate(invoiceData.date)}</p>
               ${invoiceData.due_date ? `<p>Due: ${formatDate(invoiceData.due_date)}</p>` : ''}
@@ -319,7 +722,7 @@ class InvoiceTemplateService {
 
           <div class="billing-section">
             <div class="billing-info">
-              <h3>Bill To:</h3>
+              <h3>${isThermal ? 'CUSTOMER' : 'Bill To:'}</h3>
               <p><strong>${invoiceData.customer_name}</strong></p>
               ${invoiceData.customer_address ? `<p>${invoiceData.customer_address}</p>` : ''}
               ${invoiceData.customer_phone ? `<p>Phone: ${invoiceData.customer_phone}</p>` : ''}
@@ -334,7 +737,7 @@ class InvoiceTemplateService {
                 <th>Item</th>
                 <th class="text-right">Qty</th>
                 <th class="text-right">Rate</th>
-                <th class="text-right">Tax</th>
+                ${!isThermal ? '<th class="text-right">Tax</th>' : ''}
                 <th class="text-right">Amount</th>
               </tr>
             </thead>
@@ -344,7 +747,7 @@ class InvoiceTemplateService {
                   <td>${item.item_name}</td>
                   <td class="text-right">${item.quantity}</td>
                   <td class="text-right">${formatCurrency(item.rate)}</td>
-                  <td class="text-right">${item.tax_rate}%</td>
+                  ${!isThermal ? `<td class="text-right">${item.tax_rate}%</td>` : ''}
                   <td class="text-right">${formatCurrency(item.total)}</td>
                 </tr>
               `).join('')}
@@ -356,10 +759,12 @@ class InvoiceTemplateService {
               <span>Subtotal:</span>
               <span>${formatCurrency(invoiceData.subtotal)}</span>
             </div>
-            <div class="total-row">
-              <span>Tax:</span>
-              <span>${formatCurrency(invoiceData.tax_amount)}</span>
-            </div>
+            ${!isThermal ? `
+              <div class="total-row">
+                <span>Tax:</span>
+                <span>${formatCurrency(invoiceData.tax_amount)}</span>
+              </div>
+            ` : ''}
             ${invoiceData.discount_amount > 0 ? `
               <div class="total-row">
                 <span>Discount:</span>
@@ -384,10 +789,77 @@ class InvoiceTemplateService {
               ` : ''}
             </div>
           ` : ''}
+
+          ${isThermal ? `
+            <div style="text-align: center; margin-top: 20px; padding-top: 10px; border-top: 1px dashed ${currentTheme.text};">
+              <p style="font-size: 8px; color: ${currentTheme.secondary};">
+                Thank you for your business!
+              </p>
+              <p style="font-size: 8px; color: ${currentTheme.secondary};">
+                ${new Date().toLocaleDateString('en-IN')} - ${new Date().toLocaleTimeString('en-IN')}
+              </p>
+            </div>
+          ` : ''}
         </div>
       </body>
       </html>
     `;
+
+    return htmlContent;
+  }
+
+  // Generate thermal receipt for printing
+  static async generateThermalReceipt(invoiceData, businessProfile, templateType = 'thermal-80mm') {
+    try {
+      const htmlContent = this.generateHTML(invoiceData, businessProfile, templateType, 'standard');
+      
+      const { uri } = await Print.printToFileAsync({
+        html: htmlContent,
+        base64: false
+      });
+
+      return {
+        success: true,
+        fileUri: uri,
+        filename: `receipt_${invoiceData.invoice_number}.pdf`
+      };
+    } catch (error) {
+      console.error('❌ Error generating thermal receipt:', error);
+      return {
+        success: false,
+        error: error.message
+      };
+    }
+  }
+
+  // Get template preview data
+  static getTemplatePreview(templateId, themeId) {
+    const templates = {
+      'classic': { name: 'Classic', color: '#3B82F6' },
+      'modern': { name: 'Modern', color: '#10B981' },
+      'minimal': { name: 'Minimal', color: '#8B5CF6' },
+      'corporate': { name: 'Corporate', color: '#F59E0B' },
+      'elegant': { name: 'Elegant', color: '#EC4899' },
+      'tech': { name: 'Tech', color: '#6366F1' },
+      'retro': { name: 'Retro', color: '#DC2626' },
+      'thermal-80mm': { name: 'Thermal 80mm', color: '#059669' },
+      'thermal-58mm': { name: 'Thermal 58mm', color: '#7C3AED' },
+      'thermal-receipt': { name: 'Receipt Style', color: '#EA580C' },
+      'thermal-compact': { name: 'Compact Thermal', color: '#BE185D' }
+    };
+
+    const themes = {
+      'standard': { name: 'Standard', color: '#3B82F6' },
+      'dark': { name: 'Dark Theme', color: '#1F2937' },
+      'colorful': { name: 'Colorful', color: '#EC4899' },
+      'monochrome': { name: 'Monochrome', color: '#374151' },
+      'pastel': { name: 'Pastel', color: '#F472B6' }
+    };
+
+    return {
+      template: templates[templateId] || templates['classic'],
+      theme: themes[themeId] || themes['standard']
+    };
   }
 }
 
