@@ -25,7 +25,7 @@ const { width, height } = Dimensions.get('window');
 // Loading Screen Component
 const LoadingScreen = () => (
   <SafeAreaView style={styles.loadingContainer}>
-    <StatusBar barStyle="light-content" backgroundColor="#1E40AF" />
+    <StatusBar style="light" />
     <LinearGradient
       colors={['#1E40AF', '#3B82F6', '#60A5FA']}
       style={styles.gradientBackground}
@@ -176,7 +176,7 @@ export default function App() {
     <SafeAreaProvider>
       <ThemeProvider>
         <NavigationContainer>
-          <StatusBar barStyle="dark-content" backgroundColor="#FFFFFF" />
+          <StatusBar style="dark" />
           <BottomTabNavigator />
         </NavigationContainer>
       </ThemeProvider>
