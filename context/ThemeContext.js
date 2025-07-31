@@ -1,6 +1,8 @@
+// context/ThemeContext.js
 import React, { createContext, useContext, useState, useEffect } from 'react';
 import { StatusBar } from 'expo-status-bar';
-import SettingsService from '../screens/Settings/services/SettingsService';
+// import AsyncStorage from '@react-native-async-storage/async-storage'; // Uncomment if you want to persist theme
+// import { Appearance } from 'react-native'; // Uncomment if you want to detect system theme
 
 const ThemeContext = createContext();
 
@@ -20,7 +22,7 @@ const lightTheme = {
   warning: '#f59e0b',
   purple: '#8b5cf6',
   shadow: '#000',
-  statusBar: 'dark',
+  statusBar: 'dark', // Status bar style for light theme
 };
 
 // Dark theme colors
@@ -39,64 +41,61 @@ const darkTheme = {
   warning: '#f59e0b',
   purple: '#8b5cf6',
   shadow: '#000',
-  statusBar: 'light',
+  statusBar: 'light', // Status bar style for dark theme
 };
 
 export const ThemeProvider = ({ children }) => {
-  const [isDarkMode, setIsDarkMode] = useState(false);
+  const [isDarkMode, setIsDarkMode] = useState(false); // Default to light mode
   const [theme, setTheme] = useState(lightTheme);
+
+  // Function to load theme preference (e.g., from AsyncStorage)
+  const loadThemePreference = async () => {
+    try {
+      // const storedTheme = await AsyncStorage.getItem('appTheme');
+      // if (storedTheme !== null) {
+      //   setIsDarkMode(storedTheme === 'dark');
+      // } else {
+      //   // Fallback to system preference if no stored theme
+      //   const systemColorScheme = Appearance.getColorScheme();
+      //   setIsDarkMode(systemColorScheme === 'dark');
+      // }
+      console.log('Theme preference loading not implemented yet.');
+    } catch (e) {
+      console.error('Failed to load theme preference:', e);
+    }
+  };
+
+  // Function to save theme preference and toggle
+  const toggleTheme = async () => {
+    const newMode = !isDarkMode;
+    setIsDarkMode(newMode);
+    // try {
+    //   await AsyncStorage.setItem('appTheme', newMode ? 'dark' : 'light');
+    // } catch (e) {
+    //   console.error('Failed to save theme preference:', e);
+    // }
+  };
 
   useEffect(() => {
     loadThemePreference();
+    // Optional: Listen for system theme changes
+    // const subscription = Appearance.addChangeListener(({ colorScheme }) => {
+    //   setIsDarkMode(colorScheme === 'dark');
+    // });
+    // return () => subscription.remove();
   }, []);
 
   useEffect(() => {
     setTheme(isDarkMode ? darkTheme : lightTheme);
   }, [isDarkMode]);
-  
-  const loadThemePreference = async () => {
-    try {
-      const darkModeEnabled = await SettingsService.getSetting('dark_mode_enabled');
-      if (darkModeEnabled === 'true') {
-        setIsDarkMode(true);
-      }
-    } catch (error) {
-      console.error('Error loading theme preference:', error);
-    }
-  };
-
-  const toggleTheme = async () => {
-    const newMode = !isDarkMode;
-    setIsDarkMode(newMode);
-    
-    // Save to settings
-    try {
-      await SettingsService.updateSetting('dark_mode_enabled', newMode, 'boolean');
-    } catch (error) {
-      console.error('Error saving theme preference:', error);
-    }
-  };
-
-  const value = {
-    theme,
-    isDarkMode,
-    toggleTheme,
-    };
 
   return (
-    <ThemeContext.Provider value={value}>
+    <ThemeContext.Provider value={{ theme, isDarkMode, toggleTheme }}>
+      {/* Managing StatusBar style based on current theme */}
       <StatusBar style={theme.statusBar} />
       {children}
     </ThemeContext.Provider>
   );
 };
 
-export const useTheme = () => {
-  const context = useContext(ThemeContext);
-  if (!context) {
-    throw new Error('useTheme must be used within a ThemeProvider');
-  }
-  return context;
-};
-
-export default ThemeContext;
+export const useTheme = () => useContext(ThemeContext);
