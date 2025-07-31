@@ -8,6 +8,7 @@ import { SafeAreaProvider, SafeAreaView } from 'react-native-safe-area-context';
 // Import screens
 import DashboardScreen from './screens/Dashboard/DashboardScreen';
 import PartiesScreen from './screens/Parties/PartiesScreen';
+import InventoryScreen from './screens/Inventory/InventoryScreen';
 
 // Simple test component
 const TestScreen = () => (
@@ -67,12 +68,22 @@ const TestTabNavigator = () => {
         }}
       />
       <Tab.Screen
+        name="Inventory"
+        component={InventoryScreen}
+        options={{
+          tabBarLabel: 'Inventory',
+          tabBarIcon: ({ color, size }) => (
+            <Text style={{ fontSize: size, color }}>📦</Text>
+          ),
+        }}
+      />
+      <Tab.Screen
         name="Test"
         component={TestScreen}
         options={{
           tabBarLabel: 'Test',
           tabBarIcon: ({ color, size }) => (
-            <Text style={{ fontSize: size, color }}>📦</Text>
+            <Text style={{ fontSize: size, color }}>📈</Text>
           ),
         }}
       />
