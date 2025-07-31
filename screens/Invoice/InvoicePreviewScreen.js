@@ -43,17 +43,29 @@ const InvoicePreviewScreen = ({ navigation, route }) => {
     try {
       setLoading(true);
       
+      // Get parameters from route
       const passedInvoiceData = route.params?.invoiceData;
+      const template = route.params?.selectedTemplate || 'classic';
+      const theme = route.params?.selectedTheme || 'standard';
+      
+      console.log('📄 Preview Screen - Route params:', route.params);
+      console.log('📄 Preview Screen - Invoice data:', passedInvoiceData);
+      
       if (!passedInvoiceData) {
         Alert.alert('Error', 'No invoice data found');
         navigation.goBack();
         return;
       }
 
+      setSelectedTemplate(template);
+      setSelectedTheme(theme);
+
       const [profile, invoiceDetails] = await Promise.all([
         InvoiceTemplateService.getBusinessProfile(),
         InvoiceTemplateService.getInvoiceById(passedInvoiceData.invoiceId)
       ]);
+
+      console.log('📄 Preview Screen - Invoice details:', invoiceDetails);
 
       setBusinessProfile(profile);
       setInvoiceData(invoiceDetails);
@@ -67,6 +79,11 @@ const InvoicePreviewScreen = ({ navigation, route }) => {
 
   const generatePreviewHTML = () => {
     try {
+      console.log('🔄 Generating preview HTML with:', {
+        template: selectedTemplate,
+        theme: selectedTheme
+      });
+      
       const html = InvoiceTemplateService.generateHTML(
         invoiceData, 
         businessProfile, 
@@ -120,7 +137,7 @@ const InvoicePreviewScreen = ({ navigation, route }) => {
       if (result.success) {
         await Print.printAsync({
           uri: result.fileUri,
-          printerUrl: undefined // Will show print dialog
+          printerUrl: undefined
         });
       } else {
         Alert.alert('Error', result.error || 'Failed to generate PDF for printing');
@@ -221,22 +238,29 @@ const InvoicePreviewScreen = ({ navigation, route }) => {
 
       {/* Preview Container */}
       <View style={styles.previewContainer}>
-        <WebView
-          source={{ html: htmlContent }}
-          style={styles.webview}
-          scrollEnabled={true}
-          showsVerticalScrollIndicator={false}
-          showsHorizontalScrollIndicator={false}
-          javaScriptEnabled={true}
-          domStorageEnabled={true}
-          startInLoadingState={true}
-          renderLoading={() => (
-            <View style={styles.webviewLoading}>
-              <ActivityIndicator size="large" color="#3B82F6" />
-              <Text style={styles.webviewLoadingText}>Loading Preview...</Text>
-            </View>
-          )}
-        />
+        {htmlContent ? (
+          <WebView
+            source={{ html: htmlContent }}
+            style={styles.webview}
+            scrollEnabled={true}
+            showsVerticalScrollIndicator={false}
+            showsHorizontalScrollIndicator={false}
+            javaScriptEnabled={true}
+            domStorageEnabled={true}
+            startInLoadingState={true}
+            renderLoading={() => (
+              <View style={styles.webviewLoading}>
+                <ActivityIndicator size="large" color="#3B82F6" />
+                <Text style={styles.webviewLoadingText}>Loading Preview...</Text>
+              </View>
+            )}
+          />
+        ) : (
+          <View style={styles.webviewLoading}>
+            <ActivityIndicator size="large" color="#3B82F6" />
+            <Text style={styles.webviewLoadingText}>Generating Preview...</Text>
+          </View>
+        )}
       </View>
 
       {/* Template Info */}

@@ -1,170 +1,286 @@
 // screens/Dashboard/components/NotificationCard.js
 import React from 'react';
-import { View, Text, TouchableOpacity, StyleSheet } from 'react-native';
+import {
+  View,
+  Text,
+  TouchableOpacity,
+  StyleSheet,
+  Animated,
+} from 'react-native';
+import { LinearGradient } from 'expo-linear-gradient';
 
-const NotificationCard = ({ notification, onPress, onDismiss }) => {
-  const getTypeIcon = (type) => {
-    switch (type) {
-      case 'payment_reminder':
-        return '💰';
-      case 'low_stock':
-        return '📦';
-      case 'gst_filing':
-        return '📄';
-      case 'backup_reminder':
-        return '💾';
-      case 'info':
-        return 'ℹ️';
-      case 'warning':
-        return '⚠️';
-      case 'error':
-        return '❌';
-      case 'success':
-        return '✅';
+const NotificationCard = ({ 
+  title, 
+  subtitle, 
+  icon, 
+  color = '#3B82F6', 
+  onPress,
+  timestamp,
+  isRead = false,
+  isLoading = false 
+}) => {
+  const scaleAnim = React.useRef(new Animated.Value(1)).current;
+  const opacityAnim = React.useRef(new Animated.Value(0)).current;
+  const slideAnim = React.useRef(new Animated.Value(50)).current;
+
+  React.useEffect(() => {
+    Animated.parallel([
+      Animated.timing(opacityAnim, {
+        toValue: 1,
+        duration: 600,
+        useNativeDriver: true,
+      }),
+      Animated.timing(slideAnim, {
+        toValue: 0,
+        duration: 400,
+        useNativeDriver: true,
+      }),
+    ]).start();
+  }, []);
+
+  const handlePress = () => {
+    Animated.sequence([
+      Animated.timing(scaleAnim, {
+        toValue: 0.95,
+        duration: 100,
+        useNativeDriver: true,
+      }),
+      Animated.timing(scaleAnim, {
+        toValue: 1,
+        duration: 100,
+        useNativeDriver: true,
+      }),
+    ]).start();
+
+    if (onPress) {
+      onPress();
+    }
+  };
+
+  const getGradientColors = (baseColor) => {
+    switch (baseColor) {
+      case '#3B82F6': // Blue
+        return ['#DBEAFE', '#EBF8FF'];
+      case '#EF4444': // Red
+        return ['#FEE2E2', '#FEF2F2'];
+      case '#10B981': // Green
+        return ['#D1FAE5', '#ECFDF5'];
+      case '#F59E0B': // Orange
+        return ['#FEF3C7', '#FFFBEB'];
+      case '#8B5CF6': // Purple
+        return ['#EDE9FE', '#F5F3FF'];
       default:
-        return '🔔';
+        return ['#F1F5F9', '#F8FAFC'];
     }
   };
 
-  const getTypeColor = (type) => {
-    switch (type) {
-      case 'payment_reminder':
-        return '#10b981';
-      case 'low_stock':
-        return '#f59e0b';
-      case 'gst_filing':
-        return '#3b82f6';
-      case 'backup_reminder':
-        return '#8b5cf6';
-      case 'error':
-        return '#ef4444';
-      case 'warning':
-        return '#f59e0b';
-      case 'success':
-        return '#10b981';
-      default:
-        return '#6b7280';
-    }
-  };
-
-  const formatDate = (dateString) => {
-    try {
-      const date = new Date(dateString);
-      const now = new Date();
-      const diffMs = now - date;
-      const diffMins = Math.floor(diffMs / 60000);
-      const diffHours = Math.floor(diffMs / 3600000);
-      const diffDays = Math.floor(diffMs / 86400000);
-
-      if (diffMins < 1) return 'Just now';
-      if (diffMins < 60) return `${diffMins}m ago`;
-      if (diffHours < 24) return `${diffHours}h ago`;
-      if (diffDays < 7) return `${diffDays}d ago`;
-      return date.toLocaleDateString('en-IN');
-    } catch (error) {
-      return dateString;
-    }
-  };
+  if (isLoading) {
+    return (
+      <Animated.View 
+        style={[
+          styles.container,
+          styles.loadingContainer,
+          {
+            opacity: opacityAnim,
+            transform: [
+              { translateX: slideAnim },
+              { scale: scaleAnim }
+            ]
+          }
+        ]}
+      >
+        <View style={styles.loadingContent}>
+          <View style={styles.loadingIcon} />
+          <View style={styles.loadingTextContainer}>
+            <View style={styles.loadingTitle} />
+            <View style={styles.loadingSubtitle} />
+          </View>
+        </View>
+      </Animated.View>
+    );
+  }
 
   return (
-    <TouchableOpacity style={styles.container} onPress={onPress}>
-      <View style={styles.content}>
-        <View style={[styles.iconContainer, { backgroundColor: getTypeColor(notification.type) + '20' }]}>
-          <Text style={styles.icon}>{getTypeIcon(notification.type)}</Text>
-        </View>
-        <View style={styles.textContainer}>
-          <Text style={styles.title}>{notification.title}</Text>
-          <Text style={styles.message} numberOfLines={2}>
-            {notification.message}
-          </Text>
-          <Text style={styles.timestamp}>
-            {formatDate(notification.created_at)}
-          </Text>
-        </View>
-        {!notification.read_at && <View style={styles.unreadDot} />}
-      </View>
-      {onDismiss && (
-        <TouchableOpacity style={styles.dismissButton} onPress={onDismiss}>
-          <Text style={styles.dismissText}>×</Text>
-        </TouchableOpacity>
-      )}
-    </TouchableOpacity>
+    <Animated.View
+      style={[
+        styles.container,
+        {
+          opacity: opacityAnim,
+          transform: [
+            { translateX: slideAnim },
+            { scale: scaleAnim }
+          ]
+        }
+      ]}
+    >
+      <TouchableOpacity
+        style={styles.touchable}
+        onPress={handlePress}
+        activeOpacity={0.8}
+      >
+        <LinearGradient
+          colors={getGradientColors(color)}
+          style={styles.gradientBackground}
+          start={{ x: 0, y: 0 }}
+          end={{ x: 1, y: 1 }}
+        >
+          {/* Unread Indicator */}
+          {!isRead && (
+            <View style={[styles.unreadIndicator, { backgroundColor: color }]} />
+          )}
+
+          {/* Icon */}
+          <View style={[styles.iconContainer, { backgroundColor: color + '20' }]}>
+            <Text style={styles.icon}>{icon}</Text>
+          </View>
+
+          {/* Content */}
+          <View style={styles.content}>
+            <Text style={styles.title} numberOfLines={2}>
+              {title}
+            </Text>
+            <Text style={styles.subtitle} numberOfLines={2}>
+              {subtitle}
+            </Text>
+            {timestamp && (
+              <Text style={styles.timestamp}>
+                {timestamp}
+              </Text>
+            )}
+          </View>
+
+          {/* Action Button */}
+          <View style={styles.actionContainer}>
+            <View style={[styles.actionButton, { backgroundColor: color + '20' }]}>
+              <Text style={[styles.actionText, { color: color }]}>
+                View
+              </Text>
+            </View>
+          </View>
+
+          {/* Decorative Elements */}
+          <View style={[styles.decorativeCircle, { backgroundColor: color + '15' }]} />
+        </LinearGradient>
+      </TouchableOpacity>
+    </Animated.View>
   );
 };
 
 const styles = StyleSheet.create({
   container: {
-    backgroundColor: '#ffffff',
-    borderRadius: 8,
-    marginVertical: 4,
+    width: 200,
+    height: 120,
+    borderRadius: 16,
     shadowColor: '#000',
     shadowOffset: {
       width: 0,
-      height: 1,
+      height: 2,
     },
     shadowOpacity: 0.1,
-    shadowRadius: 2,
-    elevation: 2,
+    shadowRadius: 4,
+    elevation: 4,
     overflow: 'hidden',
-  },
-  content: {
-    flexDirection: 'row',
-    alignItems: 'flex-start',
-    padding: 16,
-  },
-  iconContainer: {
-    width: 40,
-    height: 40,
-    borderRadius: 20,
-    alignItems: 'center',
-    justifyContent: 'center',
     marginRight: 12,
   },
-  icon: {
-    fontSize: 20,
+  loadingContainer: {
+    backgroundColor: '#F1F5F9',
   },
-  textContainer: {
+  touchable: {
     flex: 1,
   },
-  title: {
-    fontSize: 16,
-    fontWeight: '600',
-    color: '#111827',
-    marginBottom: 4,
+  gradientBackground: {
+    flex: 1,
+    padding: 16,
+    position: 'relative',
   },
-  message: {
-    fontSize: 14,
-    color: '#6b7280',
-    marginBottom: 6,
-    lineHeight: 20,
-  },
-  timestamp: {
-    fontSize: 12,
-    color: '#9ca3af',
-  },
-  unreadDot: {
+  unreadIndicator: {
+    position: 'absolute',
+    top: 12,
+    right: 12,
     width: 8,
     height: 8,
     borderRadius: 4,
-    backgroundColor: '#3b82f6',
-    marginLeft: 8,
-    marginTop: 6,
+    zIndex: 1,
   },
-  dismissButton: {
-    position: 'absolute',
-    top: 8,
-    right: 8,
-    width: 24,
-    height: 24,
-    borderRadius: 12,
-    backgroundColor: '#f3f4f6',
+  iconContainer: {
+    width: 32,
+    height: 32,
+    borderRadius: 8,
     alignItems: 'center',
     justifyContent: 'center',
+    marginBottom: 8,
   },
-  dismissText: {
+  icon: {
     fontSize: 16,
-    color: '#6b7280',
+  },
+  content: {
+    flex: 1,
+  },
+  title: {
+    fontSize: 14,
     fontWeight: 'bold',
+    color: '#1E293B',
+    marginBottom: 4,
+  },
+  subtitle: {
+    fontSize: 12,
+    color: '#64748B',
+    marginBottom: 4,
+  },
+  timestamp: {
+    fontSize: 10,
+    color: '#94A3B8',
+    fontStyle: 'italic',
+  },
+  actionContainer: {
+    alignItems: 'flex-end',
+    marginTop: 8,
+  },
+  actionButton: {
+    paddingHorizontal: 8,
+    paddingVertical: 4,
+    borderRadius: 8,
+  },
+  actionText: {
+    fontSize: 10,
+    fontWeight: 'bold',
+  },
+  decorativeCircle: {
+    position: 'absolute',
+    top: -10,
+    right: -10,
+    width: 30,
+    height: 30,
+    borderRadius: 15,
+  },
+  // Loading states
+  loadingContent: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    padding: 16,
+  },
+  loadingIcon: {
+    width: 32,
+    height: 32,
+    borderRadius: 8,
+    backgroundColor: '#E2E8F0',
+    marginRight: 12,
+  },
+  loadingTextContainer: {
+    flex: 1,
+  },
+  loadingTitle: {
+    width: '80%',
+    height: 14,
+    backgroundColor: '#E2E8F0',
+    borderRadius: 7,
+    marginBottom: 8,
+  },
+  loadingSubtitle: {
+    width: '60%',
+    height: 12,
+    backgroundColor: '#E2E8F0',
+    borderRadius: 6,
   },
 });
 

@@ -7,180 +7,73 @@ import {
   StyleSheet,
   ScrollView,
   SafeAreaView,
-  FlatList,
-  Alert,
-  Modal,
   TextInput,
-  StatusBar,
+  FlatList,
   RefreshControl,
+  StatusBar,
+  Alert,
+  Dimensions,
 } from "react-native";
+import { LinearGradient } from "expo-linear-gradient";
 
-// Import service
+// Import services
 import PartiesService from "./services/PartiesService";
 
-const PartiesScreen = ({ route }) => {
+const { width } = Dimensions.get('window');
+
+const PartiesScreen = ({ navigation }) => {
+  const [loading, setLoading] = useState(true);
+  const [refreshing, setRefreshing] = useState(false);
   const [parties, setParties] = useState([]);
   const [filteredParties, setFilteredParties] = useState([]);
   const [searchQuery, setSearchQuery] = useState("");
-  const [refreshing, setRefreshing] = useState(false);
-  const [loading, setLoading] = useState(true);
-  const [selectedTab, setSelectedTab] = useState("all"); // all, customers, suppliers
-  const [modalVisible, setModalVisible] = useState(false);
-  const [editingParty, setEditingParty] = useState(null);
-  const [statistics, setStatistics] = useState({});
-  const [formData, setFormData] = useState({
-    name: "",
-    phone: "",
-    email: "",
-    address: "",
-    gstNumber: "",
-    panNumber: "",
-    type: "customer", // customer or supplier
-    creditLimit: "",
-    creditDays: "30",
-    openingBalance: "0",
-    notes: "",
-  });
+  const [selectedType, setSelectedType] = useState("all");
 
   useEffect(() => {
     loadParties();
   }, []);
 
   useEffect(() => {
-    // Handle navigation params
-    if (route?.params?.action === 'add') {
-      openAddModal(route.params.type || 'customer');
-    }
-  }, [route?.params]);
-
-  useEffect(() => {
     filterParties();
-  }, [parties, searchQuery, selectedTab]);
+  }, [parties, searchQuery, selectedType]);
 
   const loadParties = async () => {
-    setLoading(true);
     try {
-      const [partiesData, stats] = await Promise.all([
-        PartiesService.getAllParties(),
-        PartiesService.getPartiesStatistics()
-      ]);
-      
-      setParties(partiesData);
-      setStatistics(stats);
+      setLoading(true);
+      const data = await PartiesService.getAllParties();
+      setParties(data);
     } catch (error) {
       console.error('❌ Error loading parties:', error);
-      Alert.alert("Error", "Failed to load parties");
     } finally {
       setLoading(false);
     }
   };
 
+  const onRefresh = async () => {
+    setRefreshing(true);
+    await loadParties();
+    setRefreshing(false);
+  };
+
   const filterParties = () => {
     let filtered = parties;
 
-    // Filter by tab
-    if (selectedTab === "customers") {
-      filtered = filtered.filter(party => 
-        party.type === "customer" || party.type === "both"
-      );
-    } else if (selectedTab === "suppliers") {
-      filtered = filtered.filter(party => 
-        party.type === "supplier" || party.type === "both"
-      );
+    if (selectedType !== "all") {
+      filtered = filtered.filter(party => party.type === selectedType);
     }
 
-    // Filter by search query
-    if (searchQuery.trim()) {
-      const query = searchQuery.toLowerCase();
+    if (searchQuery) {
       filtered = filtered.filter(party =>
-        party.name.toLowerCase().includes(query) ||
-        (party.phone && party.phone.includes(query)) ||
-        (party.email && party.email.toLowerCase().includes(query)) ||
-        (party.gstNumber && party.gstNumber.toLowerCase().includes(query))
+        party.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
+        party.phone.includes(searchQuery) ||
+        party.email.toLowerCase().includes(searchQuery.toLowerCase())
       );
     }
 
     setFilteredParties(filtered);
   };
 
-  const handleRefresh = async () => {
-    setRefreshing(true);
-    await loadParties();
-    setRefreshing(false);
-  };
-
-  const openAddModal = (type = "customer") => {
-    setEditingParty(null);
-    setFormData({
-      name: "",
-      phone: "",
-      email: "",
-      address: "",
-      gstNumber: "",
-      panNumber: "",
-      type: type,
-      creditLimit: "50000",
-      creditDays: "30",
-      openingBalance: "0",
-      notes: "",
-    });
-    setModalVisible(true);
-  };
-
-  const openEditModal = (party) => {
-    setEditingParty(party);
-    setFormData({
-      name: party.name || "",
-      phone: party.phone || "",
-      email: party.email || "",
-      address: party.address || "",
-      gstNumber: party.gstNumber || "",
-      panNumber: party.panNumber || "",
-      type: party.type || "customer",
-      creditLimit: party.creditLimit?.toString() || "50000",
-      creditDays: party.credit_days?.toString() || "30",
-      openingBalance: party.opening_balance?.toString() || "0",
-      notes: party.notes || "",
-    });
-    setModalVisible(true);
-  };
-
-  const handleSaveParty = async () => {
-    if (!formData.name.trim()) {
-      Alert.alert("Error", "Party name is required");
-      return;
-    }
-
-    if (!formData.phone.trim()) {
-      Alert.alert("Error", "Phone number is required");
-      return;
-    }
-
-    try {
-      const partyData = {
-        ...formData,
-        creditLimit: parseFloat(formData.creditLimit) || 0,
-        creditDays: parseInt(formData.creditDays) || 30,
-        openingBalance: parseFloat(formData.openingBalance) || 0,
-      };
-
-      if (editingParty) {
-        await PartiesService.updateParty(editingParty.id, partyData);
-        Alert.alert("Success", "Party updated successfully");
-      } else {
-        await PartiesService.addParty(partyData);
-        Alert.alert("Success", "Party added successfully");
-      }
-
-      setModalVisible(false);
-      await loadParties();
-    } catch (error) {
-      console.error('❌ Error saving party:', error);
-      Alert.alert("Error", "Failed to save party");
-    }
-  };
-
-  const handleDeleteParty = async (partyId) => {
+  const handleDeleteParty = (partyId) => {
     Alert.alert(
       "Delete Party",
       "Are you sure you want to delete this party?",
@@ -192,11 +85,9 @@ const PartiesScreen = ({ route }) => {
           onPress: async () => {
             try {
               await PartiesService.deleteParty(partyId);
-              Alert.alert("Success", "Party deleted successfully");
               await loadParties();
             } catch (error) {
               console.error('❌ Error deleting party:', error);
-              Alert.alert("Error", "Failed to delete party");
             }
           },
         },
@@ -206,362 +97,167 @@ const PartiesScreen = ({ route }) => {
 
   const renderPartyItem = ({ item }) => (
     <TouchableOpacity
-      style={styles.partyCard}
-      onPress={() => openEditModal(item)}
+      style={styles.partyItem}
+      onPress={() => navigation.navigate('PartyDetails', { partyId: item.id })}
     >
-      <View style={styles.partyHeader}>
-        <View style={styles.partyInfo}>
-          <Text style={styles.partyName}>{item.name}</Text>
-          <Text style={styles.partyType}>
-            {item.type.charAt(0).toUpperCase() + item.type.slice(1)}
-          </Text>
-        </View>
-        <View style={styles.partyActions}>
-          <TouchableOpacity
-            style={styles.editButton}
-            onPress={() => openEditModal(item)}
-          >
-            <Text style={styles.editButtonText}>✏️</Text>
-          </TouchableOpacity>
+      <LinearGradient
+        colors={item.type === 'customer' ? ['#10b981', '#059669'] : ['#f59e0b', '#d97706']}
+        style={styles.partyGradient}
+      >
+        <View style={styles.partyHeader}>
+          <View style={styles.partyInfo}>
+            <Text style={styles.partyName}>{item.name}</Text>
+            <View style={styles.partyType}>
+              <Text style={styles.partyTypeText}>
+                {item.type === 'customer' ? '👤 Customer' : '🏪 Supplier'}
+              </Text>
+            </View>
+          </View>
           <TouchableOpacity
             style={styles.deleteButton}
             onPress={() => handleDeleteParty(item.id)}
           >
-            <Text style={styles.deleteButtonText}>🗑️</Text>
+            <Text style={styles.deleteIcon}>🗑️</Text>
           </TouchableOpacity>
         </View>
-      </View>
-
-      <View style={styles.partyDetails}>
-        {item.phone && (
-          <Text style={styles.partyDetailText}>📞 {item.phone}</Text>
-        )}
-        {item.email && (
-          <Text style={styles.partyDetailText}>📧 {item.email}</Text>
-        )}
-        {item.gstNumber && (
-          <Text style={styles.partyDetailText}>🏢 GST: {item.gstNumber}</Text>
-        )}
-      </View>
-
-      <View style={styles.partyFooter}>
-        <Text style={styles.balanceText}>
-          Balance: ₹{(item.balance || 0).toLocaleString('en-IN')}
-        </Text>
-        <Text style={styles.creditText}>
-          Credit: ₹{(item.creditLimit || 0).toLocaleString('en-IN')}
-        </Text>
-      </View>
+        
+        <View style={styles.partyDetails}>
+          {item.phone && (
+            <View style={styles.detailRow}>
+              <Text style={styles.detailLabel}>📞</Text>
+              <Text style={styles.detailText}>{item.phone}</Text>
+            </View>
+          )}
+          {item.email && (
+            <View style={styles.detailRow}>
+              <Text style={styles.detailLabel}>📧</Text>
+              <Text style={styles.detailText}>{item.email}</Text>
+            </View>
+          )}
+          {item.address && (
+            <View style={styles.detailRow}>
+              <Text style={styles.detailLabel}>📍</Text>
+              <Text style={styles.detailText} numberOfLines={2}>{item.address}</Text>
+            </View>
+          )}
+        </View>
+      </LinearGradient>
     </TouchableOpacity>
-  );
-
-  const renderEmptyState = () => (
-    <View style={styles.emptyContainer}>
-      <Text style={styles.emptyIcon}>👥</Text>
-      <Text style={styles.emptyTitle}>No Parties Found</Text>
-      <Text style={styles.emptySubtitle}>
-        {searchQuery 
-          ? "No parties match your search criteria" 
-          : "Start by adding your first customer or supplier"
-        }
-      </Text>
-      {!searchQuery && (
-        <TouchableOpacity
-          style={styles.emptyButton}
-          onPress={() => openAddModal('customer')}
-        >
-          <Text style={styles.emptyButtonText}>Add First Party</Text>
-        </TouchableOpacity>
-      )}
-    </View>
   );
 
   if (loading) {
     return (
-      <SafeAreaView style={styles.container}>
-        <StatusBar barStyle="dark-content" />
-        <View style={styles.loadingContainer}>
-          <Text style={styles.loadingText}>Loading Parties...</Text>
-        </View>
+      <SafeAreaView style={styles.loadingContainer}>
+        <StatusBar style="light" backgroundColor="#3b82f6" />
+        <LinearGradient
+          colors={['#3b82f6', '#1d4ed8']}
+          style={styles.loadingGradient}
+        >
+          <View style={styles.loadingContent}>
+            <Text style={styles.loadingIcon}>👥</Text>
+            <Text style={styles.loadingText}>Loading Parties...</Text>
+          </View>
+        </LinearGradient>
       </SafeAreaView>
     );
   }
 
   return (
     <SafeAreaView style={styles.container}>
-      <StatusBar barStyle="dark-content" />
-
+      <StatusBar style="light" backgroundColor="#3b82f6" />
+      
       {/* Header */}
-      <View style={styles.header}>
-        <Text style={styles.headerTitle}>Parties</Text>
-        <TouchableOpacity
-          style={styles.addButton}
-          onPress={() => openAddModal('customer')}
-        >
-          <Text style={styles.addButtonText}>+ Add</Text>
-        </TouchableOpacity>
-      </View>
-
-      {/* Statistics */}
-      <View style={styles.statsContainer}>
-        <View style={styles.statCard}>
-          <Text style={styles.statValue}>{statistics.totalCustomers || 0}</Text>
-          <Text style={styles.statLabel}>Customers</Text>
-        </View>
-        <View style={styles.statCard}>
-          <Text style={styles.statValue}>{statistics.totalSuppliers || 0}</Text>
-          <Text style={styles.statLabel}>Suppliers</Text>
-        </View>
-        <View style={styles.statCard}>
-          <Text style={styles.statValue}>
-            ₹{((statistics.totalReceivables || 0) / 1000).toFixed(0)}K
-          </Text>
-          <Text style={styles.statLabel}>To Collect</Text>
-        </View>
-        <View style={styles.statCard}>
-          <Text style={styles.statValue}>
-            ₹{((statistics.totalPayables || 0) / 1000).toFixed(0)}K
-          </Text>
-          <Text style={styles.statLabel}>To Pay</Text>
-        </View>
-      </View>
-
-      {/* Search Bar */}
-      <View style={styles.searchContainer}>
-        <TextInput
-          style={styles.searchInput}
-          placeholder="Search parties by name, phone, email, or GST..."
-          value={searchQuery}
-          onChangeText={setSearchQuery}
-        />
-        <Text style={styles.searchIcon}>🔍</Text>
-      </View>
-
-      {/* Filter Tabs */}
-      <View style={styles.tabContainer}>
-        {[
-          { key: "all", label: "All" },
-          { key: "customers", label: "Customers" },
-          { key: "suppliers", label: "Suppliers" },
-        ].map((tab) => (
-          <TouchableOpacity
-            key={tab.key}
-            style={[
-              styles.tab,
-              selectedTab === tab.key && styles.activeTab,
-            ]}
-            onPress={() => setSelectedTab(tab.key)}
+      <LinearGradient
+        colors={['#3b82f6', '#1d4ed8']}
+        style={styles.header}
+      >
+        <View style={styles.headerContent}>
+          <View>
+            <Text style={styles.headerTitle}>Parties</Text>
+            <Text style={styles.headerSubtitle}>Manage customers & suppliers</Text>
+          </View>
+          <TouchableOpacity 
+            style={styles.addButton}
+            onPress={() => navigation.navigate('AddParty')}
           >
-            <Text
-              style={[
-                styles.tabText,
-                selectedTab === tab.key && styles.activeTabText,
-              ]}
-            >
-              {tab.label}
-            </Text>
+            <Text style={styles.addIcon}>+</Text>
           </TouchableOpacity>
-        ))}
+        </View>
+      </LinearGradient>
+
+      {/* Search and Filter */}
+      <View style={styles.searchContainer}>
+        <View style={styles.searchBox}>
+          <Text style={styles.searchIcon}>🔍</Text>
+          <TextInput
+            style={styles.searchInput}
+            placeholder="Search parties..."
+            value={searchQuery}
+            onChangeText={setSearchQuery}
+            placeholderTextColor="#9ca3af"
+          />
+        </View>
+        
+        <View style={styles.filterContainer}>
+          <TouchableOpacity
+            style={[
+              styles.filterButton,
+              selectedType === "all" && styles.filterButtonActive
+            ]}
+            onPress={() => setSelectedType("all")}
+          >
+            <Text style={[
+              styles.filterText,
+              selectedType === "all" && styles.filterTextActive
+            ]}>All</Text>
+          </TouchableOpacity>
+          <TouchableOpacity
+            style={[
+              styles.filterButton,
+              selectedType === "customer" && styles.filterButtonActive
+            ]}
+            onPress={() => setSelectedType("customer")}
+          >
+            <Text style={[
+              styles.filterText,
+              selectedType === "customer" && styles.filterTextActive
+            ]}>Customers</Text>
+          </TouchableOpacity>
+          <TouchableOpacity
+            style={[
+              styles.filterButton,
+              selectedType === "supplier" && styles.filterButtonActive
+            ]}
+            onPress={() => setSelectedType("supplier")}
+          >
+            <Text style={[
+              styles.filterText,
+              selectedType === "supplier" && styles.filterTextActive
+            ]}>Suppliers</Text>
+          </TouchableOpacity>
+        </View>
       </View>
 
-      {/* Party List */}
+      {/* Parties List */}
       <FlatList
         data={filteredParties}
         renderItem={renderPartyItem}
         keyExtractor={(item) => item.id.toString()}
-        refreshControl={
-          <RefreshControl refreshing={refreshing} onRefresh={handleRefresh} />
-        }
         contentContainerStyle={styles.listContainer}
-        ListEmptyComponent={renderEmptyState}
+        refreshControl={
+          <RefreshControl refreshing={refreshing} onRefresh={onRefresh} />
+        }
         showsVerticalScrollIndicator={false}
-      />
-
-      {/* Add/Edit Party Modal */}
-      <Modal
-        visible={modalVisible}
-        animationType="slide"
-        presentationStyle="pageSheet"
-      >
-        <SafeAreaView style={styles.modalContainer}>
-          <View style={styles.modalHeader}>
-            <TouchableOpacity onPress={() => setModalVisible(false)}>
-              <Text style={styles.modalCloseText}>Cancel</Text>
-            </TouchableOpacity>
-            <Text style={styles.modalTitle}>
-              {editingParty ? "Edit Party" : "Add Party"}
+        ListEmptyComponent={
+          <View style={styles.emptyContainer}>
+            <Text style={styles.emptyIcon}>👥</Text>
+            <Text style={styles.emptyTitle}>No parties found</Text>
+            <Text style={styles.emptyText}>
+              {searchQuery ? 'Try adjusting your search' : 'Add your first party to get started'}
             </Text>
-            <TouchableOpacity onPress={handleSaveParty}>
-              <Text style={styles.modalSaveText}>Save</Text>
-            </TouchableOpacity>
           </View>
-
-          <ScrollView style={styles.modalContent}>
-            {/* Basic Information */}
-            <View style={styles.section}>
-              <Text style={styles.sectionTitle}>Basic Information</Text>
-              
-              <View style={styles.inputGroup}>
-                <Text style={styles.inputLabel}>Name *</Text>
-                <TextInput
-                  style={styles.input}
-                  value={formData.name}
-                  onChangeText={(text) => setFormData({ ...formData, name: text })}
-                  placeholder="Enter party name"
-                />
-              </View>
-
-              <View style={styles.inputGroup}>
-                <Text style={styles.inputLabel}>Type</Text>
-                <View style={styles.typeSelector}>
-                  {[
-                    { key: "customer", label: "Customer" },
-                    { key: "supplier", label: "Supplier" },
-                    { key: "both", label: "Both" },
-                  ].map((type) => (
-                    <TouchableOpacity
-                      key={type.key}
-                      style={[
-                        styles.typeOption,
-                        formData.type === type.key && styles.activeTypeOption,
-                      ]}
-                      onPress={() => setFormData({ ...formData, type: type.key })}
-                    >
-                      <Text
-                        style={[
-                          styles.typeOptionText,
-                          formData.type === type.key && styles.activeTypeOptionText,
-                        ]}
-                      >
-                        {type.label}
-                      </Text>
-                    </TouchableOpacity>
-                  ))}
-                </View>
-              </View>
-
-              <View style={styles.inputGroup}>
-                <Text style={styles.inputLabel}>Phone *</Text>
-                <TextInput
-                  style={styles.input}
-                  value={formData.phone}
-                  onChangeText={(text) => setFormData({ ...formData, phone: text })}
-                  placeholder="Enter phone number"
-                  keyboardType="phone-pad"
-                />
-              </View>
-
-              <View style={styles.inputGroup}>
-                <Text style={styles.inputLabel}>Email</Text>
-                <TextInput
-                  style={styles.input}
-                  value={formData.email}
-                  onChangeText={(text) => setFormData({ ...formData, email: text })}
-                  placeholder="Enter email address"
-                  keyboardType="email-address"
-                  autoCapitalize="none"
-                />
-              </View>
-
-              <View style={styles.inputGroup}>
-                <Text style={styles.inputLabel}>Address</Text>
-                <TextInput
-                  style={[styles.input, styles.textArea]}
-                  value={formData.address}
-                  onChangeText={(text) => setFormData({ ...formData, address: text })}
-                  placeholder="Enter complete address"
-                  multiline
-                  numberOfLines={3}
-                />
-              </View>
-            </View>
-
-            {/* Business Information */}
-            <View style={styles.section}>
-              <Text style={styles.sectionTitle}>Business Information</Text>
-              
-              <View style={styles.inputGroup}>
-                <Text style={styles.inputLabel}>GST Number</Text>
-                <TextInput
-                  style={styles.input}
-                  value={formData.gstNumber}
-                  onChangeText={(text) => setFormData({ ...formData, gstNumber: text.toUpperCase() })}
-                  placeholder="Enter GST number"
-                  autoCapitalize="characters"
-                />
-              </View>
-
-              <View style={styles.inputGroup}>
-                <Text style={styles.inputLabel}>PAN Number</Text>
-                <TextInput
-                  style={styles.input}
-                  value={formData.panNumber}
-                  onChangeText={(text) => setFormData({ ...formData, panNumber: text.toUpperCase() })}
-                  placeholder="Enter PAN number"
-                  autoCapitalize="characters"
-                />
-              </View>
-            </View>
-
-            {/* Financial Information */}
-            <View style={styles.section}>
-              <Text style={styles.sectionTitle}>Financial Information</Text>
-              
-              <View style={styles.inputGroup}>
-                <Text style={styles.inputLabel}>Credit Limit (₹)</Text>
-                <TextInput
-                  style={styles.input}
-                  value={formData.creditLimit}
-                  onChangeText={(text) => setFormData({ ...formData, creditLimit: text })}
-                  placeholder="Enter credit limit"
-                  keyboardType="numeric"
-                />
-              </View>
-
-              <View style={styles.inputGroup}>
-                <Text style={styles.inputLabel}>Credit Days</Text>
-                <TextInput
-                  style={styles.input}
-                  value={formData.creditDays}
-                  onChangeText={(text) => setFormData({ ...formData, creditDays: text })}
-                  placeholder="Enter credit days"
-                  keyboardType="numeric"
-                />
-              </View>
-
-              <View style={styles.inputGroup}>
-                <Text style={styles.inputLabel}>Opening Balance (₹)</Text>
-                <TextInput
-                  style={styles.input}
-                  value={formData.openingBalance}
-                  onChangeText={(text) => setFormData({ ...formData, openingBalance: text })}
-                  placeholder="Enter opening balance"
-                  keyboardType="numeric"
-                />
-              </View>
-            </View>
-
-            {/* Additional Information */}
-            <View style={styles.section}>
-              <Text style={styles.sectionTitle}>Additional Information</Text>
-              
-              <View style={styles.inputGroup}>
-                <Text style={styles.inputLabel}>Notes</Text>
-                <TextInput
-                  style={[styles.input, styles.textArea]}
-                  value={formData.notes}
-                  onChangeText={(text) => setFormData({ ...formData, notes: text })}
-                  placeholder="Enter any additional notes"
-                  multiline
-                  numberOfLines={3}
-                />
-              </View>
-            </View>
-
-            <View style={{ height: 50 }} />
-          </ScrollView>
-        </SafeAreaView>
-      </Modal>
+        }
+      />
     </SafeAreaView>
   );
 };
@@ -569,130 +265,130 @@ const PartiesScreen = ({ route }) => {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: '#F8FAFC',
+    backgroundColor: '#f8fafc',
   },
   loadingContainer: {
+    flex: 1,
+  },
+  loadingGradient: {
     flex: 1,
     justifyContent: 'center',
     alignItems: 'center',
   },
+  loadingContent: {
+    alignItems: 'center',
+  },
+  loadingIcon: {
+    fontSize: 48,
+    marginBottom: 16,
+  },
   loadingText: {
     fontSize: 18,
-    color: '#64748B',
+    color: '#ffffff',
+    fontWeight: '600',
   },
   header: {
+    paddingTop: 20,
+    paddingBottom: 20,
+    paddingHorizontal: 20,
+  },
+  headerContent: {
     flexDirection: 'row',
     justifyContent: 'space-between',
     alignItems: 'center',
-    paddingHorizontal: 20,
-    paddingVertical: 15,
-    backgroundColor: '#FFFFFF',
-    borderBottomWidth: 1,
-    borderBottomColor: '#E2E8F0',
   },
   headerTitle: {
     fontSize: 24,
+    color: '#ffffff',
     fontWeight: 'bold',
-    color: '#1E293B',
   },
-  addButton: {
-    backgroundColor: '#3B82F6',
-    paddingHorizontal: 16,
-    paddingVertical: 8,
-    borderRadius: 8,
-  },
-  addButtonText: {
-    color: '#FFFFFF',
-    fontWeight: '600',
-  },
-  statsContainer: {
-    flexDirection: 'row',
-    paddingHorizontal: 20,
-    paddingVertical: 15,
-    backgroundColor: '#FFFFFF',
-  },
-  statCard: {
-    flex: 1,
-    alignItems: 'center',
-  },
-  statValue: {
-    fontSize: 18,
-    fontWeight: 'bold',
-    color: '#1E293B',
-  },
-  statLabel: {
-    fontSize: 12,
-    color: '#64748B',
+  headerSubtitle: {
+    fontSize: 14,
+    color: '#ffffff',
+    opacity: 0.9,
     marginTop: 2,
   },
+  addButton: {
+    width: 44,
+    height: 44,
+    borderRadius: 22,
+    backgroundColor: 'rgba(255, 255, 255, 0.2)',
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  addIcon: {
+    fontSize: 24,
+    color: '#ffffff',
+    fontWeight: 'bold',
+  },
   searchContainer: {
+    padding: 20,
+    backgroundColor: '#ffffff',
+    borderBottomWidth: 1,
+    borderBottomColor: '#e2e8f0',
+  },
+  searchBox: {
     flexDirection: 'row',
     alignItems: 'center',
-    marginHorizontal: 20,
-    marginVertical: 15,
-    backgroundColor: '#FFFFFF',
+    backgroundColor: '#f1f5f9',
     borderRadius: 12,
     paddingHorizontal: 16,
     paddingVertical: 12,
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 1 },
-    shadowOpacity: 0.1,
-    shadowRadius: 3,
-    elevation: 2,
+    marginBottom: 16,
+  },
+  searchIcon: {
+    fontSize: 16,
+    marginRight: 8,
   },
   searchInput: {
     flex: 1,
     fontSize: 16,
-    color: '#1E293B',
+    color: '#1e293b',
   },
-  searchIcon: {
-    fontSize: 20,
-    marginLeft: 10,
-  },
-  tabContainer: {
+  filterContainer: {
     flexDirection: 'row',
-    marginHorizontal: 20,
-    marginBottom: 15,
+    justifyContent: 'space-between',
   },
-  tab: {
+  filterButton: {
     flex: 1,
-    paddingVertical: 10,
-    paddingHorizontal: 16,
+    paddingVertical: 8,
+    paddingHorizontal: 12,
     borderRadius: 8,
+    backgroundColor: '#f1f5f9',
     marginHorizontal: 4,
-    backgroundColor: '#F1F5F9',
     alignItems: 'center',
   },
-  activeTab: {
-    backgroundColor: '#3B82F6',
+  filterButtonActive: {
+    backgroundColor: '#3b82f6',
   },
-  tabText: {
+  filterText: {
     fontSize: 14,
-    fontWeight: '500',
-    color: '#64748B',
+    fontWeight: '600',
+    color: '#64748b',
   },
-  activeTabText: {
-    color: '#FFFFFF',
+  filterTextActive: {
+    color: '#ffffff',
   },
   listContainer: {
-    paddingHorizontal: 20,
-    paddingBottom: 20,
+    padding: 20,
   },
-  partyCard: {
-    backgroundColor: '#FFFFFF',
-    borderRadius: 12,
-    padding: 16,
+  partyItem: {
     marginBottom: 12,
+    borderRadius: 16,
     shadowColor: '#000',
-    shadowOffset: { width: 0, height: 1 },
-    shadowOpacity: 0.1,
-    shadowRadius: 3,
-    elevation: 2,
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.15,
+    shadowRadius: 8,
+    elevation: 5,
+  },
+  partyGradient: {
+    borderRadius: 16,
+    padding: 16,
   },
   partyHeader: {
     flexDirection: 'row',
     justifyContent: 'space-between',
-    alignItems: 'flex-start',
+    alignItems: 'center',
     marginBottom: 12,
   },
   partyInfo: {
@@ -701,175 +397,58 @@ const styles = StyleSheet.create({
   partyName: {
     fontSize: 18,
     fontWeight: 'bold',
-    color: '#1E293B',
+    color: '#ffffff',
+    marginBottom: 4,
   },
   partyType: {
-    fontSize: 14,
-    color: '#3B82F6',
-    marginTop: 2,
+    alignSelf: 'flex-start',
   },
-  partyActions: {
-    flexDirection: 'row',
-  },
-  editButton: {
-    padding: 8,
-    marginLeft: 8,
-  },
-  editButtonText: {
-    fontSize: 16,
+  partyTypeText: {
+    fontSize: 12,
+    color: '#ffffff',
+    opacity: 0.9,
   },
   deleteButton: {
     padding: 8,
-    marginLeft: 8,
   },
-  deleteButtonText: {
+  deleteIcon: {
     fontSize: 16,
   },
   partyDetails: {
-    marginBottom: 12,
+    gap: 8,
   },
-  partyDetailText: {
-    fontSize: 14,
-    color: '#64748B',
-    marginBottom: 4,
-  },
-  partyFooter: {
+  detailRow: {
     flexDirection: 'row',
-    justifyContent: 'space-between',
-    paddingTop: 12,
-    borderTopWidth: 1,
-    borderTopColor: '#F1F5F9',
+    alignItems: 'center',
   },
-  balanceText: {
+  detailLabel: {
     fontSize: 14,
-    fontWeight: '600',
-    color: '#059669',
+    marginRight: 8,
   },
-  creditText: {
+  detailText: {
     fontSize: 14,
-    color: '#64748B',
+    color: '#ffffff',
+    opacity: 0.9,
+    flex: 1,
   },
   emptyContainer: {
     alignItems: 'center',
-    justifyContent: 'center',
     paddingVertical: 60,
   },
   emptyIcon: {
-    fontSize: 64,
+    fontSize: 48,
     marginBottom: 16,
   },
   emptyTitle: {
-    fontSize: 20,
+    fontSize: 18,
     fontWeight: 'bold',
-    color: '#1E293B',
+    color: '#1e293b',
     marginBottom: 8,
   },
-  emptySubtitle: {
-    fontSize: 16,
-    color: '#64748B',
+  emptyText: {
+    fontSize: 14,
+    color: '#64748b',
     textAlign: 'center',
-    marginBottom: 24,
-    paddingHorizontal: 40,
-  },
-  emptyButton: {
-    backgroundColor: '#3B82F6',
-    paddingHorizontal: 24,
-    paddingVertical: 12,
-    borderRadius: 8,
-  },
-  emptyButtonText: {
-    color: '#FFFFFF',
-    fontWeight: '600',
-  },
-  modalContainer: {
-    flex: 1,
-    backgroundColor: '#F8FAFC',
-  },
-  modalHeader: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-    paddingHorizontal: 20,
-    paddingVertical: 15,
-    backgroundColor: '#FFFFFF',
-    borderBottomWidth: 1,
-    borderBottomColor: '#E2E8F0',
-  },
-  modalCloseText: {
-    fontSize: 16,
-    color: '#64748B',
-  },
-  modalTitle: {
-    fontSize: 18,
-    fontWeight: 'bold',
-    color: '#1E293B',
-  },
-  modalSaveText: {
-    fontSize: 16,
-    color: '#3B82F6',
-    fontWeight: '600',
-  },
-  modalContent: {
-    flex: 1,
-    paddingHorizontal: 20,
-  },
-  section: {
-    marginTop: 24,
-  },
-  sectionTitle: {
-    fontSize: 18,
-    fontWeight: 'bold',
-    color: '#1E293B',
-    marginBottom: 16,
-  },
-  inputGroup: {
-    marginBottom: 16,
-  },
-  inputLabel: {
-    fontSize: 14,
-    fontWeight: '500',
-    color: '#374151',
-    marginBottom: 8,
-  },
-  input: {
-    backgroundColor: '#FFFFFF',
-    borderWidth: 1,
-    borderColor: '#D1D5DB',
-    borderRadius: 8,
-    paddingHorizontal: 12,
-    paddingVertical: 12,
-    fontSize: 16,
-    color: '#1E293B',
-  },
-  textArea: {
-    height: 80,
-    textAlignVertical: 'top',
-  },
-  typeSelector: {
-    flexDirection: 'row',
-  },
-  typeOption: {
-    flex: 1,
-    paddingVertical: 12,
-    paddingHorizontal: 16,
-    borderWidth: 1,
-    borderColor: '#D1D5DB',
-    backgroundColor: '#FFFFFF',
-    alignItems: 'center',
-    marginRight: 8,
-    borderRadius: 8,
-  },
-  activeTypeOption: {
-    backgroundColor: '#3B82F6',
-    borderColor: '#3B82F6',
-  },
-  typeOptionText: {
-    fontSize: 14,
-    fontWeight: '500',
-    color: '#64748B',
-  },
-  activeTypeOptionText: {
-    color: '#FFFFFF',
   },
 });
 
