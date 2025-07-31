@@ -207,6 +207,12 @@ const InvoiceTemplateScreen = ({ navigation, route }) => {
   };
 
   const handlePreview = () => {
+  console.log('🔄 Navigating to preview with:', {
+    invoiceData: { invoiceId: invoiceData.id },
+    selectedTemplate,
+    selectedTheme
+  });
+  
   navigation.navigate('InvoicePreview', {
     invoiceData: {
       invoiceId: invoiceData.id
