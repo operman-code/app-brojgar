@@ -16,12 +16,62 @@ const TestScreen = () => (
   </SafeAreaView>
 );
 
+// Simple BottomTabNavigator with just test screens
+import { createBottomTabNavigator } from "@react-navigation/bottom-tabs";
+
+const Tab = createBottomTabNavigator();
+
+const TestTabNavigator = () => {
+  return (
+    <Tab.Navigator
+      screenOptions={{
+        headerShown: false,
+        tabBarStyle: {
+          backgroundColor: '#FFFFFF',
+          borderTopWidth: 1,
+          borderTopColor: '#E2E8F0',
+          paddingBottom: 10,
+          paddingTop: 10,
+          height: 70,
+        },
+        tabBarActiveTintColor: '#3B82F6',
+        tabBarInactiveTintColor: '#64748B',
+        tabBarLabelStyle: {
+          fontSize: 12,
+          fontWeight: '600',
+        },
+      }}
+    >
+      <Tab.Screen
+        name="Test1"
+        component={TestScreen}
+        options={{
+          tabBarLabel: 'Test1',
+          tabBarIcon: ({ color, size }) => (
+            <Text style={{ fontSize: size, color }}>📊</Text>
+          ),
+        }}
+      />
+      <Tab.Screen
+        name="Test2"
+        component={TestScreen}
+        options={{
+          tabBarLabel: 'Test2',
+          tabBarIcon: ({ color, size }) => (
+            <Text style={{ fontSize: size, color }}>👥</Text>
+          ),
+        }}
+      />
+    </Tab.Navigator>
+  );
+};
+
 export default function App() {
   return (
     <SafeAreaProvider>
       <NavigationContainer>
         <StatusBar style="dark" />
-        <TestScreen />
+        <TestTabNavigator />
       </NavigationContainer>
     </SafeAreaProvider>
   );
