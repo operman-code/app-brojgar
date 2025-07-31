@@ -5,6 +5,9 @@ import { StatusBar } from 'expo-status-bar';
 import { View, Text, StyleSheet } from 'react-native';
 import { SafeAreaProvider, SafeAreaView } from 'react-native-safe-area-context';
 
+// Import DashboardScreen
+import DashboardScreen from './screens/Dashboard/DashboardScreen';
+
 // Simple test component
 const TestScreen = () => (
   <SafeAreaView style={styles.container}>
@@ -16,7 +19,7 @@ const TestScreen = () => (
   </SafeAreaView>
 );
 
-// Simple BottomTabNavigator with just test screens
+// Simple BottomTabNavigator with DashboardScreen
 import { createBottomTabNavigator } from "@react-navigation/bottom-tabs";
 
 const Tab = createBottomTabNavigator();
@@ -43,20 +46,20 @@ const TestTabNavigator = () => {
       }}
     >
       <Tab.Screen
-        name="Test1"
-        component={TestScreen}
+        name="Dashboard"
+        component={DashboardScreen}
         options={{
-          tabBarLabel: 'Test1',
+          tabBarLabel: 'Dashboard',
           tabBarIcon: ({ color, size }) => (
             <Text style={{ fontSize: size, color }}>📊</Text>
           ),
         }}
       />
       <Tab.Screen
-        name="Test2"
+        name="Test"
         component={TestScreen}
         options={{
-          tabBarLabel: 'Test2',
+          tabBarLabel: 'Test',
           tabBarIcon: ({ color, size }) => (
             <Text style={{ fontSize: size, color }}>👥</Text>
           ),
