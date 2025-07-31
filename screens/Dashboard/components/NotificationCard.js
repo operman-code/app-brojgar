@@ -126,7 +126,7 @@ const NotificationCard = ({
         >
           {/* Unread Indicator */}
           {!isRead && (
-            <View style={[styles.unreadIndicator, { backgroundColor: color }} />
+            <View style={[styles.unreadIndicator, { backgroundColor: color }]} />
           )}
 
           {/* Icon */}
