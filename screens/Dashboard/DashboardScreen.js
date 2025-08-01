@@ -1,5 +1,5 @@
 // screens/Dashboard/DashboardScreen.js
-import React, { useState, useEffect } from "react";
+import React, { useState, useEffect, useRef } from "react";
 import {
   View,
   Text,
@@ -7,226 +7,392 @@ import {
   StyleSheet,
   ScrollView,
   SafeAreaView,
-  RefreshControl,
-  StatusBar,
+  FlatList,
   Dimensions,
+  Animated,
+  RefreshControl,
+  TextInput,
+  Alert,
+  StatusBar,
 } from "react-native";
-import { LinearGradient } from "expo-linear-gradient";
 
-// Import services
+// Import components
+import KPICard from "./components/KPICard";
+import TransactionItem from "./components/TransactionItem";
+import QuickActionButton from "./components/QuickActionButton";
+import NotificationCard from "./components/NotificationCard";
+
+// Import service
 import DashboardService from "./services/DashboardService";
 
 const { width } = Dimensions.get('window');
 
 const DashboardScreen = ({ navigation }) => {
-  const [loading, setLoading] = useState(true);
+  // Enhanced state management
+  const [kpiData, setKpiData] = useState({});
+  const [recentTransactions, setRecentTransactions] = useState([]);
+  const [reminders, setReminders] = useState([]);
+  const [notifications, setNotifications] = useState([]);
+  const [salesChartData, setSalesChartData] = useState([]);
+  const [businessProfile, setBusinessProfile] = useState({});
+  
   const [refreshing, setRefreshing] = useState(false);
-  const [dashboardData, setDashboardData] = useState({
-    totalSales: 0,
-    totalPurchases: 0,
-    totalParties: 0,
-    totalItems: 0,
-    recentTransactions: [],
-    lowStockItems: [],
-    notifications: []
-  });
+  const [searchQuery, setSearchQuery] = useState("");
+  const [filteredTransactions, setFilteredTransactions] = useState([]);
+  const [activeTab, setActiveTab] = useState("overview");
+  const [loading, setLoading] = useState(true);
+  
+  // Animation values
+  const fadeAnim = useRef(new Animated.Value(0)).current;
+  const slideAnim = useRef(new Animated.Value(50)).current;
 
   useEffect(() => {
     loadDashboardData();
+    
+    // Enhanced animations
+    Animated.parallel([
+      Animated.timing(fadeAnim, {
+        toValue: 1,
+        duration: 1000,
+        useNativeDriver: true,
+      }),
+      Animated.timing(slideAnim, {
+        toValue: 0,
+        duration: 800,
+        useNativeDriver: true,
+      }),
+    ]).start();
   }, []);
 
+  useEffect(() => {
+    filterTransactions();
+  }, [recentTransactions, searchQuery]);
+
   const loadDashboardData = async () => {
+    setLoading(true);
     try {
-      setLoading(true);
-      const data = await DashboardService.getDashboardData();
-      setDashboardData(data);
+      const [
+        kpiResult,
+        transactionsResult,
+        remindersResult,
+        notificationsResult,
+        chartResult,
+        profileResult
+      ] = await Promise.all([
+        DashboardService.getKPIData(),
+        DashboardService.getRecentTransactions(),
+        DashboardService.getReminders(),
+        DashboardService.getNotifications(),
+        DashboardService.getSalesChartData(),
+        DashboardService.getBusinessProfile()
+      ]);
+
+      setKpiData(kpiResult);
+      setRecentTransactions(transactionsResult);
+      setReminders(remindersResult);
+      setNotifications(notificationsResult);
+      setSalesChartData(chartResult);
+      setBusinessProfile(profileResult);
     } catch (error) {
-      console.error('❌ Error loading dashboard data:', error);
+      console.error('❌ Error loading dashboard:', error);
+      Alert.alert("Error", "Failed to load dashboard data");
     } finally {
       setLoading(false);
     }
   };
 
-  const onRefresh = async () => {
+  const filterTransactions = () => {
+    if (searchQuery.trim() === "") {
+      setFilteredTransactions(recentTransactions);
+    } else {
+      const filtered = recentTransactions.filter(transaction =>
+        transaction.customer?.toLowerCase().includes(searchQuery.toLowerCase()) ||
+        transaction.reference?.toLowerCase().includes(searchQuery.toLowerCase()) ||
+        transaction.type?.toLowerCase().includes(searchQuery.toLowerCase())
+      );
+      setFilteredTransactions(filtered);
+    }
+  };
+
+  const handleRefresh = async () => {
     setRefreshing(true);
     await loadDashboardData();
     setRefreshing(false);
   };
 
+  const handleQuickAction = (action) => {
+    switch (action) {
+      case 'newSale':
+        navigation.navigate('Invoice');
+        break;
+      case 'addItem':
+        navigation.navigate('Inventory', { action: 'add' });
+        break;
+      case 'newCustomer':
+        navigation.navigate('Parties', { action: 'add', type: 'customer' });
+        break;
+      case 'receivePayment':
+        Alert.alert("Coming Soon", "Payment collection feature will be available soon");
+        break;
+      case 'newInvoice':
+        navigation.navigate('Invoice');
+        break;
+      case 'viewReports':
+        navigation.navigate('Reports');
+        break;
+      default:
+        Alert.alert("Feature", `${action} feature coming soon`);
+    }
+  };
+
+  const renderKPICards = () => (
+    <View style={styles.kpiContainer}>
+      <KPICard
+        title="To Collect"
+        value={kpiData.toCollect || 0}
+        change={kpiData.toCollectTrend}
+        icon="💰"
+        color="#10b981"
+      />
+      <KPICard
+        title="To Pay"
+        value={kpiData.toPay || 0}
+        change={kpiData.toPayTrend}
+        icon="💳"
+        color="#ef4444"
+      />
+      <KPICard
+        title="Stock Value"
+        value={kpiData.stockValue || 0}
+        change={kpiData.stockTrend}
+        icon="📦"
+        color="#3b82f6"
+      />
+      <KPICard
+        title="This Week"
+        value={kpiData.weekSales || 0}
+        change={kpiData.salesTrend}
+        icon="📈"
+        color="#8b5cf6"
+      />
+    </View>
+  );
+
+  const renderReminders = () => (
+    <View style={styles.section}>
+      <View style={styles.sectionHeader}>
+        <Text style={styles.sectionTitle}>🔔 Reminders</Text>
+        <TouchableOpacity>
+          <Text style={styles.viewAllText}>View All</Text>
+        </TouchableOpacity>
+      </View>
+      
+      {reminders.length > 0 ? (
+        <View>
+          {reminders.slice(0, 3).map((item) => (
+            <View key={item.id.toString()} style={styles.reminderCard}>
+              <View style={styles.reminderLeft}>
+                <View style={[styles.reminderIcon, { backgroundColor: item.color }]}>
+                  <Text style={styles.reminderIconText}>{item.icon}</Text>
+                </View>
+                <View style={styles.reminderContent}>
+                  <Text style={styles.reminderTitle}>{item.title}</Text>
+                  <Text style={styles.reminderSubtitle}>{item.subtitle}</Text>
+                </View>
+              </View>
+              <Text style={styles.reminderAmount}>₹{item.amount?.toLocaleString()}</Text>
+            </View>
+          ))}
+        </View>
+      ) : (
+        <View style={styles.emptyState}>
+          <Text style={styles.emptyStateText}>No pending reminders</Text>
+        </View>
+      )}
+    </View>
+  );
+
+  const renderQuickActions = () => (
+    <View style={styles.section}>
+      <Text style={styles.sectionTitle}>⚡ Quick Actions</Text>
+      <View style={styles.quickActionsGrid}>
+        {[
+          { id: '1', title: 'New Sale', icon: '💰', action: 'newSale', color: '#10b981' },
+          { id: '2', title: 'Add Item', icon: '📦', action: 'addItem', color: '#3b82f6' },
+          { id: '3', title: 'New Customer', icon: '👤', action: 'newCustomer', color: '#8b5cf6' },
+          { id: '4', title: 'Payment', icon: '💳', action: 'receivePayment', color: '#f59e0b' },
+          { id: '5', title: 'Invoice', icon: '🧾', action: 'newInvoice', color: '#ef4444' },
+          { id: '6', title: 'Reports', icon: '📊', action: 'viewReports', color: '#06b6d4' },
+        ].map((action) => (
+          <QuickActionButton
+            key={action.id}
+            title={action.title}
+            icon={action.icon}
+            color={action.color}
+            onPress={() => handleQuickAction(action.action)}
+          />
+        ))}
+      </View>
+    </View>
+  );
+
+  const renderTransactions = () => (
+    <View style={styles.section}>
+      <View style={styles.sectionHeader}>
+        <Text style={styles.sectionTitle}>📋 Recent Transactions</Text>
+        <TouchableOpacity>
+          <Text style={styles.viewAllText}>View All</Text>
+        </TouchableOpacity>
+      </View>
+      
+      <View style={styles.searchContainer}>
+        <TextInput
+          style={styles.searchInput}
+          placeholder="Search transactions..."
+          value={searchQuery}
+          onChangeText={setSearchQuery}
+          placeholderTextColor="#9ca3af"
+        />
+      </View>
+
+      {filteredTransactions.length > 0 ? (
+        <View>
+          {filteredTransactions.slice(0, 5).map((item) => (
+            <TransactionItem
+            key={item.id.toString()}
+              transaction={item}
+              onPress={() => {
+                // Handle transaction press
+                Alert.alert("Transaction", `View ${item.type} details`);
+              }}
+            />
+          ))}
+        </View>
+      ) : (
+        <View style={styles.emptyState}>
+          <Text style={styles.emptyStateText}>
+            {searchQuery ? 'No matching transactions' : 'No recent transactions'}
+          </Text>
+        </View>
+      )}
+    </View>
+  );
+
+  const renderTabs = () => (
+    <View style={styles.tabContainer}>
+      {[
+        { id: 'overview', title: 'Overview', icon: '📊' },
+        { id: 'transactions', title: 'Transactions', icon: '📋' },
+        { id: 'reports', title: 'Reports', icon: '📈' }
+      ].map((tab) => (
+        <TouchableOpacity
+          key={tab.id}
+          style={[styles.tab, activeTab === tab.id && styles.activeTab]}
+          onPress={() => setActiveTab(tab.id)}
+        >
+          <Text style={styles.tabIcon}>{tab.icon}</Text>
+          <Text style={[styles.tabText, activeTab === tab.id && styles.activeTabText]}>
+            {tab.title}
+          </Text>
+        </TouchableOpacity>
+      ))}
+    </View>
+  );
+
+  const renderContent = () => {
+    switch (activeTab) {
+      case 'overview':
+        return (
+          <>
+            {renderKPICards()}
+            {renderReminders()}
+            {renderQuickActions()}
+          </>
+        );
+      case 'transactions':
+        return renderTransactions();
+      case 'reports':
+        return (
+          <View style={styles.section}>
+            <Text style={styles.sectionTitle}>📈 Quick Reports</Text>
+            <TouchableOpacity 
+              style={styles.reportButton}
+              onPress={() => navigation.navigate('Reports')}
+            >
+              <Text style={styles.reportButtonText}>View Detailed Reports</Text>
+            </TouchableOpacity>
+          </View>
+        );
+      default:
+        return null;
+    }
+  };
+
   if (loading) {
     return (
-      <SafeAreaView style={styles.loadingContainer}>
-        <StatusBar style="light" backgroundColor="#3b82f6" />
-        <LinearGradient
-          colors={['#3b82f6', '#1d4ed8']}
-          style={styles.loadingGradient}
-        >
-          <View style={styles.loadingContent}>
-            <Text style={styles.loadingIcon}>📊</Text>
-            <Text style={styles.loadingText}>Loading Dashboard...</Text>
-          </View>
-        </LinearGradient>
+      <SafeAreaView style={styles.container}>
+        <StatusBar barStyle="dark-content" backgroundColor="#ffffff" />
+        <View style={styles.loadingContainer}>
+          <Text style={styles.loadingText}>Loading Dashboard...</Text>
+        </View>
       </SafeAreaView>
     );
   }
 
   return (
     <SafeAreaView style={styles.container}>
-      <StatusBar style="light" backgroundColor="#3b82f6" />
+      <StatusBar barStyle="dark-content" backgroundColor="#ffffff" />
       
-      {/* Header */}
-      <LinearGradient
-        colors={['#3b82f6', '#1d4ed8']}
-        style={styles.header}
+      <Animated.View 
+        style={[
+          styles.animatedContainer,
+          {
+            opacity: fadeAnim,
+            transform: [{ translateY: slideAnim }]
+          }
+        ]}
       >
-        <View style={styles.headerContent}>
+        {/* Header */}
+        <View style={styles.header}>
           <View>
             <Text style={styles.welcomeText}>Welcome back!</Text>
-            <Text style={styles.businessName}>Brojgar Business</Text>
+            <Text style={styles.businessName}>{businessProfile.businessName || 'Brojgar Business'}</Text>
           </View>
-          <TouchableOpacity style={styles.profileButton}>
-            <Text style={styles.profileIcon}>👤</Text>
-          </TouchableOpacity>
-        </View>
-      </LinearGradient>
-
-      {/* Main Content */}
-      <ScrollView
-        style={styles.content}
-        contentContainerStyle={styles.contentContainer}
-        refreshControl={
-          <RefreshControl refreshing={refreshing} onRefresh={onRefresh} />
-        }
-        showsVerticalScrollIndicator={false}
-      >
-        {/* KPI Cards */}
-        <View style={styles.kpiSection}>
-          <Text style={styles.sectionTitle}>Business Overview</Text>
-          <View style={styles.kpiGrid}>
-            <TouchableOpacity style={styles.kpiCard}>
-              <LinearGradient
-                colors={['#10b981', '#059669']}
-                style={styles.kpiGradient}
-              >
-                <Text style={styles.kpiIcon}>💰</Text>
-                <Text style={styles.kpiValue}>₹{dashboardData.totalSales.toLocaleString()}</Text>
-                <Text style={styles.kpiLabel}>Total Sales</Text>
-              </LinearGradient>
-            </TouchableOpacity>
-            
-            <TouchableOpacity style={styles.kpiCard}>
-              <LinearGradient
-                colors={['#f59e0b', '#d97706']}
-                style={styles.kpiGradient}
-              >
-                <Text style={styles.kpiIcon}>🛒</Text>
-                <Text style={styles.kpiValue}>₹{dashboardData.totalPurchases.toLocaleString()}</Text>
-                <Text style={styles.kpiLabel}>Total Purchases</Text>
-              </LinearGradient>
-            </TouchableOpacity>
-            
-            <TouchableOpacity style={styles.kpiCard}>
-              <LinearGradient
-                colors={['#8b5cf6', '#7c3aed']}
-                style={styles.kpiGradient}
-              >
-                <Text style={styles.kpiIcon}>👥</Text>
-                <Text style={styles.kpiValue}>{dashboardData.totalParties}</Text>
-                <Text style={styles.kpiLabel}>Total Parties</Text>
-              </LinearGradient>
-            </TouchableOpacity>
-            
-            <TouchableOpacity style={styles.kpiCard}>
-              <LinearGradient
-                colors={['#ef4444', '#dc2626']}
-                style={styles.kpiGradient}
-              >
-                <Text style={styles.kpiIcon}>📦</Text>
-                <Text style={styles.kpiValue}>{dashboardData.totalItems}</Text>
-                <Text style={styles.kpiLabel}>Total Items</Text>
-              </LinearGradient>
-            </TouchableOpacity>
-          </View>
-        </View>
-
-        {/* Quick Actions */}
-        <View style={styles.actionsSection}>
-          <Text style={styles.sectionTitle}>Quick Actions</Text>
-          <View style={styles.actionsGrid}>
+          <View style={styles.headerActions}>
             <TouchableOpacity 
-              style={styles.actionButton}
-              onPress={() => navigation.navigate('Invoice')}
+              style={styles.headerButton}
+              onPress={() => navigation.navigate('Search')}
             >
-              <LinearGradient
-                colors={['#3b82f6', '#1d4ed8']}
-                style={styles.actionGradient}
-              >
-                <Text style={styles.actionIcon}>📄</Text>
-                <Text style={styles.actionText}>Create Invoice</Text>
-              </LinearGradient>
+              <Text style={styles.headerButtonIcon}>🔍</Text>
             </TouchableOpacity>
-            
             <TouchableOpacity 
-              style={styles.actionButton}
-              onPress={() => navigation.navigate('Parties')}
+              style={styles.notificationButton}
+              onPress={() => navigation.navigate('Notifications')}
             >
-              <LinearGradient
-                colors={['#10b981', '#059669']}
-                style={styles.actionGradient}
-              >
-                <Text style={styles.actionIcon}>👥</Text>
-                <Text style={styles.actionText}>Add Party</Text>
-              </LinearGradient>
-            </TouchableOpacity>
-            
-            <TouchableOpacity 
-              style={styles.actionButton}
-              onPress={() => navigation.navigate('Inventory')}
-            >
-              <LinearGradient
-                colors={['#f59e0b', '#d97706']}
-                style={styles.actionGradient}
-              >
-                <Text style={styles.actionIcon}>📦</Text>
-                <Text style={styles.actionText}>Add Item</Text>
-              </LinearGradient>
-            </TouchableOpacity>
-            
-            <TouchableOpacity 
-              style={styles.actionButton}
-              onPress={() => navigation.navigate('Reports')}
-            >
-              <LinearGradient
-                colors={['#8b5cf6', '#7c3aed']}
-                style={styles.actionGradient}
-              >
-                <Text style={styles.actionIcon}>📊</Text>
-                <Text style={styles.actionText}>Reports</Text>
-              </LinearGradient>
-            </TouchableOpacity>
-          </View>
-        </View>
-
-        {/* Recent Transactions */}
-        <View style={styles.transactionsSection}>
-          <Text style={styles.sectionTitle}>Recent Transactions</Text>
-          {dashboardData.recentTransactions.length > 0 ? (
-            dashboardData.recentTransactions.map((transaction, index) => (
-              <View key={index} style={styles.transactionItem}>
-                <View style={styles.transactionInfo}>
-                  <Text style={styles.transactionTitle}>{transaction.title}</Text>
-                  <Text style={styles.transactionDate}>{transaction.date}</Text>
+              <Text style={styles.notificationIcon}>🔔</Text>
+              {notifications.length > 0 && (
+                <View style={styles.notificationBadge}>
+                  <Text style={styles.notificationBadgeText}>{notifications.length}</Text>
                 </View>
-                <Text style={styles.transactionAmount}>₹{transaction.amount}</Text>
-              </View>
-            ))
-          ) : (
-            <View style={styles.noDataContainer}>
-              <Text style={styles.noDataText}>No recent transactions</Text>
-            </View>
-          )}
+              )}
+            </TouchableOpacity>
+          </View>
         </View>
-      </ScrollView>
+
+        {/* Tabs */}
+        {renderTabs()}
+
+        {/* Content */}
+        <ScrollView
+          style={styles.content}
+          showsVerticalScrollIndicator={false}
+          refreshControl={
+            <RefreshControl refreshing={refreshing} onRefresh={handleRefresh} />
+          }
+        >
+          {renderContent()}
+        </ScrollView>
+      </Animated.View>
     </SafeAreaView>
   );
 };
@@ -238,184 +404,228 @@ const styles = StyleSheet.create({
   },
   loadingContainer: {
     flex: 1,
-  },
-  loadingGradient: {
-    flex: 1,
     justifyContent: 'center',
     alignItems: 'center',
   },
-  loadingContent: {
-    alignItems: 'center',
-  },
-  loadingIcon: {
-    fontSize: 48,
-    marginBottom: 16,
-  },
   loadingText: {
-    fontSize: 18,
-    color: '#ffffff',
-    fontWeight: '600',
+    fontSize: 16,
+    color: '#6b7280',
+  },
+  animatedContainer: {
+    flex: 1,
   },
   header: {
-    paddingTop: 20,
-    paddingBottom: 30,
-    paddingHorizontal: 20,
-  },
-  headerContent: {
     flexDirection: 'row',
     justifyContent: 'space-between',
     alignItems: 'center',
+    paddingHorizontal: 20,
+    paddingVertical: 16,
+    backgroundColor: '#ffffff',
+    borderBottomWidth: 1,
+    borderBottomColor: '#e5e7eb',
   },
   welcomeText: {
-    fontSize: 16,
-    color: '#ffffff',
-    opacity: 0.9,
+    fontSize: 14,
+    color: '#6b7280',
+    marginBottom: 4,
   },
   businessName: {
-    fontSize: 24,
-    color: '#ffffff',
+    fontSize: 20,
     fontWeight: 'bold',
-    marginTop: 4,
+    color: '#111827',
   },
-  profileButton: {
+  headerActions: {
+    flexDirection: 'row',
+    alignItems: 'center',
+  },
+  headerButton: {
     width: 40,
     height: 40,
     borderRadius: 20,
-    backgroundColor: 'rgba(255, 255, 255, 0.2)',
+    backgroundColor: '#f3f4f6',
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginRight: 12,
+  },
+  headerButtonIcon: {
+    fontSize: 18,
+  },
+  notificationButton: {
+    position: 'relative',
+    padding: 8,
+  },
+  notificationIcon: {
+    fontSize: 24,
+  },
+  notificationBadge: {
+    position: 'absolute',
+    top: 4,
+    right: 4,
+    backgroundColor: '#ef4444',
+    borderRadius: 10,
+    minWidth: 20,
+    height: 20,
     justifyContent: 'center',
     alignItems: 'center',
   },
-  profileIcon: {
-    fontSize: 20,
+  notificationBadgeText: {
+    color: '#ffffff',
+    fontSize: 12,
+    fontWeight: 'bold',
+  },
+  tabContainer: {
+    flexDirection: 'row',
+    backgroundColor: '#ffffff',
+    paddingHorizontal: 16,
+    paddingVertical: 8,
+    borderBottomWidth: 1,
+    borderBottomColor: '#e5e7eb',
+  },
+  tab: {
+    flex: 1,
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    paddingVertical: 12,
+    paddingHorizontal: 16,
+    borderRadius: 8,
+    marginHorizontal: 4,
+  },
+  activeTab: {
+    backgroundColor: '#eff6ff',
+  },
+  tabIcon: {
+    fontSize: 16,
+    marginRight: 6,
+  },
+  tabText: {
+    fontSize: 14,
+    color: '#6b7280',
+    fontWeight: '500',
+  },
+  activeTabText: {
+    color: '#3b82f6',
+    fontWeight: '600',
   },
   content: {
     flex: 1,
   },
-  contentContainer: {
-    padding: 20,
+  section: {
+    backgroundColor: '#ffffff',
+    marginHorizontal: 16,
+    marginVertical: 8,
+    padding: 16,
+    borderRadius: 12,
+    shadowColor: '#000',
+    shadowOffset: {
+      width: 0,
+      height: 2,
+    },
+    shadowOpacity: 0.1,
+    shadowRadius: 3.84,
+    elevation: 5,
+  },
+  sectionHeader: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    marginBottom: 16,
   },
   sectionTitle: {
     fontSize: 18,
     fontWeight: 'bold',
-    color: '#1e293b',
-    marginBottom: 16,
+    color: '#111827',
   },
-  kpiSection: {
-    marginBottom: 24,
-  },
-  kpiGrid: {
-    flexDirection: 'row',
-    flexWrap: 'wrap',
-    justifyContent: 'space-between',
-  },
-  kpiCard: {
-    width: '48%',
-    borderRadius: 16,
-    marginBottom: 12,
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 4 },
-    shadowOpacity: 0.15,
-    shadowRadius: 8,
-    elevation: 5,
-  },
-  kpiGradient: {
-    borderRadius: 16,
-    padding: 16,
-    alignItems: 'center',
-  },
-  kpiIcon: {
-    fontSize: 24,
-    marginBottom: 8,
-  },
-  kpiValue: {
-    fontSize: 18,
-    fontWeight: 'bold',
-    color: '#ffffff',
-    marginBottom: 4,
-  },
-  kpiLabel: {
-    fontSize: 12,
-    color: '#ffffff',
-    textAlign: 'center',
-    opacity: 0.9,
-  },
-  actionsSection: {
-    marginBottom: 24,
-  },
-  actionsGrid: {
-    flexDirection: 'row',
-    flexWrap: 'wrap',
-    justifyContent: 'space-between',
-  },
-  actionButton: {
-    width: '48%',
-    borderRadius: 16,
-    marginBottom: 12,
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 4 },
-    shadowOpacity: 0.15,
-    shadowRadius: 8,
-    elevation: 5,
-  },
-  actionGradient: {
-    borderRadius: 16,
-    padding: 16,
-    alignItems: 'center',
-  },
-  actionIcon: {
-    fontSize: 24,
-    marginBottom: 8,
-  },
-  actionText: {
+  viewAllText: {
     fontSize: 14,
-    fontWeight: '600',
-    color: '#ffffff',
-    textAlign: 'center',
+    color: '#3b82f6',
+    fontWeight: '500',
   },
-  transactionsSection: {
-    marginBottom: 24,
+  kpiContainer: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    justifyContent: 'space-between',
+    paddingHorizontal: 16,
+    paddingVertical: 8,
   },
-  transactionItem: {
-    backgroundColor: '#ffffff',
-    borderRadius: 12,
-    padding: 16,
-    marginBottom: 8,
+  reminderCard: {
     flexDirection: 'row',
     justifyContent: 'space-between',
     alignItems: 'center',
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.1,
-    shadowRadius: 4,
-    elevation: 2,
+    paddingVertical: 12,
+    borderBottomWidth: 1,
+    borderBottomColor: '#f3f4f6',
   },
-  transactionInfo: {
+  reminderLeft: {
+    flexDirection: 'row',
+    alignItems: 'center',
     flex: 1,
   },
-  transactionTitle: {
+  reminderIcon: {
+    width: 40,
+    height: 40,
+    borderRadius: 20,
+    justifyContent: 'center',
+    alignItems: 'center',
+    marginRight: 12,
+  },
+  reminderIconText: {
+    fontSize: 18,
+  },
+  reminderContent: {
+    flex: 1,
+  },
+  reminderTitle: {
     fontSize: 16,
     fontWeight: '600',
-    color: '#1e293b',
-    marginBottom: 4,
+    color: '#111827',
+    marginBottom: 2,
   },
-  transactionDate: {
-    fontSize: 12,
-    color: '#64748b',
+  reminderSubtitle: {
+    fontSize: 14,
+    color: '#6b7280',
   },
-  transactionAmount: {
+  reminderAmount: {
     fontSize: 16,
     fontWeight: 'bold',
-    color: '#10b981',
+    color: '#111827',
   },
-  noDataContainer: {
-    backgroundColor: '#ffffff',
-    borderRadius: 12,
-    padding: 24,
+  quickActionsGrid: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    justifyContent: 'space-between',
+  },
+  searchContainer: {
+    marginBottom: 16,
+  },
+  searchInput: {
+    backgroundColor: '#f9fafb',
+    borderRadius: 8,
+    paddingHorizontal: 12,
+    paddingVertical: 10,
+    fontSize: 16,
+    borderWidth: 1,
+    borderColor: '#e5e7eb',
+  },
+  emptyState: {
+    alignItems: 'center',
+    paddingVertical: 32,
+  },
+  emptyStateText: {
+    fontSize: 16,
+    color: '#6b7280',
+  },
+  reportButton: {
+    backgroundColor: '#3b82f6',
+    paddingVertical: 12,
+    paddingHorizontal: 24,
+    borderRadius: 8,
     alignItems: 'center',
   },
-  noDataText: {
-    fontSize: 14,
-    color: '#64748b',
+  reportButtonText: {
+    color: '#ffffff',
+    fontSize: 16,
+    fontWeight: '600',
   },
 });
 
