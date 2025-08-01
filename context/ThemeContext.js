@@ -1,5 +1,6 @@
-// context/ThemeContext.js
 import React, { createContext, useContext, useState, useEffect } from 'react';
+import { StatusBar } from 'expo-status-bar';
+import SettingsService from '../screens/Settings/services/SettingsService';
 
 const ThemeContext = createContext();
 
@@ -55,12 +56,12 @@ export const ThemeProvider = ({ children }) => {
   
   const loadThemePreference = async () => {
     try {
-      // For now, just use light theme by default
-      // You can add SettingsService integration later
-      setIsDarkMode(false);
+      const darkModeEnabled = await SettingsService.getSetting('dark_mode_enabled');
+      if (darkModeEnabled === 'true') {
+        setIsDarkMode(true);
+      }
     } catch (error) {
       console.error('Error loading theme preference:', error);
-      setIsDarkMode(false);
     }
   };
 
@@ -68,9 +69,9 @@ export const ThemeProvider = ({ children }) => {
     const newMode = !isDarkMode;
     setIsDarkMode(newMode);
     
-    // Save to settings later when SettingsService is ready
+    // Save to settings
     try {
-      // await SettingsService.updateSetting('dark_mode_enabled', newMode, 'boolean');
+      await SettingsService.updateSetting('dark_mode_enabled', newMode, 'boolean');
     } catch (error) {
       console.error('Error saving theme preference:', error);
     }
@@ -80,10 +81,11 @@ export const ThemeProvider = ({ children }) => {
     theme,
     isDarkMode,
     toggleTheme,
-  };
+    };
 
   return (
     <ThemeContext.Provider value={value}>
+      <StatusBar style={theme.statusBar} />
       {children}
     </ThemeContext.Provider>
   );
