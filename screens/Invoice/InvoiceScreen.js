@@ -14,6 +14,9 @@ import {
   StatusBar,
 } from "react-native";
 
+// Import components
+import CalendarPicker from "../../components/CalendarPicker";
+
 // Import services
 import InvoiceService from "./services/InvoiceService";
 import PartiesService from "../Parties/services/PartiesService";
@@ -279,22 +282,25 @@ const InvoiceScreen = ({ navigation, route }) => {
 
             <View style={[styles.inputGroup, styles.halfWidth]}>
               <Text style={styles.inputLabel}>Date</Text>
-              <TextInput
-                style={styles.input}
+              <CalendarPicker
                 value={invoiceData.date}
-                onChangeText={(text) => setInvoiceData(prev => ({ ...prev, date: text }))}
-                placeholder="YYYY-MM-DD"
+                onDateChange={(date) => setInvoiceData(prev => ({ ...prev, date: date }))}
+                placeholder="Select Date"
+                style={styles.input}
               />
             </View>
           </View>
 
           <View style={styles.inputGroup}>
             <Text style={styles.inputLabel}>Due Date</Text>
-            <TextInput
-              style={styles.input}
+            <CalendarPicker
               value={invoiceData.dueDate}
-              onChangeText={(text) => setInvoiceData(prev => ({ ...prev, dueDate: text }))}
-              placeholder="YYYY-MM-DD (Optional)"
+              onDateChange={(date) => setInvoiceData(prev => ({ ...prev, dueDate: date }))}
+              placeholder="Select Due Date (Optional)"
+              style={styles.input}
+              minimumDate={new Date(invoiceData.date)}
+              showClearButton={true}
+              onClear={() => setInvoiceData(prev => ({ ...prev, dueDate: "" }))}
             />
           </View>
         </View>
