@@ -129,7 +129,7 @@ const EnhancedNavigator = () => {
   };
 
   // Show bottom tab bar only for main screens
-  const mainScreens = ['Dashboard', 'Parties', 'Inventory', 'Reports', 'Settings'];
+  const mainScreens = ['Dashboard', 'Parties', 'Inventory', 'Purchase', 'Reports', 'Settings'];
   const showBottomTabs = mainScreens.includes(currentRoute);
 
   return (
