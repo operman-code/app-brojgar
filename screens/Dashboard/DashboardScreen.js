@@ -137,6 +137,9 @@ const DashboardScreen = ({ navigation }) => {
       case 'newInvoice':
         navigation.navigate('Invoice');
         break;
+      case 'githubPR':
+        Alert.alert("GitHub PR", "GitHub Pull Request feature coming soon!");
+        break;
       case 'viewReports':
         navigation.navigate('Reports');
         break;
