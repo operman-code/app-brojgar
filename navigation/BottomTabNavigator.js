@@ -1,6 +1,7 @@
 import React, { useState } from "react";
 import { createBottomTabNavigator } from "@react-navigation/bottom-tabs";
 import DashboardScreen from "../screens/Dashboard/DashboardScreen";
+import EnhancedDashboardScreen from "../screens/Dashboard/EnhancedDashboardScreen";
 import PartiesScreen from "../screens/Parties/PartiesScreen";
 import InventoryScreen from "../screens/Inventory/InventoryScreen";
 import ReportsScreen from "../screens/Reports/ReportsScreen";
@@ -11,7 +12,123 @@ import NotificationScreen from "../screens/Notifications/NotificationScreen";
 import GlobalSearchScreen from "../screens/Search/GlobalSearchScreen";
 import { View, Text, TouchableOpacity } from "react-native";
 
+// Import new navigation components
+import MainLayout from "./components/MainLayout";
+import EnhancedBottomTabBar from "./components/EnhancedBottomTabBar";
+import { NavigationProvider, useNavigation } from "../context/NavigationContext";
+
 const Tab = createBottomTabNavigator();
+
+// Enhanced Navigator Component with new UI
+const EnhancedNavigator = () => {
+  const { currentRoute, routeParams, navigateTo } = useNavigation();
+
+  // Create navigation object compatible with existing screens
+  const navigation = {
+    navigate: navigateTo,
+    goBack: () => {
+      if (currentRoute !== 'Dashboard') {
+        navigateTo('Dashboard');
+      }
+    },
+    push: navigateTo,
+    replace: navigateTo,
+  };
+
+  // Create route object that matches React Navigation structure
+  const createRoute = (screenName, params = null) => ({
+    params: params || routeParams,
+    name: screenName,
+    key: `${screenName}-${Date.now()}`
+  });
+
+  // Render current screen with MainLayout wrapper
+  const renderCurrentScreen = () => {
+    const route = createRoute(currentRoute, routeParams);
+    
+    switch (currentRoute) {
+      case 'Invoice':
+        return (
+          <MainLayout title="Create Invoice" showSearch={false}>
+            <InvoiceScreen navigation={navigation} route={route} />
+          </MainLayout>
+        );
+      
+      case 'InvoiceTemplate':
+        return (
+          <MainLayout title="Invoice Template" showSearch={false}>
+            <InvoiceTemplateScreen navigation={navigation} route={route} />
+          </MainLayout>
+        );
+      
+      case 'Notifications':
+        return (
+          <MainLayout title="Notifications" showSearch={false}>
+            <NotificationScreen navigation={navigation} route={route} />
+          </MainLayout>
+        );
+      
+      case 'Search':
+        return (
+          <MainLayout title="Search" showSearch={true}>
+            <GlobalSearchScreen navigation={navigation} route={route} />
+          </MainLayout>
+        );
+      
+      case 'Reports':
+        return (
+          <MainLayout title="Reports">
+            <ReportsScreen navigation={navigation} route={route} />
+          </MainLayout>
+        );
+      
+      case 'Parties':
+        return (
+          <MainLayout title="Parties">
+            <PartiesScreen navigation={navigation} route={route} />
+          </MainLayout>
+        );
+      
+      case 'Inventory':
+        return (
+          <MainLayout title="Inventory">
+            <InventoryScreen navigation={navigation} route={route} />
+          </MainLayout>
+        );
+      
+      case 'Settings':
+        return (
+          <MainLayout title="Settings" showSearch={false}>
+            <SettingsScreen navigation={navigation} route={route} />
+          </MainLayout>
+        );
+      
+      case 'Dashboard':
+      default:
+        return (
+          <MainLayout title="Dashboard">
+            <EnhancedDashboardScreen navigation={navigation} route={route} />
+          </MainLayout>
+        );
+    }
+  };
+
+  // Show bottom tab bar only for main screens
+  const mainScreens = ['Dashboard', 'Parties', 'Inventory', 'Reports', 'Settings'];
+  const showBottomTabs = mainScreens.includes(currentRoute);
+
+  return (
+    <View style={{ flex: 1 }}>
+      {renderCurrentScreen()}
+      {showBottomTabs && (
+        <EnhancedBottomTabBar
+          currentRoute={currentRoute}
+          onTabPress={navigateTo}
+        />
+      )}
+    </View>
+  );
+};
 
 const BottomTabNavigator = () => {
   const [currentScreen, setCurrentScreen] = useState('main');
@@ -123,194 +240,11 @@ if (currentScreen === 'reports') {
     );
   }
   
+  // Use the new enhanced navigator wrapped with NavigationProvider
   return (
-    <Tab.Navigator
-      screenOptions={({ route }) => ({
-        headerShown: false,
-        tabBarActiveTintColor: "#3b82f6",
-        tabBarInactiveTintColor: "#64748b",
-        tabBarStyle: {
-          backgroundColor: "#ffffff",
-          borderTopWidth: 0,
-          paddingTop: 8,
-          paddingBottom: 8,
-          height: 70,
-          shadowColor: "#000",
-          shadowOffset: {
-            width: 0,
-            height: -2,
-          },
-          shadowOpacity: 0.08,
-          shadowRadius: 12,
-          elevation: 8,
-        },
-        tabBarLabelStyle: {
-          fontSize: 12,
-          fontWeight: "600",
-          marginTop: 4,
-        },
-        tabBarIconStyle: {
-          marginBottom: 0,
-        },
-        tabBarItemStyle: {
-          paddingVertical: 8,
-        },
-        tabBarButton: (props) => (
-          <TouchableOpacity
-            {...props}
-            style={[
-              props.style,
-              {
-                flex: 1,
-                alignItems: 'center',
-                justifyContent: 'center',
-              }
-            ]}
-          />
-        ),
-      })}
-    >
-      <Tab.Screen
-        name="Dashboard"
-        children={() => (
-          <DashboardScreen 
-            navigation={navigation} 
-            route={createRoute('Dashboard')}
-          />
-        )}
-        options={{
-          tabBarIcon: ({ color, focused }) => (
-            <View style={{
-              alignItems: 'center',
-              justifyContent: 'center',
-              width: 40,
-              height: 40,
-              borderRadius: 12,
-              backgroundColor: focused ? '#eff6ff' : 'transparent',
-            }}>
-              <Text style={{
-                fontSize: 20,
-                opacity: focused ? 1 : 0.7,
-              }}>
-                🏠
-              </Text>
-            </View>
-          ),
-        }}
-      />
-      <Tab.Screen
-        name="Parties"
-        children={() => (
-          <PartiesScreen 
-            navigation={navigation} 
-            route={createRoute('Parties')}
-          />
-        )}
-        options={{
-          tabBarIcon: ({ color, focused }) => (
-            <View style={{
-              alignItems: 'center',
-              justifyContent: 'center',
-              width: 40,
-              height: 40,
-              borderRadius: 12,
-              backgroundColor: focused ? '#eff6ff' : 'transparent',
-            }}>
-              <Text style={{
-                fontSize: 20,
-                opacity: focused ? 1 : 0.7,
-              }}>
-                👥
-              </Text>
-            </View>
-          ),
-        }}
-      />
-      <Tab.Screen
-        name="Inventory"
-        children={() => (
-          <InventoryScreen 
-            navigation={navigation} 
-            route={createRoute('Inventory')}
-          />
-        )}
-        options={{
-          tabBarIcon: ({ color, focused }) => (
-            <View style={{
-              alignItems: 'center',
-              justifyContent: 'center',
-              width: 40,
-              height: 40,
-              borderRadius: 12,
-              backgroundColor: focused ? '#eff6ff' : 'transparent',
-            }}>
-              <Text style={{
-                fontSize: 20,
-                opacity: focused ? 1 : 0.7,
-              }}>
-                📦
-              </Text>
-            </View>
-          ),
-        }}
-      />
-      <Tab.Screen
-        name="Reports"
-        children={() => (
-          <ReportsScreen 
-            navigation={navigation} 
-            route={createRoute('Reports')}
-          />
-        )}
-        options={{
-          tabBarIcon: ({ color, focused }) => (
-            <View style={{
-              alignItems: 'center',
-              justifyContent: 'center',
-              width: 40,
-              height: 40,
-              borderRadius: 12,
-              backgroundColor: focused ? '#eff6ff' : 'transparent',
-            }}>
-              <Text style={{
-                fontSize: 20,
-                opacity: focused ? 1 : 0.7,
-              }}>
-                📊
-              </Text>
-            </View>
-          ),
-        }}
-      />
-      <Tab.Screen
-        name="Settings"
-        children={() => (
-          <SettingsScreen 
-            navigation={navigation} 
-            route={createRoute('Settings')}
-          />
-        )}
-        options={{
-          tabBarIcon: ({ color, focused }) => (
-            <View style={{
-              alignItems: 'center',
-              justifyContent: 'center',
-              width: 40,
-              height: 40,
-              borderRadius: 12,
-              backgroundColor: focused ? '#eff6ff' : 'transparent',
-            }}>
-              <Text style={{
-                fontSize: 20,
-                opacity: focused ? 1 : 0.7,
-              }}>
-                ⚙️
-              </Text>
-            </View>
-          ),
-        }}
-      />
-    </Tab.Navigator>
+    <NavigationProvider>
+      <EnhancedNavigator />
+    </NavigationProvider>
   );
 };
 
