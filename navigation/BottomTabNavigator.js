@@ -3,6 +3,7 @@ import { createBottomTabNavigator } from "@react-navigation/bottom-tabs";
 import DashboardScreen from "../screens/Dashboard/DashboardScreen";
 import PartiesScreen from "../screens/Parties/PartiesScreen";
 import InventoryScreen from "../screens/Inventory/InventoryScreen";
+import PurchaseScreen from "../screens/Purchase/PurchaseScreen";
 import ReportsScreen from "../screens/Reports/ReportsScreen";
 import SettingsScreen from "../screens/Settings/SettingsScreen";
 import InvoiceScreen from "../screens/Invoice/InvoiceScreen";
@@ -100,6 +101,13 @@ const EnhancedNavigator = () => {
         return (
           <MainLayout title="Inventory">
             <InventoryScreen navigation={navigation} route={route} />
+          </MainLayout>
+        );
+      
+      case 'Purchase':
+        return (
+          <MainLayout title="Purchase">
+            <PurchaseScreen navigation={navigation} route={route} />
           </MainLayout>
         );
       

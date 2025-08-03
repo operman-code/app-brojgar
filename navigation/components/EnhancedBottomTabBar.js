@@ -15,6 +15,7 @@ const EnhancedBottomTabBar = ({ currentRoute, onTabPress }) => {
     { id: 'Dashboard', title: 'Home', icon: '🏠', route: 'Dashboard' },
     { id: 'Parties', title: 'Parties', icon: '👥', route: 'Parties' },
     { id: 'Inventory', title: 'Items', icon: '📦', route: 'Inventory' },
+    { id: 'Purchase', title: 'Purchase', icon: '🛒', route: 'Purchase' },
     { id: 'Reports', title: 'Reports', icon: '📊', route: 'Reports' },
     { id: 'Settings', title: 'Settings', icon: '⚙️', route: 'Settings' },
   ];

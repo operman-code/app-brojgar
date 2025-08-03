@@ -50,6 +50,7 @@ const SideDrawer = ({ isVisible, onClose, navigation, currentRoute = 'Dashboard'
     { id: 'Dashboard', title: 'Dashboard', icon: '🏠', route: 'Dashboard' },
     { id: 'Parties', title: 'Parties', icon: '👥', route: 'Parties' },
     { id: 'Inventory', title: 'Inventory', icon: '📦', route: 'Inventory' },
+    { id: 'Purchase', title: 'Purchase', icon: '🛒', route: 'Purchase' },
     { id: 'Invoice', title: 'Invoices', icon: '📄', route: 'Invoice' },
     { id: 'Reports', title: 'Reports', icon: '📊', route: 'Reports' },
     { id: 'Search', title: 'Search', icon: '🔍', route: 'Search' },

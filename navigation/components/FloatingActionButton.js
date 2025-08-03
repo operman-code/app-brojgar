@@ -17,6 +17,7 @@ const FloatingActionButton = ({ onActionPress, currentRoute }) => {
 
   const quickActions = [
     { id: 'invoice', title: 'New Invoice', icon: '📄', route: 'Invoice' },
+    { id: 'purchase', title: 'New Purchase', icon: '🛒', route: 'Purchase', action: 'add' },
     { id: 'party', title: 'Add Party', icon: '👤', route: 'Parties', action: 'add' },
     { id: 'item', title: 'Add Item', icon: '📦', route: 'Inventory', action: 'add' },
     { id: 'search', title: 'Search', icon: '🔍', route: 'Search' },
