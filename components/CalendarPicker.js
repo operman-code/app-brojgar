@@ -84,6 +84,7 @@ const CalendarPicker = ({
 
   const showDatePicker = () => {
     if (disabled) return;
+    console.log('📅 Calendar picker pressed!');
     setTempDate(value ? new Date(value) : new Date());
     setShowPicker(true);
   };
@@ -94,6 +95,7 @@ const CalendarPicker = ({
         style={[styles.dateInput, style, disabled && styles.disabled]}
         onPress={showDatePicker}
         disabled={disabled}
+        activeOpacity={0.7}
       >
         <Text style={[
           styles.dateText,
@@ -101,6 +103,9 @@ const CalendarPicker = ({
         ]}>
           {value ? formatDate(value) : placeholder}
         </Text>
+        {!value && (
+          <Text style={styles.tapHint}>Tap to select</Text>
+        )}
         <View style={styles.iconContainer}>
           {showClearButton && value && (
             <TouchableOpacity
@@ -110,7 +115,9 @@ const CalendarPicker = ({
               <Text style={styles.clearIcon}>✕</Text>
             </TouchableOpacity>
           )}
-          <Text style={styles.calendarIcon}>📅</Text>
+          <View style={styles.calendarButton}>
+            <Text style={styles.calendarIcon}>📅</Text>
+          </View>
         </View>
       </TouchableOpacity>
 
@@ -167,13 +174,18 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-between',
-    borderWidth: 1,
-    borderColor: '#ddd',
+    borderWidth: 2,
+    borderColor: '#3b82f6',
     borderRadius: 8,
     paddingHorizontal: 12,
     paddingVertical: 12,
     backgroundColor: '#fff',
     minHeight: 48,
+    elevation: 1,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 1 },
+    shadowOpacity: 0.1,
+    shadowRadius: 2,
   },
   dateText: {
     fontSize: 16,
@@ -188,8 +200,20 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     gap: 8,
   },
+  calendarButton: {
+    padding: 4,
+    borderRadius: 4,
+    backgroundColor: '#f3f4f6',
+  },
   calendarIcon: {
-    fontSize: 18,
+    fontSize: 20,
+    color: '#3b82f6',
+  },
+  tapHint: {
+    fontSize: 12,
+    color: '#6b7280',
+    fontStyle: 'italic',
+    marginTop: 2,
   },
   clearButton: {
     padding: 4,
