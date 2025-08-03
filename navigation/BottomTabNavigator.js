@@ -1,7 +1,6 @@
 import React, { useState } from "react";
 import { createBottomTabNavigator } from "@react-navigation/bottom-tabs";
 import DashboardScreen from "../screens/Dashboard/DashboardScreen";
-import EnhancedDashboardScreen from "../screens/Dashboard/EnhancedDashboardScreen";
 import PartiesScreen from "../screens/Parties/PartiesScreen";
 import InventoryScreen from "../screens/Inventory/InventoryScreen";
 import ReportsScreen from "../screens/Reports/ReportsScreen";
@@ -107,7 +106,7 @@ const EnhancedNavigator = () => {
       default:
         return (
           <MainLayout title="Dashboard">
-            <EnhancedDashboardScreen navigation={navigation} route={route} />
+            <DashboardScreen navigation={navigation} route={route} />
           </MainLayout>
         );
     }
