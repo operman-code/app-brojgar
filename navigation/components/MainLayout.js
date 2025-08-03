@@ -8,7 +8,7 @@ import {
 import TopNavigationBar from './TopNavigationBar';
 import SideDrawer from './SideDrawer';
 import FloatingActionButton from './FloatingActionButton';
-import { useNavigation } from '../../context/NavigationContext';
+import { useNavigation as useCustomNavigation } from '../../context/NavigationContext';
 
 const MainLayout = ({ children, showTopNav = true, showSearch = true, title }) => {
   const {
@@ -22,7 +22,7 @@ const MainLayout = ({ children, showTopNav = true, showSearch = true, title }) =
     notificationCount,
     handleNotificationPress,
     navigateTo,
-  } = useNavigation();
+  } = useCustomNavigation();
 
   // Create navigation object for screens
   const navigation = {
