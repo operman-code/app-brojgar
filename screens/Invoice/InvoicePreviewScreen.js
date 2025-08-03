@@ -180,19 +180,15 @@ const InvoicePreviewScreen = ({ navigation, route }) => {
 
   if (loading) {
     return (
-      <SafeAreaView style={styles.container}>
-        <StatusBar barStyle="dark-content" />
-        <View style={styles.loadingContainer}>
-          <ActivityIndicator size="large" color="#3B82F6" />
-          <Text style={styles.loadingText}>Loading Invoice Preview...</Text>
-        </View>
-      </SafeAreaView>
+      <View style={styles.loadingContainer}>
+        <ActivityIndicator size="large" color="#3B82F6" />
+        <Text style={styles.loadingText}>Loading Invoice Preview...</Text>
+      </View>
     );
   }
 
   return (
-    <SafeAreaView style={styles.container}>
-      <StatusBar barStyle="dark-content" />
+    <View style={styles.container}>
 
       {/* Header */}
       <View style={styles.header}>
@@ -269,7 +265,7 @@ const InvoicePreviewScreen = ({ navigation, route }) => {
           Template: {selectedTemplate} • Theme: {selectedTheme}
         </Text>
       </View>
-    </SafeAreaView>
+    </View>
   );
 };
 

@@ -240,18 +240,14 @@ const InvoiceScreen = ({ navigation, route }) => {
 
   if (loading) {
     return (
-      <SafeAreaView style={styles.container}>
-        <StatusBar barStyle="dark-content" />
-        <View style={styles.loadingContainer}>
-          <Text style={styles.loadingText}>Loading Invoice...</Text>
-        </View>
-      </SafeAreaView>
+      <View style={styles.loadingContainer}>
+        <Text style={styles.loadingText}>Loading Invoice...</Text>
+      </View>
     );
   }
 
   return (
-    <SafeAreaView style={styles.container}>
-      <StatusBar barStyle="dark-content" />
+    <View style={styles.container}>
 
       {/* Header */}
       <View style={styles.header}>
@@ -574,7 +570,7 @@ const InvoiceScreen = ({ navigation, route }) => {
           )}
         </SafeAreaView>
       </Modal>
-    </SafeAreaView>
+    </View>
   );
 };
 

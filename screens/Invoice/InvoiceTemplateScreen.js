@@ -415,18 +415,14 @@ const InvoiceTemplateScreen = ({ navigation, route }) => {
 
   if (loading) {
     return (
-      <SafeAreaView style={styles.container}>
-        <StatusBar barStyle="dark-content" />
-        <View style={styles.loadingContainer}>
-          <Text style={styles.loadingText}>Loading Templates...</Text>
-        </View>
-      </SafeAreaView>
+      <View style={styles.loadingContainer}>
+        <Text style={styles.loadingText}>Loading Templates...</Text>
+      </View>
     );
   }
 
   return (
-    <SafeAreaView style={styles.container}>
-      <StatusBar barStyle="dark-content" />
+    <View style={styles.container}>
 
       {/* Header */}
       <View style={styles.header}>
@@ -544,7 +540,7 @@ const InvoiceTemplateScreen = ({ navigation, route }) => {
           <Text style={styles.generateButtonText}>Generate Invoice</Text>
         </TouchableOpacity>
       </View>
-    </SafeAreaView>
+    </View>
   );
 };
 

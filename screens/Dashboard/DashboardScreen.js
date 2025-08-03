@@ -330,54 +330,27 @@ const DashboardScreen = ({ navigation }) => {
 
   if (loading) {
     return (
-      <SafeAreaView style={styles.container}>
-        <StatusBar barStyle="dark-content" backgroundColor="#ffffff" />
-        <View style={styles.loadingContainer}>
-          <Text style={styles.loadingText}>Loading Dashboard...</Text>
-        </View>
-      </SafeAreaView>
+      <View style={styles.loadingContainer}>
+        <Text style={styles.loadingText}>Loading Dashboard...</Text>
+      </View>
     );
   }
 
   return (
-    <SafeAreaView style={styles.container}>
-      <StatusBar barStyle="dark-content" backgroundColor="#ffffff" />
-      
-      <Animated.View 
-        style={[
-          styles.animatedContainer,
-          {
-            opacity: fadeAnim,
-            transform: [{ translateY: slideAnim }]
-          }
-        ]}
-      >
-        {/* Header */}
-        <View style={styles.header}>
-          <View>
-            <Text style={styles.welcomeText}>Welcome back!</Text>
-            <Text style={styles.businessName}>{businessProfile.businessName || 'Brojgar Business'}</Text>
-          </View>
-          <View style={styles.headerActions}>
-            <TouchableOpacity 
-              style={styles.headerButton}
-              onPress={() => navigation.navigate('Search')}
-            >
-              <Text style={styles.headerButtonIcon}>🔍</Text>
-            </TouchableOpacity>
-            <TouchableOpacity 
-              style={styles.notificationButton}
-              onPress={() => navigation.navigate('Notifications')}
-            >
-              <Text style={styles.notificationIcon}>🔔</Text>
-              {notifications.length > 0 && (
-                <View style={styles.notificationBadge}>
-                  <Text style={styles.notificationBadgeText}>{notifications.length}</Text>
-                </View>
-              )}
-            </TouchableOpacity>
-          </View>
-        </View>
+    <Animated.View 
+      style={[
+        styles.container,
+        {
+          opacity: fadeAnim,
+          transform: [{ translateY: slideAnim }]
+        }
+      ]}
+    >
+      {/* Welcome Section */}
+      <View style={styles.welcomeSection}>
+        <Text style={styles.welcomeText}>Welcome back!</Text>
+        <Text style={styles.businessName}>{businessProfile.businessName || 'Brojgar Business'}</Text>
+      </View>
 
         {/* Tabs */}
         {renderTabs()}
@@ -393,8 +366,7 @@ const DashboardScreen = ({ navigation }) => {
           {renderContent()}
         </ScrollView>
       </Animated.View>
-    </SafeAreaView>
-  );
+    );
 };
 
 const styles = StyleSheet.create({
@@ -411,18 +383,13 @@ const styles = StyleSheet.create({
     fontSize: 16,
     color: '#6b7280',
   },
-  animatedContainer: {
-    flex: 1,
-  },
-  header: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
+  welcomeSection: {
     paddingHorizontal: 20,
     paddingVertical: 16,
     backgroundColor: '#ffffff',
     borderBottomWidth: 1,
-    borderBottomColor: '#e5e7eb',
+    borderBottomColor: '#f1f5f9',
+    marginBottom: 8,
   },
   welcomeText: {
     fontSize: 14,

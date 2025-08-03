@@ -211,17 +211,14 @@ const NotificationScreen = ({ navigation }) => {
 
   if (loading) {
     return (
-      <SafeAreaView style={styles.container}>
-        <View style={styles.loadingContainer}>
-          <Text style={styles.loadingText}>Loading notifications...</Text>
-        </View>
-      </SafeAreaView>
+      <View style={styles.loadingContainer}>
+        <Text style={styles.loadingText}>Loading notifications...</Text>
+      </View>
     );
   }
 
   return (
-    <SafeAreaView style={styles.container}>
-      <StatusBar barStyle="dark-content" backgroundColor="#ffffff" />
+    <View style={styles.container}>
       
       <Animated.View style={[styles.content, { opacity: fadeAnim }]}>
         {/* Header */}
@@ -343,7 +340,7 @@ const NotificationScreen = ({ navigation }) => {
           </SafeAreaView>
         </Modal>
       </Animated.View>
-    </SafeAreaView>
+    </View>
   );
 };
 
