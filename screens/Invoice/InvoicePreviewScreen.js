@@ -77,19 +77,32 @@ const InvoicePreviewScreen = ({ navigation, route }) => {
     }
   };
 
-  const generatePreviewHTML = () => {
+  const generatePreviewHTML = async () => {
     try {
       console.log('🔄 Generating preview HTML with:', {
         template: selectedTemplate,
         theme: selectedTheme
       });
       
-      const html = InvoiceTemplateService.generateHTML(
-        invoiceData, 
-        businessProfile, 
-        selectedTemplate, 
-        selectedTheme
-      );
+      let html;
+      
+      // Handle GST template separately
+      if (selectedTemplate === 'gst-compliant') {
+        const GSTInvoiceService = require('./services/GSTInvoiceService').default;
+        const result = await GSTInvoiceService.generateGSTInvoiceHTML(invoiceData, businessProfile, selectedTemplate);
+        if (!result.success) {
+          throw new Error(result.error || 'Failed to generate GST invoice HTML');
+        }
+        html = result.html;
+      } else {
+        html = InvoiceTemplateService.generateHTML(
+          invoiceData, 
+          businessProfile, 
+          selectedTemplate, 
+          selectedTheme
+        );
+      }
+      
       setHtmlContent(html);
     } catch (error) {
       console.error('❌ Error generating preview HTML:', error);

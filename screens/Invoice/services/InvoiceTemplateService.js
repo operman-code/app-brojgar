@@ -27,7 +27,7 @@ class InvoiceTemplateService {
         email: profile.email || '',
         phone: profile.phone || '',
         address: profile.address || '',
-        gst_number: profile.gst_number || '',
+        gstin: profile.gstin || '',
         ...profile
       };
     } catch (error) {
@@ -46,7 +46,7 @@ class InvoiceTemplateService {
           p.phone as customer_phone,
           p.email as customer_email,
           p.address as customer_address,
-          p.gst_number as customer_gst
+          p.gstin as customer_gstin
         FROM invoices i
         LEFT JOIN parties p ON i.party_id = p.id
         WHERE i.id = ? AND i.deleted_at IS NULL
@@ -79,7 +79,19 @@ class InvoiceTemplateService {
     try {
       console.log('🔄 Generating PDF...', { templateType, theme });
       
-      const htmlContent = this.generateHTML(invoiceData, businessProfile, templateType, theme);
+      let htmlContent;
+      
+      // Handle GST template separately
+      if (templateType === 'gst-compliant') {
+        const GSTInvoiceService = require('./GSTInvoiceService').default;
+        const result = await GSTInvoiceService.generateGSTInvoiceHTML(invoiceData, businessProfile, templateType);
+        if (!result.success) {
+          throw new Error(result.error || 'Failed to generate GST invoice HTML');
+        }
+        htmlContent = result.html;
+      } else {
+        htmlContent = this.generateHTML(invoiceData, businessProfile, templateType, theme);
+      }
       
       // Validate HTML content
       if (!htmlContent || htmlContent.length === 0) {
