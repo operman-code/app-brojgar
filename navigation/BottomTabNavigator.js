@@ -3,7 +3,6 @@ import { createBottomTabNavigator } from "@react-navigation/bottom-tabs";
 import DashboardScreen from "../screens/Dashboard/DashboardScreen";
 import PartiesScreen from "../screens/Parties/PartiesScreen";
 import InventoryScreen from "../screens/Inventory/InventoryScreen";
-import PurchaseScreen from "../screens/Purchase/PurchaseScreen";
 import ReportsScreen from "../screens/Reports/ReportsScreen";
 import SettingsScreen from "../screens/Settings/SettingsScreen";
 import InvoiceScreen from "../screens/Invoice/InvoiceScreen";
@@ -104,13 +103,6 @@ const EnhancedNavigator = () => {
           </MainLayout>
         );
       
-      case 'Purchase':
-        return (
-          <MainLayout title="Purchase">
-            <PurchaseScreen navigation={navigation} route={route} />
-          </MainLayout>
-        );
-      
       case 'Settings':
         return (
           <MainLayout title="Settings" showSearch={false}>
@@ -129,7 +121,7 @@ const EnhancedNavigator = () => {
   };
 
   // Show bottom tab bar only for main screens
-  const mainScreens = ['Dashboard', 'Parties', 'Inventory', 'Purchase', 'Reports', 'Settings'];
+  const mainScreens = ['Dashboard', 'Parties', 'Inventory', 'Reports', 'Settings'];
   const showBottomTabs = mainScreens.includes(currentRoute);
 
   return (
