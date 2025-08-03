@@ -222,7 +222,8 @@ const DashboardScreen = ({ navigation }) => {
           { id: '3', title: 'New Customer', icon: '👤', action: 'newCustomer', color: '#8b5cf6' },
           { id: '4', title: 'Payment', icon: '💳', action: 'receivePayment', color: '#f59e0b' },
           { id: '5', title: 'Invoice', icon: '🧾', action: 'newInvoice', color: '#ef4444' },
-          { id: '6', title: 'Reports', icon: '📊', action: 'viewReports', color: '#06b6d4' },
+          { id: '6', title: 'GitHub PR', icon: '🔀', action: 'githubPR', color: '#6b7280' },
+          { id: '7', title: 'Reports', icon: '📊', action: 'viewReports', color: '#06b6d4' },
         ].map((action) => (
           <QuickActionButton
             key={action.id}
