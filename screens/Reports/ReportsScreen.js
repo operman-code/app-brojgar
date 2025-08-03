@@ -319,8 +319,7 @@ const ReportsScreen = ({ navigation }) => {
   }
 
   return (
-    <SafeAreaView style={styles.container}>
-      <StatusBar barStyle="dark-content" backgroundColor="#ffffff" />
+    <View style={styles.container}>
       
       {/* Header */}
       <View style={styles.header}>
@@ -377,7 +376,7 @@ const ReportsScreen = ({ navigation }) => {
         {selectedTab === 'inventory' && renderInventoryTab()}
         {selectedTab === 'customers' && renderCustomersTab()}
       </Animated.ScrollView>
-    </SafeAreaView>
+    </View>
   );
 };
 

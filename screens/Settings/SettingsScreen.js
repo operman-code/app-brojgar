@@ -316,8 +316,7 @@ const SettingsScreen = ({ navigation }) => {
   );
 
   return (
-    <SafeAreaView style={[styles.container, { backgroundColor: theme.background }]}>
-      <StatusBar barStyle={theme.statusBar === 'dark' ? 'dark-content' : 'light-content'} backgroundColor={theme.surface} />
+    <View style={[styles.container, { backgroundColor: theme.background }]}>
       
       <Animated.View style={[styles.content, { opacity: fadeAnim }]}>
         {/* Header */}
@@ -459,7 +458,7 @@ const SettingsScreen = ({ navigation }) => {
           </ScrollView>
         </SafeAreaView>
       </Modal>
-    </SafeAreaView>
+    </View>
   );
 };
 

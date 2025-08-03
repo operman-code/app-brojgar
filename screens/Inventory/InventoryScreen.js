@@ -316,18 +316,14 @@ const InventoryScreen = ({ route }) => {
 
   if (loading) {
     return (
-      <SafeAreaView style={styles.container}>
-        <StatusBar barStyle="dark-content" />
-        <View style={styles.loadingContainer}>
-          <Text style={styles.loadingText}>Loading Inventory...</Text>
-        </View>
-      </SafeAreaView>
+      <View style={styles.loadingContainer}>
+        <Text style={styles.loadingText}>Loading Inventory...</Text>
+      </View>
     );
   }
 
   return (
-    <SafeAreaView style={styles.container}>
-      <StatusBar barStyle="dark-content" />
+    <View style={styles.container}>
 
       {/* Header */}
       <View style={styles.header}>
@@ -628,7 +624,7 @@ const InventoryScreen = ({ route }) => {
           </View>
         </SafeAreaView>
       </Modal>
-    </SafeAreaView>
+    </View>
   );
 };
 

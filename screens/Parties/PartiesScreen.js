@@ -278,18 +278,14 @@ const PartiesScreen = ({ route }) => {
 
   if (loading) {
     return (
-      <SafeAreaView style={styles.container}>
-        <StatusBar barStyle="dark-content" />
-        <View style={styles.loadingContainer}>
-          <Text style={styles.loadingText}>Loading Parties...</Text>
-        </View>
-      </SafeAreaView>
+      <View style={styles.loadingContainer}>
+        <Text style={styles.loadingText}>Loading Parties...</Text>
+      </View>
     );
   }
 
   return (
-    <SafeAreaView style={styles.container}>
-      <StatusBar barStyle="dark-content" />
+    <View style={styles.container}>
 
       {/* Header */}
       <View style={styles.header}>
@@ -562,7 +558,7 @@ const PartiesScreen = ({ route }) => {
           </ScrollView>
         </SafeAreaView>
       </Modal>
-    </SafeAreaView>
+    </View>
   );
 };
 

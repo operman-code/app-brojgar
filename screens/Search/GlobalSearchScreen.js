@@ -216,8 +216,7 @@ const GlobalSearchScreen = ({ navigation }) => {
   );
 
   return (
-    <SafeAreaView style={styles.container}>
-      <StatusBar barStyle="dark-content" backgroundColor="#ffffff" />
+    <View style={styles.container}>
       
       <Animated.View style={[styles.content, { opacity: fadeAnim }]}>
         {/* Header */}
@@ -331,7 +330,7 @@ const GlobalSearchScreen = ({ navigation }) => {
           )}
         </ScrollView>
       </Animated.View>
-    </SafeAreaView>
+    </View>
   );
 };
 
