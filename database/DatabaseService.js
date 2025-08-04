@@ -58,14 +58,14 @@ class DatabaseService {
         deleted_at DATETIME NULL
       )`,
 
-      // Parties Table (Customers & Suppliers)
+      // Parties Table - Keep gst_number (don't change to gstin)
 `CREATE TABLE IF NOT EXISTS parties (
   id INTEGER PRIMARY KEY AUTOINCREMENT,
   name TEXT NOT NULL,
   phone TEXT,
   email TEXT,
   address TEXT,
-  gstin TEXT,
+  gst_number TEXT,  // ← Keep this as gst_number
   pan_number TEXT,
   type TEXT NOT NULL DEFAULT 'customer',
   credit_limit REAL DEFAULT 0,
@@ -77,7 +77,6 @@ class DatabaseService {
   updated_at DATETIME DEFAULT CURRENT_TIMESTAMP,
   deleted_at DATETIME NULL
 )`,
-
       // Inventory Items Table
       `CREATE TABLE IF NOT EXISTS inventory_items (
         id INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -112,6 +111,9 @@ class DatabaseService {
   status TEXT DEFAULT 'draft',
   notes TEXT,
   terms TEXT,
+  hsn_code TEXT,      // ← NEW
+  sac_code TEXT,      // ← NEW
+  discount REAL DEFAULT 0, // ← NEW
   gst_rate REAL DEFAULT 18,
   place_of_supply TEXT,
   supply_type TEXT DEFAULT 'regular',
