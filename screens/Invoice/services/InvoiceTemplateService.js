@@ -6,73 +6,73 @@ import * as Print from 'expo-print';
 class InvoiceTemplateService {
   // Get business profile
   static async getBusinessProfile() {
-    try {
-      const query = `
-        SELECT key, value 
-        FROM business_settings 
-        WHERE deleted_at IS NULL 
-          AND key LIKE 'business_%'
-      `;
-      
-      const settings = await DatabaseService.executeQuery(query);
-      const profile = {};
-      
-      settings.forEach(setting => {
-        const key = setting.key.replace('business_', '');
-        profile[key] = setting.value;
-      });
-      
-      return {
-        name: profile.name || 'Your Business',
-        email: profile.email || '',
-        phone: profile.phone || '',
-        address: profile.address || '',
-        gst_number: profile.gst_number || '',
-        ...profile
-      };
-    } catch (error) {
-      console.error('❌ Error getting business profile:', error);
-      return {};
-    }
+  try {
+    const query = `
+      SELECT key, value 
+      FROM business_settings 
+      WHERE deleted_at IS NULL 
+        AND key LIKE 'business_%'
+    `;
+    
+    const settings = await DatabaseService.executeQuery(query);
+    const profile = {};
+    
+    settings.forEach(setting => {
+      const key = setting.key.replace('business_', '');
+      profile[key] = setting.value;
+    });
+    
+    return {
+      name: profile.name || 'Your Business',
+      email: profile.email || '',
+      phone: profile.phone || '',
+      address: profile.address || '',
+      gst_number: profile.gst_number || '',  // ← Use gst_number
+      ...profile
+    };
+  } catch (error) {
+    console.error('❌ Error getting business profile:', error);
+    return {};
   }
+}
 
   // Get invoice by ID with items
   static async getInvoiceById(invoiceId) {
-    try {
-      const invoiceQuery = `
-        SELECT 
-          i.*,
-          p.name as customer_name,
-          p.phone as customer_phone,
-          p.email as customer_email,
-          p.address as customer_address,
-          p.gst_number as customer_gst
-        FROM invoices i
-        LEFT JOIN parties p ON i.party_id = p.id
-        WHERE i.id = ? AND i.deleted_at IS NULL
-      `;
+  try {
+    const invoiceQuery = `
+      SELECT 
+        i.*,
+        p.name as customer_name,
+        p.phone as customer_phone,
+        p.email as customer_email,
+        p.address as customer_address,
+        p.gst_number as customer_gst_number  // ← Use gst_number
+      FROM invoices i
+      LEFT JOIN parties p ON i.party_id = p.id
+      WHERE i.id = ? AND i.deleted_at IS NULL
+    `;
 
-      const invoice = await DatabaseService.executeQuery(invoiceQuery, [invoiceId]);
-      
-      if (invoice.length === 0) return null;
+    const invoice = await DatabaseService.executeQuery(invoiceQuery, [invoiceId]);
+    
+    if (invoice.length === 0) return null;
 
-      const itemsQuery = `
-        SELECT * FROM invoice_items 
-        WHERE invoice_id = ? AND deleted_at IS NULL
-        ORDER BY id ASC
-      `;
+    const itemsQuery = `
+      SELECT * FROM invoice_items 
+      WHERE invoice_id = ? AND deleted_at IS NULL
+      ORDER BY id ASC
+    `;
 
-      const items = await DatabaseService.executeQuery(itemsQuery, [invoiceId]);
+    const items = await DatabaseService.executeQuery(itemsQuery, [invoiceId]);
 
-      return {
-        ...invoice[0],
-        items: items || []
-      };
-    } catch (error) {
-      console.error('❌ Error getting invoice by ID:', error);
-      return null;
-    }
+    return {
+      ...invoice[0],
+      items: items || []
+    };
+  } catch (error) {
+    console.error('❌ Error getting invoice by ID:', error);
+    return null;
   }
+}
 
   // Generate PDF with better error handling
   static async generatePDF(invoiceData, businessProfile, templateType = 'classic', theme = 'standard') {
