@@ -77,19 +77,32 @@ const InvoicePreviewScreen = ({ navigation, route }) => {
     }
   };
 
-  const generatePreviewHTML = () => {
+  const generatePreviewHTML = async () => {
     try {
       console.log('🔄 Generating preview HTML with:', {
         template: selectedTemplate,
         theme: selectedTheme
       });
       
-      const html = InvoiceTemplateService.generateHTML(
-        invoiceData, 
-        businessProfile, 
-        selectedTemplate, 
-        selectedTheme
-      );
+      let html;
+      
+      // Handle GST template separately
+      if (selectedTemplate === 'gst-compliant') {
+        const GSTInvoiceService = require('./services/GSTInvoiceService').default;
+        const result = await GSTInvoiceService.generateGSTInvoiceHTML(invoiceData, businessProfile, selectedTemplate);
+        if (!result.success) {
+          throw new Error(result.error || 'Failed to generate GST invoice HTML');
+        }
+        html = result.html;
+      } else {
+        html = InvoiceTemplateService.generateHTML(
+          invoiceData, 
+          businessProfile, 
+          selectedTemplate, 
+          selectedTheme
+        );
+      }
+      
       setHtmlContent(html);
     } catch (error) {
       console.error('❌ Error generating preview HTML:', error);
@@ -171,7 +184,7 @@ const InvoicePreviewScreen = ({ navigation, route }) => {
         Alert.alert('Error', result.error || 'Failed to save invoice');
       }
     } catch (error) {
-      console.error('❌ Error saving:', error);
+      console.error('❌ Error saving invoice:', error);
       Alert.alert('Error', 'Failed to save invoice');
     } finally {
       setGenerating(false);
@@ -189,7 +202,6 @@ const InvoicePreviewScreen = ({ navigation, route }) => {
 
   return (
     <View style={styles.container}>
-
       {/* Header */}
       <View style={styles.header}>
         <TouchableOpacity onPress={() => navigation.navigate('InvoiceTemplate', route.params)}>
@@ -199,16 +211,31 @@ const InvoicePreviewScreen = ({ navigation, route }) => {
         <View />
       </View>
 
+      {/* Preview Content */}
+      <View style={styles.previewContainer}>
+        <WebView
+          source={{ html: htmlContent }}
+          style={styles.webview}
+          showsVerticalScrollIndicator={false}
+          showsHorizontalScrollIndicator={false}
+          scalesPageToFit={true}
+          javaScriptEnabled={true}
+          domStorageEnabled={true}
+        />
+      </View>
+
       {/* Action Buttons */}
-      <View style={styles.actionBar}>
+      <View style={styles.actionContainer}>
         <TouchableOpacity
           style={[styles.actionButton, styles.shareButton]}
           onPress={handleSharePDF}
           disabled={generating}
         >
-          <Text style={styles.actionButtonText}>
-            {generating ? 'Generating...' : 'Share PDF'}
-          </Text>
+          {generating ? (
+            <ActivityIndicator size="small" color="#FFFFFF" />
+          ) : (
+            <Text style={styles.actionButtonText}>Share PDF</Text>
+          )}
         </TouchableOpacity>
 
         <TouchableOpacity
@@ -216,9 +243,11 @@ const InvoicePreviewScreen = ({ navigation, route }) => {
           onPress={handlePrint}
           disabled={generating}
         >
-          <Text style={styles.actionButtonText}>
-            {generating ? 'Generating...' : 'Print'}
-          </Text>
+          {generating ? (
+            <ActivityIndicator size="small" color="#FFFFFF" />
+          ) : (
+            <Text style={styles.actionButtonText}>Print</Text>
+          )}
         </TouchableOpacity>
 
         <TouchableOpacity
@@ -226,44 +255,12 @@ const InvoicePreviewScreen = ({ navigation, route }) => {
           onPress={handleSave}
           disabled={generating}
         >
-          <Text style={styles.actionButtonText}>
-            {generating ? 'Saving...' : 'Save'}
-          </Text>
+          {generating ? (
+            <ActivityIndicator size="small" color="#FFFFFF" />
+          ) : (
+            <Text style={styles.actionButtonText}>Save</Text>
+          )}
         </TouchableOpacity>
-      </View>
-
-      {/* Preview Container */}
-      <View style={styles.previewContainer}>
-        {htmlContent ? (
-          <WebView
-            source={{ html: htmlContent }}
-            style={styles.webview}
-            scrollEnabled={true}
-            showsVerticalScrollIndicator={false}
-            showsHorizontalScrollIndicator={false}
-            javaScriptEnabled={true}
-            domStorageEnabled={true}
-            startInLoadingState={true}
-            renderLoading={() => (
-              <View style={styles.webviewLoading}>
-                <ActivityIndicator size="large" color="#3B82F6" />
-                <Text style={styles.webviewLoadingText}>Loading Preview...</Text>
-              </View>
-            )}
-          />
-        ) : (
-          <View style={styles.webviewLoading}>
-            <ActivityIndicator size="large" color="#3B82F6" />
-            <Text style={styles.webviewLoadingText}>Generating Preview...</Text>
-          </View>
-        )}
-      </View>
-
-      {/* Template Info */}
-      <View style={styles.templateInfo}>
-        <Text style={styles.templateInfoText}>
-          Template: {selectedTemplate} • Theme: {selectedTheme}
-        </Text>
       </View>
     </View>
   );
@@ -278,9 +275,10 @@ const styles = StyleSheet.create({
     flex: 1,
     justifyContent: 'center',
     alignItems: 'center',
+    backgroundColor: '#F8FAFC',
   },
   loadingText: {
-    fontSize: 18,
+    fontSize: 16,
     color: '#64748B',
     marginTop: 16,
   },
@@ -303,34 +301,6 @@ const styles = StyleSheet.create({
     fontWeight: 'bold',
     color: '#1E293B',
   },
-  actionBar: {
-    flexDirection: 'row',
-    padding: 16,
-    backgroundColor: '#FFFFFF',
-    borderBottomWidth: 1,
-    borderBottomColor: '#E2E8F0',
-    gap: 12,
-  },
-  actionButton: {
-    flex: 1,
-    paddingVertical: 12,
-    borderRadius: 8,
-    alignItems: 'center',
-  },
-  shareButton: {
-    backgroundColor: '#3B82F6',
-  },
-  printButton: {
-    backgroundColor: '#10B981',
-  },
-  saveButton: {
-    backgroundColor: '#8B5CF6',
-  },
-  actionButtonText: {
-    color: '#FFFFFF',
-    fontSize: 14,
-    fontWeight: '600',
-  },
   previewContainer: {
     flex: 1,
     backgroundColor: '#FFFFFF',
@@ -346,31 +316,34 @@ const styles = StyleSheet.create({
   webview: {
     flex: 1,
   },
-  webviewLoading: {
-    position: 'absolute',
-    top: 0,
-    left: 0,
-    right: 0,
-    bottom: 0,
-    justifyContent: 'center',
-    alignItems: 'center',
-    backgroundColor: '#FFFFFF',
-  },
-  webviewLoadingText: {
-    fontSize: 16,
-    color: '#64748B',
-    marginTop: 12,
-  },
-  templateInfo: {
-    padding: 16,
+  actionContainer: {
+    flexDirection: 'row',
+    padding: 20,
     backgroundColor: '#FFFFFF',
     borderTopWidth: 1,
     borderTopColor: '#E2E8F0',
+    gap: 12,
   },
-  templateInfoText: {
+  actionButton: {
+    flex: 1,
+    paddingVertical: 12,
+    borderRadius: 8,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  shareButton: {
+    backgroundColor: '#3B82F6',
+  },
+  printButton: {
+    backgroundColor: '#10B981',
+  },
+  saveButton: {
+    backgroundColor: '#F59E0B',
+  },
+  actionButtonText: {
+    color: '#FFFFFF',
     fontSize: 14,
-    color: '#64748B',
-    textAlign: 'center',
+    fontWeight: '600',
   },
 });
 
