@@ -2,7 +2,6 @@ import React, { useState, useEffect } from 'react';
 import { NavigationContainer } from '@react-navigation/native';
 import { StatusBar } from 'expo-status-bar';
 import { Alert } from 'react-native';
-import * as SQLite from 'expo-sqlite';
 
 // Import navigation
 import BottomTabNavigator from './navigation/BottomTabNavigator';
@@ -24,47 +23,12 @@ export default function App() {
     initializeApp();
   }, []);
 
-  const resetDatabase = async () => {
-    try {
-      console.log('🔄 Resetting database...');
-      
-      // Open database directly to drop all tables
-      const db = await SQLite.openDatabaseAsync('brojgar_business.db');
-      
-      // Drop all existing tables
-      const tables = [
-        'notifications', 'recent_searches', 'backups', 'invoice_items', 
-        'invoices', 'transactions', 'inventory_items', 'parties', 
-        'categories', 'business_settings'
-      ];
-
-      for (const table of tables) {
-        try {
-          await db.execAsync(`DROP TABLE IF EXISTS ${table}`);
-        } catch (error) {
-          console.log(`Note: Table ${table} may not exist`);
-        }
-      }
-
-      await db.closeAsync();
-      console.log('✅ Database reset completed');
-    } catch (error) {
-      console.error('❌ Error resetting database:', error);
-    }
-  };
-
   const initializeApp = async () => {
     try {
       console.log('🚀 Initializing Brojgar Business App...');
       
-      // Reset database first to ensure clean schema
-      await resetDatabase();
-      
       // Initialize database
       await DatabaseService.init();
-      
-      // Small delay to ensure tables are created
-      await new Promise(resolve => setTimeout(resolve, 100));
       
       // Initialize other services with error handling
       try {
