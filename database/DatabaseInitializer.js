@@ -94,8 +94,9 @@ class DatabaseInitializer {
         email: 'rajesh.kumar@email.com',
         phone: '+91 98765 43210',
         address: '123 MG Road, Mumbai, Maharashtra 400001',
-        gst_number: '27ABCDE1234F1Z5',
-        outstanding_balance: 15000
+        gst_number: null,
+        credit_limit: 50000,
+        balance: 0
       },
       {
         name: 'Priya Sharma',
@@ -103,17 +104,19 @@ class DatabaseInitializer {
         email: 'priya.sharma@email.com',
         phone: '+91 87654 32109',
         address: '456 Park Street, Delhi, Delhi 110001',
-        outstanding_balance: 8500
+        gst_number: null,
+        credit_limit: 30000,
+        balance: 0
       },
       {
         name: 'ABC Electronics Ltd',
         type: 'customer',
         email: 'sales@abcelectronics.com',
         phone: '+91 76543 21098',
-        gst_number: '29FGHIJ5678K2L6',
+        gst_number: '27ABCDE1234F1Z5',
         address: '789 Business Park, Bangalore, Karnataka 560001',
-        outstanding_balance: 45000,
-        credit_limit: 100000
+        credit_limit: 100000,
+        balance: 0
       },
       // Suppliers
       {
@@ -121,25 +124,30 @@ class DatabaseInitializer {
         type: 'supplier',
         email: 'info@techsuppliers.com',
         phone: '+91 65432 10987',
-        gst_number: '33KLMNO9012P3M7',
-        address: '321 Industrial Area, Chennai, Tamil Nadu 600001'
+        gst_number: '29FGHIJ5678K2L6',
+        address: '321 Industrial Area, Chennai, Tamil Nadu 600001',
+        credit_limit: 0,
+        balance: 0
       },
       {
         name: 'Fashion Wholesale',
         type: 'supplier',
         email: 'orders@fashionwholesale.com',
         phone: '+91 54321 09876',
-        address: '654 Textile Market, Ahmedabad, Gujarat 380001'
+        address: '654 Textile Market, Ahmedabad, Gujarat 380001',
+        gst_number: null,
+        credit_limit: 0,
+        balance: 0
       }
     ];
 
     for (const party of parties) {
       await DatabaseService.executeQuery(
-        `INSERT INTO parties (name, type, email, phone, gst_number, address, balance, credit_limit) 
+        `INSERT INTO parties (name, type, email, phone, gst_number, address, credit_limit, balance) 
          VALUES (?, ?, ?, ?, ?, ?, ?, ?)`,
         [
-          party.name, party.type, party.email, party.phone, party.gst_number || null,
-          party.address, party.outstanding_balance || 0, party.credit_limit || 0
+          party.name, party.type, party.email, party.phone, party.gst_number,
+          party.address, party.credit_limit, party.balance
         ]
       );
     }
@@ -166,19 +174,19 @@ class DatabaseInitializer {
         name: 'Samsung Galaxy S24',
         description: 'Flagship Android smartphone',
         category: 'Electronics',
-        item_code: 'SAMS24ULTRA001',
-        cost_price: 75000,
-        selling_price: 115000,
-        stock_quantity: 30,
-        min_stock_level: 8,
+        item_code: 'SAM24001',
+        cost_price: 65000,
+        selling_price: 85000,
+        stock_quantity: 18,
+        min_stock_level: 5,
         hsn_code: '8517'
       },
       // Clothing
       {
         name: 'Cotton T-Shirt',
-        description: 'Comfortable cotton t-shirt',
+        description: 'Premium quality cotton t-shirt',
         category: 'Clothing',
-        item_code: 'COTTONTS001',
+        item_code: 'TSHIRT001',
         cost_price: 200,
         selling_price: 450,
         stock_quantity: 100,
@@ -187,38 +195,26 @@ class DatabaseInitializer {
       },
       {
         name: 'Denim Jeans',
-        description: 'Classic blue denim jeans',
+        description: 'Classic fit denim jeans',
         category: 'Clothing',
-        item_code: 'DENIMJEANS001',
+        item_code: 'JEANS001',
         cost_price: 800,
-        selling_price: 1800,
-        stock_quantity: 50,
+        selling_price: 1500,
+        stock_quantity: 45,
         min_stock_level: 10,
         hsn_code: '6203'
       },
-      // Food & Beverages
+      // Low stock items for notifications
       {
-        name: 'Organic Coffee Beans',
-        description: 'Premium organic coffee beans',
-        category: 'Food & Beverages',
-        item_code: 'COFFEEBEANS001',
-        cost_price: 300,
-        selling_price: 600,
-        stock_quantity: 40,
-        min_stock_level: 15,
-        hsn_code: '0901'
-      },
-      // Books
-      {
-        name: 'Business Strategy Book',
-        description: 'Comprehensive business strategy guide',
-        category: 'Books',
-        item_code: 'BUSINESSBOOK001',
-        cost_price: 150,
-        selling_price: 350,
-        stock_quantity: 75,
-        min_stock_level: 25,
-        hsn_code: '4901'
+        name: 'Wireless Earbuds',
+        description: 'Bluetooth wireless earbuds',
+        category: 'Electronics',
+        item_code: 'EARBUDS001',
+        cost_price: 1500,
+        selling_price: 2500,
+        stock_quantity: 3, // Low stock
+        min_stock_level: 5,
+        hsn_code: '8517'
       }
     ];
 
@@ -238,53 +234,75 @@ class DatabaseInitializer {
   async populateSampleTransactions() {
     console.log('💰 Adding sample transactions...');
     
-    const transactions = [
-      {
-        reference: 'TXN001',
-        party_id: 1,
-        type: 'income',
-        amount: 1180,
-        date: new Date().toISOString().split('T')[0],
-        description: 'Sale of iPhone 15 Pro',
-        category: 'Sales',
-        payment_method: 'card',
-        status: 'completed'
-      },
-      {
-        reference: 'TXN002',
-        party_id: 2,
-        type: 'income',
-        amount: 450,
-        date: new Date().toISOString().split('T')[0],
-        description: 'Sale of Cotton T-Shirt',
-        category: 'Sales',
-        payment_method: 'cash',
-        status: 'completed'
-      },
-      {
-        reference: 'TXN003',
-        party_id: 4,
-        type: 'expense',
-        amount: 50000,
-        date: new Date().toISOString().split('T')[0],
-        description: 'Purchase of Electronics',
-        category: 'Purchases',
-        payment_method: 'bank_transfer',
-        status: 'completed'
-      }
-    ];
+    // Get party and item IDs for references
+    const customer1 = await DatabaseService.executeQuery('SELECT id FROM parties WHERE name = ?', ['Rajesh Kumar']);
+    const customer2 = await DatabaseService.executeQuery('SELECT id FROM parties WHERE name = ?', ['ABC Electronics Ltd']);
+    const iphone = await DatabaseService.executeQuery('SELECT id FROM inventory_items WHERE item_code = ?', ['IPH15PRO001']);
+    const samsung = await DatabaseService.executeQuery('SELECT id FROM inventory_items WHERE item_code = ?', ['SAM24001']);
 
-    for (const transaction of transactions) {
+    if (customer1.length > 0 && iphone.length > 0) {
+      // Create sample invoice 1
       await DatabaseService.executeQuery(
-        `INSERT INTO transactions (reference, party_id, type, amount, date, description, category, payment_method, status) 
-         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)`,
-        [
-          transaction.reference, transaction.party_id, transaction.type, transaction.amount,
-          transaction.date, transaction.description, transaction.category, transaction.payment_method, transaction.status
-        ]
+        `INSERT INTO invoices (invoice_number, party_id, date, due_date, subtotal, tax_amount, total, status) 
+         VALUES (?, ?, ?, ?, ?, ?, ?, ?)`,
+        ['INV-001', customer1[0].id, '2024-01-15', '2024-02-15', 125000, 22500, 147500, 'paid']
+      );
+
+      // Get the invoice ID
+      const invoice1 = await DatabaseService.executeQuery('SELECT id FROM invoices WHERE invoice_number = ?', ['INV-001']);
+      
+      if (invoice1.length > 0) {
+        await DatabaseService.executeQuery(
+          'INSERT INTO invoice_items (invoice_id, item_id, item_name, quantity, rate, tax_rate, tax_amount, total) VALUES (?, ?, ?, ?, ?, ?, ?, ?)',
+          [invoice1[0].id, iphone[0].id, 'iPhone 15 Pro', 1, 125000, 18, 22500, 147500]
+        );
+      }
+    }
+
+    if (customer2.length > 0 && samsung.length > 0) {
+      // Create sample invoice 2
+      await DatabaseService.executeQuery(
+        `INSERT INTO invoices (invoice_number, party_id, date, due_date, subtotal, tax_amount, total, status) 
+         VALUES (?, ?, ?, ?, ?, ?, ?, ?)`,
+        ['INV-002', customer2[0].id, '2024-01-20', '2024-02-20', 170000, 30600, 200600, 'pending']
+      );
+
+      // Get the invoice ID
+      const invoice2 = await DatabaseService.executeQuery('SELECT id FROM invoices WHERE invoice_number = ?', ['INV-002']);
+      
+      if (invoice2.length > 0) {
+        await DatabaseService.executeQuery(
+          'INSERT INTO invoice_items (invoice_id, item_id, item_name, quantity, rate, tax_rate, tax_amount, total) VALUES (?, ?, ?, ?, ?, ?, ?, ?)',
+          [invoice2[0].id, samsung[0].id, 'Samsung Galaxy S24', 2, 85000, 18, 30600, 200600]
+        );
+      }
+    }
+
+    // Add sample transactions
+    if (customer1.length > 0) {
+      await DatabaseService.executeQuery(
+        `INSERT INTO transactions (reference, party_id, type, amount, date, description, status) 
+         VALUES (?, ?, ?, ?, ?, ?, ?)`,
+        ['TXN001', customer1[0].id, 'income', 147500, '2024-01-15', 'Sale of iPhone 15 Pro', 'completed']
       );
     }
+
+    if (customer2.length > 0) {
+      await DatabaseService.executeQuery(
+        `INSERT INTO transactions (reference, party_id, type, amount, date, description, status) 
+         VALUES (?, ?, ?, ?, ?, ?, ?)`,
+        ['TXN002', customer2[0].id, 'income', 200600, '2024-01-20', 'Sale of Samsung Galaxy S24', 'pending']
+      );
+    }
+
+    // Add sample notification
+    await DatabaseService.executeQuery(
+      `INSERT INTO notifications (title, message, type, related_id, related_type) 
+       VALUES (?, ?, ?, ?, ?)`,
+      ['Welcome!', 'Welcome to Brojgar Business App', 'info', null, null]
+    );
   }
 }
 
+// Export singleton instance
 export default new DatabaseInitializer();
