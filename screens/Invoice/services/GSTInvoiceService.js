@@ -50,8 +50,8 @@ class GSTInvoiceService {
    */
   static checkInterStateTransaction(invoiceData, businessProfile) {
     // Extract state codes from GSTIN (first 2 digits)
-    const businessStateCode = businessProfile.gstin?.substring(0, 2);
-    const customerStateCode = invoiceData.customer_gstin?.substring(0, 2);
+    const businessStateCode = businessProfile.gst_number?.substring(0, 2);
+    const customerStateCode = invoiceData.customer_gst_number?.substring(0, 2);
     
     // If customer has GSTIN and different state, it's inter-state
     if (customerStateCode && businessStateCode && customerStateCode !== businessStateCode) {
@@ -246,7 +246,7 @@ class GSTInvoiceService {
             <div class="invoice-title">TAX INVOICE</div>
             <div class="business-name">${businessProfile.name || 'Your Business'}</div>
             <div class="business-details">${businessProfile.address || 'Business Address'}</div>
-            <div class="business-details">GSTIN: ${businessProfile.gstin || 'GSTIN Number'}</div>
+            <div class="business-details">GSTIN: ${businessProfile.gst_number || 'GSTIN Number'}</div>
             <div class="business-details">Phone: ${businessProfile.phone || 'Phone'} | Email: ${businessProfile.email || 'Email'}</div>
           </div>
           
@@ -256,7 +256,7 @@ class GSTInvoiceService {
               <div class="section-title">Bill To:</div>
               <div class="customer-info">${invoiceData.customer_name}</div>
               <div class="customer-info">${invoiceData.customer_address || 'Customer Address'}</div>
-              <div class="customer-info">GSTIN: ${invoiceData.customer_gstin || 'N/A'}</div>
+              <div class="customer-info">GSTIN: ${invoiceData.customer_gst_number || 'N/A'}</div>
               <div class="customer-info">Phone: ${invoiceData.customer_phone || 'N/A'}</div>
             </div>
             
@@ -355,7 +355,8 @@ class GSTInvoiceService {
       }
       
       const total = finalTaxableValue + taxAmount;
-  return `
+      
+      return `
         <tr>
           <td class="item-name">${item.item_name}</td>
           <td>${item.hsn_code || 'N/A'}</td>
