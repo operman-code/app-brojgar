@@ -1,5 +1,6 @@
 // database/DatabaseService.js
 import * as SQLite from 'expo-sqlite';
+import * as FileSystem from 'expo-file-system';
 
 class DatabaseService {
   static db = null;
@@ -31,6 +32,12 @@ class DatabaseService {
       return true;
     } catch (error) {
       console.error('❌ Database initialization failed:', error);
+      // If there's a syntax error, try to reset the database
+      if (error.message && error.message.includes('syntax error')) {
+        console.log('🔄 Attempting to reset database due to syntax error...');
+        await this.resetDatabase();
+        return await this.init();
+      }
       throw error;
     }
   }
@@ -57,7 +64,7 @@ class DatabaseService {
         deleted_at DATETIME NULL
       )`,
 
-      // Parties Table (Customers & Suppliers) - GST number optional
+      // Parties Table (Customers & Suppliers)
       `CREATE TABLE IF NOT EXISTS parties (
         id INTEGER PRIMARY KEY AUTOINCREMENT,
         name TEXT NOT NULL,
@@ -361,6 +368,9 @@ class DatabaseService {
       );
 
       // Insert sample invoice
+    
+📁 File 2: database/DatabaseService.js (continued)
+      // Insert sample invoice
       await this.executeQuery(
         `INSERT INTO invoices (invoice_number, party_id, date, due_date, subtotal, tax_amount, total, status) 
          VALUES (?, ?, ?, ?, ?, ?, ?, ?)`,
@@ -413,6 +423,8 @@ class DatabaseService {
       }
     } catch (error) {
       console.error('❌ Query execution error:', error);
+      console.error('❌ SQL Query:', sql);
+      console.error('❌ Parameters:', params);
       throw error;
     }
   }
@@ -557,6 +569,34 @@ class DatabaseService {
     } catch (error) {
       console.error('❌ Error restoring backup:', error);
       throw error;
+    }
+  }
+
+  static async resetDatabase() {
+    try {
+      console.log('🔄 Resetting database...');
+      
+      if (this.db) {
+        await this.db.closeAsync();
+      }
+      
+      // Delete the database file
+      const { deleteAsync } = await import('expo-file-system');
+      const dbPath = `${FileSystem.documentDirectory}SQLite/brojgar_business.db`;
+      
+      try {
+        await deleteAsync(dbPath);
+        console.log('✅ Database file deleted');
+      } catch (error) {
+        console.log('ℹ️ Database file not found or already deleted');
+      }
+      
+      this.db = null;
+      this.isInitialized = false;
+      
+      console.log('✅ Database reset completed');
+    } catch (error) {
+      console.error('❌ Error resetting database:', error);
     }
   }
 }
