@@ -283,7 +283,7 @@ const InvoiceTemplateScreen = ({ navigation, route }) => {
           <View style={styles.gstTable}>
             <View style={styles.gstTableHeader}>
               <Text style={styles.gstHeaderCell}>Item</Text>
-              <Text style={styles.gstHeaderCell}>HSN</Text>
+              <Text style={styles.gstHeaderCell}>HSN/SAC</Text>
               <Text style={styles.gstHeaderCell}>Qty</Text>
               <Text style={styles.gstHeaderCell}>Rate</Text>
               <Text style={styles.gstHeaderCell}>CGST</Text>
@@ -478,7 +478,6 @@ const InvoiceTemplateScreen = ({ navigation, route }) => {
 
   return (
     <View style={styles.container}>
-
       {/* Header */}
       <View style={styles.header}>
         <TouchableOpacity onPress={() => navigation.goBack()}>
@@ -947,24 +946,22 @@ const styles = StyleSheet.create({
     padding: 15,
     borderRadius: 8,
     marginBottom: 10,
+    alignItems: 'center',
   },
   gstTitle: {
     fontSize: 18,
     fontWeight: 'bold',
     color: '#ffffff',
-    textAlign: 'center',
     marginBottom: 8,
   },
   gstBusinessName: {
     fontSize: 14,
     color: '#ffffff',
-    textAlign: 'center',
     marginBottom: 4,
   },
   gstGstin: {
     fontSize: 12,
     color: '#ffffff',
-    textAlign: 'center',
   },
   gstTable: {
     borderWidth: 1,
@@ -979,7 +976,7 @@ const styles = StyleSheet.create({
   gstHeaderCell: {
     flex: 1,
     fontSize: 10,
-    fontWeight: '600',
+    fontWeight: 'bold',
     textAlign: 'center',
     color: '#374151',
   },
