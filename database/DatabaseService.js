@@ -22,7 +22,6 @@ class DatabaseService {
       
       await this.runMigrations();
       console.log('✅ All migrations executed successfully');
-      console.log('✅ Migrations completed');
       
       console.log('⚙️ Inserting initial configuration...');
       await this.insertInitialData();
@@ -58,25 +57,26 @@ class DatabaseService {
         deleted_at DATETIME NULL
       )`,
 
-      // Parties Table - Keep gst_number (don't change to gstin)
-`CREATE TABLE IF NOT EXISTS parties (
-  id INTEGER PRIMARY KEY AUTOINCREMENT,
-  name TEXT NOT NULL,
-  phone TEXT,
-  email TEXT,
-  address TEXT,
-  gst_number TEXT,  // ← Keep this as gst_number
-  pan_number TEXT,
-  type TEXT NOT NULL DEFAULT 'customer',
-  credit_limit REAL DEFAULT 0,
-  credit_days INTEGER DEFAULT 30,
-  opening_balance REAL DEFAULT 0,
-  balance REAL DEFAULT 0,
-  notes TEXT,
-  created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
-  updated_at DATETIME DEFAULT CURRENT_TIMESTAMP,
-  deleted_at DATETIME NULL
-)`,
+      // Parties Table (Customers & Suppliers) - GST number optional
+      `CREATE TABLE IF NOT EXISTS parties (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        name TEXT NOT NULL,
+        phone TEXT,
+        email TEXT,
+        address TEXT,
+        gst_number TEXT,
+        pan_number TEXT,
+        type TEXT NOT NULL DEFAULT 'customer',
+        credit_limit REAL DEFAULT 0,
+        credit_days INTEGER DEFAULT 30,
+        opening_balance REAL DEFAULT 0,
+        balance REAL DEFAULT 0,
+        notes TEXT,
+        created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+        updated_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+        deleted_at DATETIME NULL
+      )`,
+
       // Inventory Items Table
       `CREATE TABLE IF NOT EXISTS inventory_items (
         id INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -97,52 +97,50 @@ class DatabaseService {
       )`,
 
       // Invoices Table
-`CREATE TABLE IF NOT EXISTS invoices (
-  id INTEGER PRIMARY KEY AUTOINCREMENT,
-  invoice_number TEXT UNIQUE NOT NULL,
-  party_id INTEGER,
-  date TEXT NOT NULL,
-  due_date TEXT,
-  subtotal REAL DEFAULT 0,
-  tax_amount REAL DEFAULT 0,
-  discount_amount REAL DEFAULT 0,
-  total REAL DEFAULT 0,
-  paid_amount REAL DEFAULT 0,
-  status TEXT DEFAULT 'draft',
-  notes TEXT,
-  terms TEXT,
-  hsn_code TEXT,      // ← NEW
-  sac_code TEXT,      // ← NEW
-  discount REAL DEFAULT 0, // ← NEW
-  gst_rate REAL DEFAULT 18,
-  place_of_supply TEXT,
-  supply_type TEXT DEFAULT 'regular',
-  reverse_charge TEXT DEFAULT 'N',
-  created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
-  updated_at DATETIME DEFAULT CURRENT_TIMESTAMP,
-  deleted_at DATETIME NULL,
-  FOREIGN KEY (party_id) REFERENCES parties (id)
-)`,
+      `CREATE TABLE IF NOT EXISTS invoices (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        invoice_number TEXT UNIQUE NOT NULL,
+        party_id INTEGER,
+        date TEXT NOT NULL,
+        due_date TEXT,
+        subtotal REAL DEFAULT 0,
+        tax_amount REAL DEFAULT 0,
+        discount_amount REAL DEFAULT 0,
+        total REAL DEFAULT 0,
+        paid_amount REAL DEFAULT 0,
+        status TEXT DEFAULT 'draft',
+        notes TEXT,
+        terms TEXT,
+        gst_rate REAL DEFAULT 18,
+        place_of_supply TEXT,
+        supply_type TEXT DEFAULT 'regular',
+        reverse_charge TEXT DEFAULT 'N',
+        created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+        updated_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+        deleted_at DATETIME NULL,
+        FOREIGN KEY (party_id) REFERENCES parties (id)
+      )`,
+
       // Invoice Items Table
-`CREATE TABLE IF NOT EXISTS invoice_items (
-  id INTEGER PRIMARY KEY AUTOINCREMENT,
-  invoice_id INTEGER NOT NULL,
-  item_id INTEGER NOT NULL,
-  item_name TEXT,
-  quantity REAL DEFAULT 1,
-  rate REAL DEFAULT 0,
-  tax_rate REAL DEFAULT 18,
-  tax_amount REAL DEFAULT 0,
-  total REAL DEFAULT 0,
-  hsn_code TEXT,
-  sac_code TEXT,
-  discount REAL DEFAULT 0,
-  created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
-  updated_at DATETIME DEFAULT CURRENT_TIMESTAMP,
-  deleted_at DATETIME NULL,
-  FOREIGN KEY (invoice_id) REFERENCES invoices (id),
-  FOREIGN KEY (item_id) REFERENCES inventory_items (id)
-)`,
+      `CREATE TABLE IF NOT EXISTS invoice_items (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        invoice_id INTEGER NOT NULL,
+        item_id INTEGER NOT NULL,
+        item_name TEXT,
+        quantity REAL DEFAULT 1,
+        rate REAL DEFAULT 0,
+        tax_rate REAL DEFAULT 18,
+        tax_amount REAL DEFAULT 0,
+        total REAL DEFAULT 0,
+        hsn_code TEXT,
+        sac_code TEXT,
+        discount REAL DEFAULT 0,
+        created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+        updated_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+        deleted_at DATETIME NULL,
+        FOREIGN KEY (invoice_id) REFERENCES invoices (id),
+        FOREIGN KEY (item_id) REFERENCES inventory_items (id)
+      )`,
 
       // Transactions Table (Income & Expenses)
       `CREATE TABLE IF NOT EXISTS transactions (
@@ -206,7 +204,96 @@ class DatabaseService {
   }
 
   static async runMigrations() {
-    console.log('✅ Schema is fresh, no migrations needed');
+    try {
+      console.log('🔄 Running database migrations...');
+      
+      // Migration 1: Ensure gst_number column exists in parties table
+      try {
+        await this.db.execAsync(`
+          ALTER TABLE parties 
+          ADD COLUMN gst_number TEXT
+        `);
+        console.log('✅ Added gst_number column to parties table');
+      } catch (error) {
+        console.log('ℹ️ gst_number column already exists');
+      }
+      
+      // Migration 2: Add GST fields to invoices table
+      try {
+        await this.db.execAsync(`
+          ALTER TABLE invoices 
+          ADD COLUMN gst_rate REAL DEFAULT 18
+        `);
+        console.log('✅ Added gst_rate column to invoices table');
+      } catch (error) {
+        console.log('ℹ️ gst_rate column already exists');
+      }
+      
+      try {
+        await this.db.execAsync(`
+          ALTER TABLE invoices 
+          ADD COLUMN place_of_supply TEXT
+        `);
+        console.log('✅ Added place_of_supply column to invoices table');
+      } catch (error) {
+        console.log('ℹ️ place_of_supply column already exists');
+      }
+      
+      try {
+        await this.db.execAsync(`
+          ALTER TABLE invoices 
+          ADD COLUMN supply_type TEXT DEFAULT 'regular'
+        `);
+        console.log('✅ Added supply_type column to invoices table');
+      } catch (error) {
+        console.log('ℹ️ supply_type column already exists');
+      }
+      
+      try {
+        await this.db.execAsync(`
+          ALTER TABLE invoices 
+          ADD COLUMN reverse_charge TEXT DEFAULT 'N'
+        `);
+        console.log('✅ Added reverse_charge column to invoices table');
+      } catch (error) {
+        console.log('ℹ️ reverse_charge column already exists');
+      }
+      
+      // Migration 3: Add GST fields to invoice_items table
+      try {
+        await this.db.execAsync(`
+          ALTER TABLE invoice_items 
+          ADD COLUMN hsn_code TEXT
+        `);
+        console.log('✅ Added hsn_code column to invoice_items table');
+      } catch (error) {
+        console.log('ℹ️ hsn_code column already exists');
+      }
+      
+      try {
+        await this.db.execAsync(`
+          ALTER TABLE invoice_items 
+          ADD COLUMN sac_code TEXT
+        `);
+        console.log('✅ Added sac_code column to invoice_items table');
+      } catch (error) {
+        console.log('ℹ️ sac_code column already exists');
+      }
+      
+      try {
+        await this.db.execAsync(`
+          ALTER TABLE invoice_items 
+          ADD COLUMN discount REAL DEFAULT 0
+        `);
+        console.log('✅ Added discount column to invoice_items table');
+      } catch (error) {
+        console.log('ℹ️ discount column already exists');
+      }
+      
+      console.log('✅ Database migrations completed');
+    } catch (error) {
+      console.error('❌ Error running migrations:', error);
+    }
   }
 
   static async insertInitialData() {
@@ -227,6 +314,7 @@ class DatabaseService {
         { key: 'business_email', value: '' },
         { key: 'business_phone', value: '' },
         { key: 'business_address', value: '' },
+        { key: 'business_gst_number', value: '' },
         { key: 'tax_rate', value: '18' },
         { key: 'currency', value: 'INR' },
         { key: 'invoice_prefix', value: 'INV' },
