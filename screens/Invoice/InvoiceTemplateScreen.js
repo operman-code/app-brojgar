@@ -13,7 +13,6 @@ import {
 } from 'react-native';
 
 import InvoiceTemplateService from './services/InvoiceTemplateService';
-import GSTInvoiceService from './services/GSTInvoiceService';
 import * as Sharing from 'expo-sharing';
 
 const { width } = Dimensions.get('window');
@@ -40,14 +39,6 @@ const InvoiceTemplateScreen = ({ navigation, route }) => {
       description: 'Contemporary layout with bold headers',
       preview: '🎨',
       color: '#10B981',
-      category: 'standard'
-    },
-    {
-      id: 'gst-compliant',
-      name: 'GST Compliant',
-      description: 'Full GST-compliant invoice with tax breakdown',
-      preview: '🧾',
-      color: '#059669',
       category: 'standard'
     },
     {
@@ -89,6 +80,14 @@ const InvoiceTemplateScreen = ({ navigation, route }) => {
       preview: '🕰️',
       color: '#DC2626',
       category: 'standard'
+    },
+    {
+      id: 'gst-compliant',
+      name: 'GST Compliant',
+      description: 'GST-compliant invoice with tax details',
+      preview: '🏛️',
+      color: '#059669',
+      category: 'gst'
     },
     {
       id: 'thermal-80mm',
@@ -216,39 +215,29 @@ const InvoiceTemplateScreen = ({ navigation, route }) => {
   };
 
   const handlePreview = () => {
-    console.log('🔄 Navigating to preview with:', {
-      invoiceData: { invoiceId: invoiceData.id },
-      selectedTemplate,
-      selectedTheme
-    });
-    
-    navigation.navigate('InvoicePreview', {
-      invoiceData: {
-        invoiceId: invoiceData.id
-      },
-      selectedTemplate,
-      selectedTheme
-    });
-  };
+  console.log('🔄 Navigating to preview with:', {
+    invoiceData: { invoiceId: invoiceData.id },
+    selectedTemplate,
+    selectedTheme
+  });
+  
+  navigation.navigate('InvoicePreview', {
+    invoiceData: {
+      invoiceId: invoiceData.id
+    },
+    selectedTemplate,
+    selectedTheme
+  });
+};
 
   const handleSharePDF = async () => {
     try {
-      let result;
-      
-      if (selectedTemplate === 'gst-compliant') {
-        result = await GSTInvoiceService.generateGSTInvoiceHTML(
-          invoiceData, 
-          businessProfile, 
-          selectedTemplate
-        );
-      } else {
-        result = await InvoiceTemplateService.generatePDF(
-          invoiceData, 
-          businessProfile, 
-          selectedTemplate,
-          selectedTheme
-        );
-      }
+      const result = await InvoiceTemplateService.generatePDF(
+        invoiceData, 
+        businessProfile, 
+        selectedTemplate,
+        selectedTheme
+      );
       
       if (result.success) {
         await Sharing.shareAsync(result.fileUri, {
@@ -271,43 +260,8 @@ const InvoiceTemplateScreen = ({ navigation, route }) => {
 
     if (!invoiceData) return null;
 
-    // GST Template Preview
-    if (templateId === 'gst-compliant') {
-      return (
-        <View style={[styles.invoicePreview, { borderColor: color }]}>
-          <View style={styles.gstHeader}>
-            <Text style={styles.gstTitle}>TAX INVOICE</Text>
-            <Text style={styles.gstBusinessName}>Your Business Name</Text>
-            <Text style={styles.gstGstin}>GSTIN: 22AAAAA0000A1Z5</Text>
-          </View>
-          <View style={styles.gstTable}>
-            <View style={styles.gstTableHeader}>
-              <Text style={styles.gstHeaderCell}>Item</Text>
-              <Text style={styles.gstHeaderCell}>HSN/SAC</Text>
-              <Text style={styles.gstHeaderCell}>Qty</Text>
-              <Text style={styles.gstHeaderCell}>Rate</Text>
-              <Text style={styles.gstHeaderCell}>CGST</Text>
-              <Text style={styles.gstHeaderCell}>SGST</Text>
-              <Text style={styles.gstHeaderCell}>Total</Text>
-            </View>
-            <View style={styles.gstTableRow}>
-              <Text style={styles.gstCell}>Sample Item</Text>
-              <Text style={styles.gstCell}>1001</Text>
-              <Text style={styles.gstCell}>2</Text>
-              <Text style={styles.gstCell}>₹500</Text>
-              <Text style={styles.gstCell}>9%</Text>
-              <Text style={styles.gstCell}>9%</Text>
-              <Text style={styles.gstCell}>₹1180</Text>
-            </View>
-          </View>
-          <View style={styles.gstTotals}>
-            <Text style={styles.gstTotalLabel}>Total: ₹1180</Text>
-          </View>
-        </View>
-      );
-    }
-
     const isThermal = template?.category === 'thermal';
+    const isGST = template?.category === 'gst';
     const previewStyle = isThermal ? styles.thermalPreview : styles.invoicePreview;
 
     return (
@@ -324,10 +278,15 @@ const InvoiceTemplateScreen = ({ navigation, route }) => {
             <Text style={styles.previewBusinessDetails}>
               {businessProfile.phone || 'Phone'} • {businessProfile.email || 'Email'}
             </Text>
+            {isGST && (
+              <Text style={styles.previewBusinessDetails}>
+                GSTIN: {businessProfile.gst_number || '27ABCDE1234F1Z5'}
+              </Text>
+            )}
           </View>
           <View style={styles.previewInvoiceInfo}>
             <Text style={[styles.previewInvoiceTitle, { color }]}>
-              {isThermal ? 'RECEIPT' : 'INVOICE'}
+              {isThermal ? 'RECEIPT' : isGST ? 'TAX INVOICE' : 'INVOICE'}
             </Text>
             <Text style={styles.previewInvoiceNumber}>
               #{invoiceData.invoice_number}
@@ -335,6 +294,11 @@ const InvoiceTemplateScreen = ({ navigation, route }) => {
             <Text style={styles.previewDate}>
               {invoiceData.date}
             </Text>
+            {isGST && (
+              <Text style={styles.previewDate}>
+                Place of Supply: {invoiceData.place_of_supply || 'Maharashtra'}
+              </Text>
+            )}
           </View>
         </View>
 
@@ -349,6 +313,11 @@ const InvoiceTemplateScreen = ({ navigation, route }) => {
           <Text style={styles.previewDate}>
             {invoiceData.customer_phone || ''}
           </Text>
+          {isGST && (
+            <Text style={styles.previewDate}>
+              GSTIN: {invoiceData.customer_gst_number || '29FGHIJ5678K2L6'}
+            </Text>
+          )}
         </View>
 
         {/* Items */}
@@ -365,6 +334,41 @@ const InvoiceTemplateScreen = ({ navigation, route }) => {
                     {item.quantity}x{item.rate}
                   </Text>
                   <Text style={styles.thermalItemTotal}>
+                    ₹{parseFloat(item.total).toFixed(2)}
+                  </Text>
+                </View>
+              ))}
+              {invoiceData.items?.length > 3 && (
+                <Text style={styles.previewMoreItems}>
+                  +{invoiceData.items.length - 3} more items
+                </Text>
+              )}
+            </View>
+          ) : isGST ? (
+            // GST format - with tax details
+            <View>
+              <View style={[styles.previewItemsHeader, { backgroundColor: color + '20' }]}>
+                <Text style={[styles.previewItemHeaderText, { color }]}>Item</Text>
+                <Text style={[styles.previewItemHeaderText, { color }]}>HSN</Text>
+                <Text style={[styles.previewItemHeaderText, { color }]}>Qty</Text>
+                <Text style={[styles.previewItemHeaderText, { color }]}>Rate</Text>
+                <Text style={[styles.previewItemHeaderText, { color }]}>Amount</Text>
+              </View>
+              {invoiceData.items?.slice(0, 3).map((item, index) => (
+                <View key={index} style={styles.previewItemRow}>
+                  <Text style={styles.previewItemName} numberOfLines={1}>
+                    {item.item_name}
+                  </Text>
+                  <Text style={styles.previewItemQty}>
+                    {item.hsn_code || '8517'}
+                  </Text>
+                  <Text style={styles.previewItemQty}>
+                    {item.quantity}
+                  </Text>
+                  <Text style={styles.previewItemQty}>
+                    ₹{parseFloat(item.rate).toFixed(2)}
+                  </Text>
+                  <Text style={styles.previewItemAmount}>
                     ₹{parseFloat(item.total).toFixed(2)}
                   </Text>
                 </View>
@@ -407,9 +411,31 @@ const InvoiceTemplateScreen = ({ navigation, route }) => {
 
         {/* Total */}
         <View style={[styles.previewTotal, { borderTopColor: color }]}>
-          <Text style={[styles.previewTotalText, { color }]}>
-            Total: ₹{parseFloat(invoiceData.total).toLocaleString('en-IN')}
-          </Text>
+          {isGST ? (
+            // GST totals with tax breakdown
+            <View>
+              <View style={styles.previewTaxRow}>
+                <Text style={styles.previewTaxLabel}>Subtotal:</Text>
+                <Text style={styles.previewTaxValue}>₹{parseFloat(invoiceData.subtotal || invoiceData.total * 0.847).toFixed(2)}</Text>
+              </View>
+              <View style={styles.previewTaxRow}>
+                <Text style={styles.previewTaxLabel}>CGST (9%):</Text>
+                <Text style={styles.previewTaxValue}>₹{parseFloat(invoiceData.cgst_amount || invoiceData.total * 0.076).toFixed(2)}</Text>
+              </View>
+              <View style={styles.previewTaxRow}>
+                <Text style={styles.previewTaxLabel}>SGST (9%):</Text>
+                <Text style={styles.previewTaxValue}>₹{parseFloat(invoiceData.sgst_amount || invoiceData.total * 0.076).toFixed(2)}</Text>
+              </View>
+              <View style={[styles.previewTaxRow, styles.previewTotalRow]}>
+                <Text style={[styles.previewTotalText, { color }]}>Total:</Text>
+                <Text style={[styles.previewTotalText, { color }]}>₹{parseFloat(invoiceData.total).toLocaleString('en-IN')}</Text>
+              </View>
+            </View>
+          ) : (
+            <Text style={[styles.previewTotalText, { color }]}>
+              Total: ₹{parseFloat(invoiceData.total).toLocaleString('en-IN')}
+            </Text>
+          )}
         </View>
       </View>
     );
@@ -478,6 +504,7 @@ const InvoiceTemplateScreen = ({ navigation, route }) => {
 
   return (
     <View style={styles.container}>
+
       {/* Header */}
       <View style={styles.header}>
         <TouchableOpacity onPress={() => navigation.goBack()}>
@@ -569,7 +596,7 @@ const InvoiceTemplateScreen = ({ navigation, route }) => {
             </View>
             <View style={styles.featureItem}>
               <Text style={styles.featureIcon}>🧾</Text>
-              <Text style={styles.featureText}>GST-compliant invoices</Text>
+              <Text style={styles.featureText}>Thermal printer support</Text>
             </View>
             <View style={styles.featureItem}>
               <Text style={styles.featureIcon}>📱</Text>
@@ -579,6 +606,12 @@ const InvoiceTemplateScreen = ({ navigation, route }) => {
               <Text style={styles.featureIcon}>🔗</Text>
               <Text style={styles.featureText}>Easy sharing options</Text>
             </View>
+            {selectedTemplate === 'gst-compliant' && (
+              <View style={styles.featureItem}>
+                <Text style={styles.featureIcon}>🏛️</Text>
+                <Text style={styles.featureText}>GST-compliant with tax breakdown</Text>
+              </View>
+            )}
           </View>
         </View>
 
@@ -940,70 +973,6 @@ const styles = StyleSheet.create({
     fontSize: 14,
     fontWeight: 'bold',
   },
-  // GST Template Styles
-  gstHeader: {
-    backgroundColor: '#059669',
-    padding: 15,
-    borderRadius: 8,
-    marginBottom: 10,
-    alignItems: 'center',
-  },
-  gstTitle: {
-    fontSize: 18,
-    fontWeight: 'bold',
-    color: '#ffffff',
-    marginBottom: 8,
-  },
-  gstBusinessName: {
-    fontSize: 14,
-    color: '#ffffff',
-    marginBottom: 4,
-  },
-  gstGstin: {
-    fontSize: 12,
-    color: '#ffffff',
-  },
-  gstTable: {
-    borderWidth: 1,
-    borderColor: '#e5e7eb',
-    borderRadius: 4,
-  },
-  gstTableHeader: {
-    flexDirection: 'row',
-    backgroundColor: '#f3f4f6',
-    paddingVertical: 8,
-  },
-  gstHeaderCell: {
-    flex: 1,
-    fontSize: 10,
-    fontWeight: 'bold',
-    textAlign: 'center',
-    color: '#374151',
-  },
-  gstTableRow: {
-    flexDirection: 'row',
-    paddingVertical: 6,
-    borderTopWidth: 1,
-    borderTopColor: '#e5e7eb',
-  },
-  gstCell: {
-    flex: 1,
-    fontSize: 9,
-    textAlign: 'center',
-    color: '#6b7280',
-  },
-  gstTotals: {
-    marginTop: 8,
-    padding: 8,
-    backgroundColor: '#f8fafc',
-    borderRadius: 4,
-  },
-  gstTotalLabel: {
-    fontSize: 12,
-    fontWeight: '600',
-    color: '#059669',
-    textAlign: 'center',
-  },
   featuresList: {
     gap: 12,
   },
@@ -1042,6 +1011,23 @@ const styles = StyleSheet.create({
     color: '#FFFFFF',
     fontSize: 18,
     fontWeight: 'bold',
+  },
+  previewTaxRow: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    marginBottom: 4,
+  },
+  previewTaxLabel: {
+    fontSize: 11,
+    color: '#64748B',
+  },
+  previewTaxValue: {
+    fontSize: 11,
+    fontWeight: '600',
+    color: '#1E293B',
+  },
+  previewTotalRow: {
+    marginTop: 8,
   },
 });
 
