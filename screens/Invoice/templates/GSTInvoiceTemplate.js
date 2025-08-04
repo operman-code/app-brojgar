@@ -65,7 +65,7 @@ const GSTInvoiceTemplate = ({ invoiceData, businessProfile, isPreview = false })
           {businessProfile?.address || 'Business Address'}
         </Text>
         <Text style={styles.businessDetails}>
-          GSTIN: {businessProfile?.gstin || 'GSTIN Number'}
+          GSTIN: {businessProfile?.gst_number || 'GSTIN Number'}
         </Text>
         <Text style={styles.businessDetails}>
           Phone: {businessProfile?.phone || 'Phone'} | Email: {businessProfile?.email || 'Email'}
@@ -81,7 +81,7 @@ const GSTInvoiceTemplate = ({ invoiceData, businessProfile, isPreview = false })
             {invoiceData?.customer_address || 'Customer Address'}
           </Text>
           <Text style={styles.customerInfo}>
-            GSTIN: {invoiceData?.customer_gstin || 'N/A'}
+            GSTIN: {invoiceData?.customer_gst_number || 'N/A'}
           </Text>
           <Text style={styles.customerInfo}>
             Phone: {invoiceData?.customer_phone || 'N/A'}
