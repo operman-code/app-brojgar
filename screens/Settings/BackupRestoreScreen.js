@@ -24,15 +24,15 @@ const BackupRestoreScreen = ({ navigation }) => {
   const [autoBackupEnabled, setAutoBackupEnabled] = useState(false);
   const [lastBackupDate, setLastBackupDate] = useState(null);
 
-  // Google Auth Hook - MUST be inside the component
-  const [request, response, promptAsync] = Google.useAuthRequest({
-    clientId: 'your_google_client_id_here', // Replace with your actual Google Client ID
-    scopes: [
-      'https://www.googleapis.com/auth/drive.file',
-      'https://www.googleapis.com/auth/userinfo.email'
-    ],
-    redirectUri: 'https://auth.expo.io/@your-expo-username/your-app-slug' // Replace with your actual redirect URI
-  });
+  // Google Auth Hook - Simple setup for Expo Go
+const [request, response, promptAsync] = Google.useAuthRequest({
+  clientId: '867567815082-er802upj96nl591jur5slssshb11kng8.apps.googleusercontent.com', // ← Just one client ID
+  scopes: [
+    'https://www.googleapis.com/auth/drive.file',
+    'https://www.googleapis.com/auth/userinfo.email'
+  ],
+  redirectUri: 'https://auth.expo.io/@operman-code/brojgar'
+});
 
   useEffect(() => {
     loadInitialState();
