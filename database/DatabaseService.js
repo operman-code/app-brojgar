@@ -13,28 +13,28 @@ class DatabaseService {
         return true;
       }
 
-      console.log('Connecting to SQLite database...');
+      console.log('🔌 Connecting to SQLite database...');
       this.db = await SQLite.openDatabaseAsync('brojgar_business.db');
       
-      console.log('Creating database tables...');
+      console.log('🗄️ Creating database tables...');
       await this.createTables();
       
-      console.log('All tables created successfully');
+      console.log('✅ All tables created successfully');
       
       await this.runMigrations();
-      console.log('All migrations executed successfully');
+      console.log('✅ All migrations executed successfully');
       
-      console.log('Inserting initial configuration...');
+      console.log('⚙️ Inserting initial configuration...');
       await this.insertInitialData();
       
       this.isInitialized = true;
-      console.log('Database connected successfully');
+      console.log('✅ Database connected successfully');
       return true;
     } catch (error) {
-      console.error('Database initialization failed:', error);
+      console.error('❌ Database initialization failed:', error);
       // If there's a syntax error, try to reset the database
       if (error.message && error.message.includes('syntax error')) {
-        console.log('Attempting to reset database due to syntax error...');
+        console.log('🔄 Attempting to reset database due to syntax error...');
         await this.resetDatabase();
         return await this.init();
       }
@@ -212,7 +212,7 @@ class DatabaseService {
 
   static async runMigrations() {
     try {
-      console.log('Running database migrations...');
+      console.log('🔄 Running database migrations...');
       
       // Migration 1: Ensure gst_number column exists in parties table
       try {
@@ -220,9 +220,9 @@ class DatabaseService {
           ALTER TABLE parties 
           ADD COLUMN gst_number TEXT
         `);
-        console.log('Added gst_number column to parties table');
+        console.log('✅ Added gst_number column to parties table');
       } catch (error) {
-        console.log('gst_number column already exists');
+        console.log('ℹ️ gst_number column already exists');
       }
       
       // Migration 2: Add GST fields to invoices table
@@ -231,9 +231,9 @@ class DatabaseService {
           ALTER TABLE invoices 
           ADD COLUMN gst_rate REAL DEFAULT 18
         `);
-        console.log('Added gst_rate column to invoices table');
+        console.log('✅ Added gst_rate column to invoices table');
       } catch (error) {
-        console.log('gst_rate column already exists');
+        console.log('ℹ️ gst_rate column already exists');
       }
       
       try {
@@ -241,9 +241,9 @@ class DatabaseService {
           ALTER TABLE invoices 
           ADD COLUMN place_of_supply TEXT
         `);
-        console.log('Added place_of_supply column to invoices table');
+        console.log('✅ Added place_of_supply column to invoices table');
       } catch (error) {
-        console.log('place_of_supply column already exists');
+        console.log('ℹ️ place_of_supply column already exists');
       }
       
       try {
@@ -251,9 +251,9 @@ class DatabaseService {
           ALTER TABLE invoices 
           ADD COLUMN supply_type TEXT DEFAULT 'regular'
         `);
-        console.log('Added supply_type column to invoices table');
+        console.log('✅ Added supply_type column to invoices table');
       } catch (error) {
-        console.log('supply_type column already exists');
+        console.log('ℹ️ supply_type column already exists');
       }
       
       try {
@@ -261,9 +261,9 @@ class DatabaseService {
           ALTER TABLE invoices 
           ADD COLUMN reverse_charge TEXT DEFAULT 'N'
         `);
-        console.log('Added reverse_charge column to invoices table');
+        console.log('✅ Added reverse_charge column to invoices table');
       } catch (error) {
-        console.log('reverse_charge column already exists');
+        console.log('ℹ️ reverse_charge column already exists');
       }
       
       // Migration 3: Add GST fields to invoice_items table
@@ -272,9 +272,9 @@ class DatabaseService {
           ALTER TABLE invoice_items 
           ADD COLUMN hsn_code TEXT
         `);
-        console.log('Added hsn_code column to invoice_items table');
+        console.log('✅ Added hsn_code column to invoice_items table');
       } catch (error) {
-        console.log('hsn_code column already exists');
+        console.log('ℹ️ hsn_code column already exists');
       }
       
       try {
@@ -282,9 +282,9 @@ class DatabaseService {
           ALTER TABLE invoice_items 
           ADD COLUMN sac_code TEXT
         `);
-        console.log('Added sac_code column to invoice_items table');
+        console.log('✅ Added sac_code column to invoice_items table');
       } catch (error) {
-        console.log('sac_code column already exists');
+        console.log('ℹ️ sac_code column already exists');
       }
       
       try {
@@ -292,14 +292,14 @@ class DatabaseService {
           ALTER TABLE invoice_items 
           ADD COLUMN discount REAL DEFAULT 0
         `);
-        console.log('Added discount column to invoice_items table');
+        console.log('✅ Added discount column to invoice_items table');
       } catch (error) {
-        console.log('discount column already exists');
+        console.log('ℹ️ discount column already exists');
       }
       
-      console.log('Database migrations completed');
+      console.log('✅ Database migrations completed');
     } catch (error) {
-      console.error('Error running migrations:', error);
+      console.error('❌ Error running migrations:', error);
     }
   }
 
@@ -311,7 +311,7 @@ class DatabaseService {
       );
 
       if (existingSettings[0]?.count > 0) {
-        console.log('Initial data already exists');
+        console.log('ℹ️ Initial data already exists');
         return;
       }
 
@@ -338,9 +338,9 @@ class DatabaseService {
       }
 
       await this.insertSampleData();
-      console.log('Initial data inserted successfully');
+      console.log('✅ Initial data inserted successfully');
     } catch (error) {
-      console.error('Error inserting initial data:', error);
+      console.error('❌ Error inserting initial data:', error);
       throw error;
     }
   }
@@ -397,9 +397,9 @@ class DatabaseService {
         ['Welcome!', 'Welcome to Brojgar Business App', 'info', null, null]
       );
 
-      console.log('Sample data inserted successfully');
+      console.log('✅ Sample data inserted successfully');
     } catch (error) {
-      console.error('Error inserting sample data:', error);
+      console.error('❌ Error inserting sample data:', error);
     }
   }
 
@@ -419,9 +419,9 @@ class DatabaseService {
         return await this.db.runAsync(sql, params);
       }
     } catch (error) {
-      console.error('Query execution error:', error);
-      console.error('SQL Query:', sql);
-      console.error('Parameters:', params);
+      console.error('❌ Query execution error:', error);
+      console.error('❌ SQL Query:', sql);
+      console.error('❌ Parameters:', params);
       throw error;
     }
   }
@@ -434,7 +434,7 @@ class DatabaseService {
       );
       return result[0]?.value || null;
     } catch (error) {
-      console.error('Error getting setting:', error);
+      console.error('❌ Error getting setting:', error);
       return null;
     }
   }
@@ -458,10 +458,10 @@ class DatabaseService {
         );
       }
 
-      console.log(`Setting ${key} updated`);
+      console.log(`✅ Setting ${key} updated`);
       return true;
     } catch (error) {
-      console.error('Error setting value:', error);
+      console.error('❌ Error setting value:', error);
       return false;
     }
   }
@@ -476,7 +476,7 @@ class DatabaseService {
       const prefix = await this.getSetting('invoice_prefix') || 'INV';
       return `${prefix}${nextNumber.toString().padStart(4, '0')}`;
     } catch (error) {
-      console.error('Error getting next invoice number:', error);
+      console.error('❌ Error getting next invoice number:', error);
       return `INV${Date.now()}`;
     }
   }
@@ -493,10 +493,10 @@ class DatabaseService {
         await this.db.execAsync(`DELETE FROM ${table}`);
       }
 
-      console.log('All data cleared');
+      console.log('✅ All data cleared');
       return true;
     } catch (error) {
-      console.error('Error clearing data:', error);
+      console.error('❌ Error clearing data:', error);
       return false;
     }
   }
@@ -507,10 +507,10 @@ class DatabaseService {
         await this.db.closeAsync();
         this.db = null;
         this.isInitialized = false;
-        console.log('Database connection closed');
+        console.log('✅ Database connection closed');
       }
     } catch (error) {
-      console.error('Error closing database:', error);
+      console.error('❌ Error closing database:', error);
     }
   }
 
@@ -533,7 +533,7 @@ class DatabaseService {
         data: backup
       };
     } catch (error) {
-      console.error('Error creating backup:', error);
+      console.error('❌ Error creating backup:', error);
       throw error;
     }
   }
@@ -561,17 +561,17 @@ class DatabaseService {
         }
       }
 
-      console.log('Database restored from backup');
+      console.log('✅ Database restored from backup');
       return true;
     } catch (error) {
-      console.error('Error restoring backup:', error);
+      console.error('❌ Error restoring backup:', error);
       throw error;
     }
   }
 
   static async resetDatabase() {
     try {
-      console.log('Resetting database...');
+      console.log('🔄 Resetting database...');
       
       if (this.db) {
         await this.db.closeAsync();
@@ -583,17 +583,17 @@ class DatabaseService {
       
       try {
         await deleteAsync(dbPath);
-        console.log('Database file deleted');
+        console.log('✅ Database file deleted');
       } catch (error) {
-        console.log('Database file not found or already deleted');
+        console.log('ℹ️ Database file not found or already deleted');
       }
       
       this.db = null;
       this.isInitialized = false;
       
-      console.log('Database reset completed');
+      console.log('✅ Database reset completed');
     } catch (error) {
-      console.error('Error resetting database:', error);
+      console.error('❌ Error resetting database:', error);
     }
   }
 }
