@@ -15,6 +15,7 @@ import NotificationService from './screens/Notifications/services/NotificationSe
 import GlobalSearchService from './screens/Search/services/GlobalSearchService';
 import BackupService from './screens/Backup/services/BackupService';
 import SettingsService from './screens/Settings/services/SettingsService';
+import GoogleDriveService from './screens/Settings/services/GoogleDriveService';
 
 export default function App() {
   const [isReady, setIsReady] = useState(false);
@@ -23,12 +24,30 @@ export default function App() {
     initializeApp();
   }, []);
 
+  const setupAutoBackup = async () => {
+    try {
+      // Load backup settings
+      await GoogleDriveService.loadBackupSettings();
+      
+      // Check if auto backup is needed
+      const needsBackup = await GoogleDriveService.checkBackupNeeded();
+      if (needsBackup) {
+        await GoogleDriveService.performAutoBackup();
+      }
+    } catch (error) {
+      console.error('Auto backup setup failed:', error);
+    }
+  };
+
   const initializeApp = async () => {
     try {
       console.log('🚀 Initializing Brojgar Business App...');
       
       // Initialize database
       await DatabaseService.init();
+      
+      // Setup auto backup
+      await setupAutoBackup();
       
       // Initialize other services with error handling
       try {
