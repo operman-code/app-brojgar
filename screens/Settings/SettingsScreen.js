@@ -176,7 +176,7 @@ const SettingsScreen = ({ navigation }) => {
           title: 'Backup & Restore', 
           subtitle: 'Manage your data', 
           icon: '💾', 
-          action: () => Alert.alert('Coming Soon', 'Backup features coming soon')
+          action: () => navigation.navigate('BackupRestore')
         },
         { 
           title: 'Export Data', 

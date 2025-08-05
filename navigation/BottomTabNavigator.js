@@ -10,6 +10,7 @@ import InvoiceTemplateScreen from "../screens/Invoice/InvoiceTemplateScreen";
 import InvoicePreviewScreen from "../screens/Invoice/InvoicePreviewScreen";
 import NotificationScreen from "../screens/Notifications/NotificationScreen";
 import GlobalSearchScreen from "../screens/Search/GlobalSearchScreen";
+import BackupRestoreScreen from "../screens/Settings/BackupRestoreScreen";
 import { View, Text, TouchableOpacity } from "react-native";
 
 // Import new navigation components
@@ -107,6 +108,13 @@ const EnhancedNavigator = () => {
         return (
           <MainLayout title="Settings" showSearch={false}>
             <SettingsScreen navigation={navigation} route={route} />
+          </MainLayout>
+        );
+      
+      case 'BackupRestore':
+        return (
+          <MainLayout title="Backup & Restore" showSearch={false}>
+            <BackupRestoreScreen navigation={navigation} route={route} />
           </MainLayout>
         );
       
