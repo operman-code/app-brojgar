@@ -1,71 +1,27 @@
-// screens/Settings/services/GoogleDriveService.js
-import * as Google from 'expo-auth-session/providers/google';
-import * as WebBrowser from 'expo-web-browser';
 import * as FileSystem from 'expo-file-system';
 import * as Notifications from 'expo-notifications';
 import DatabaseService from '../../../database/DatabaseService';
-
-WebBrowser.maybeCompleteAuthSession();
 
 class GoogleDriveService {
   static accessToken = null;
   static userEmail = null;
   static autoBackupEnabled = false;
   static lastBackupDate = null;
-  static dailyBackupFileId = null; // Store the daily backup file ID
+  static dailyBackupFileId = null;
 
   // Google Drive API endpoints
   static GOOGLE_DRIVE_API = 'https://www.googleapis.com/drive/v3';
   static GOOGLE_UPLOAD_API = 'https://www.googleapis.com/upload/drive/v3';
 
-  // Initialize Google Auth
-  static async initializeAuth() {
-    try {
-      const [request, response, promptAsync] = Google.useAuthRequest({
-        expoClientId: 'YOUR_EXPO_CLIENT_ID',
-        iosClientId: 'YOUR_IOS_CLIENT_ID',
-        androidClientId: 'YOUR_ANDROID_CLIENT_ID',
-        scopes: [
-          'https://www.googleapis.com/auth/drive.file',
-          'https://www.googleapis.com/auth/userinfo.email'
-        ]
-      });
-
-      return { request, response, promptAsync };
-    } catch (error) {
-      console.error('❌ Error initializing Google Auth:', error);
-      throw error;
-    }
+  // Setter methods for the component to use
+  static setAccessToken(token) {
+    this.accessToken = token;
   }
 
-  // Authenticate user
-  static async authenticateUser() {
-    try {
-      const { promptAsync } = await this.initializeAuth();
-      const result = await promptAsync();
-
-      if (result.type === 'success') {
-        this.accessToken = result.authentication.accessToken;
-        
-        // Get user email
-        const userInfo = await this.getUserInfo();
-        this.userEmail = userInfo.email;
-        
-        // Check for existing backups and find daily backup file
-        await this.findDailyBackupFile();
-        
-        console.log('✅ Google authentication successful');
-        return { success: true, email: this.userEmail };
-      } else {
-        throw new Error('Authentication failed');
-      }
-    } catch (error) {
-      console.error('❌ Google authentication failed:', error);
-      return { success: false, error: error.message };
-    }
+  static setUserEmail(email) {
+    this.userEmail = email;
   }
 
-  // Get user info from Google
   static async getUserInfo() {
     try {
       const response = await fetch('https://www.googleapis.com/oauth2/v2/userinfo', {
@@ -73,121 +29,103 @@ class GoogleDriveService {
           'Authorization': `Bearer ${this.accessToken}`
         }
       });
-      
+
+      if (!response.ok) {
+        throw new Error('Failed to get user info');
+      }
+
       return await response.json();
     } catch (error) {
-      console.error('❌ Error getting user info:', error);
+      console.error('Get user info error:', error);
       throw error;
     }
   }
 
-  // Find existing daily backup file
   static async findDailyBackupFile() {
     try {
       const result = await this.listBackupFiles();
       if (result.success && result.files.length > 0) {
-        // Look for daily backup file (brojgar_daily_backup.json)
         const dailyBackup = result.files.find(file => 
           file.name === 'brojgar_daily_backup.json'
         );
-        
         if (dailyBackup) {
           this.dailyBackupFileId = dailyBackup.id;
-          console.log('📁 Found existing daily backup file:', dailyBackup.id);
-        } else {
-          console.log('📁 No existing daily backup file found');
         }
-        
-        return result.files;
-      } else {
-        console.log('📁 No existing backups found');
-        return [];
       }
+      return result.files;
     } catch (error) {
-      console.error('❌ Error finding daily backup file:', error);
+      console.error('Find daily backup file error:', error);
       return [];
     }
   }
 
-  // Create backup file
-  static async createBackupFile() {
-    try {
-      const backupData = await DatabaseService.backup();
-      
-      const timestamp = new Date().toISOString().split('T')[0];
-      const fileName = `brojgar_backup_${timestamp}_${Date.now()}.json`;
-      const filePath = `${FileSystem.documentDirectory}${fileName}`;
-      
-      // Write backup to local file
-      await FileSystem.writeAsStringAsync(filePath, JSON.stringify(backupData, null, 2));
-      
-      return { success: true, filePath, fileName };
-    } catch (error) {
-      console.error('❌ Error creating backup file:', error);
-      return { success: false, error: error.message };
-    }
-  }
-
-  // Create daily backup file
   static async createDailyBackupFile() {
     try {
       const backupData = await DatabaseService.backup();
-      
       const fileName = 'brojgar_daily_backup.json';
       const filePath = `${FileSystem.documentDirectory}${fileName}`;
       
-      // Write backup to local file
       await FileSystem.writeAsStringAsync(filePath, JSON.stringify(backupData, null, 2));
       
       return { success: true, filePath, fileName };
     } catch (error) {
-      console.error('❌ Error creating daily backup file:', error);
+      console.error('Create daily backup file error:', error);
       return { success: false, error: error.message };
     }
   }
 
-  // Upload file to Google Drive
   static async uploadToGoogleDrive(filePath, fileName) {
     try {
       const fileContent = await FileSystem.readAsStringAsync(filePath);
       
-      // Create metadata
-      const metadata = {
-        name: fileName,
-        parents: ['appDataFolder'], // Store in app-specific folder
-        description: 'Brojgar Business App Backup'
-      };
-
-      // Upload file
       const response = await fetch(`${this.GOOGLE_UPLOAD_API}/files?uploadType=multipart`, {
         method: 'POST',
         headers: {
           'Authorization': `Bearer ${this.accessToken}`,
-          'Content-Type': 'multipart/related; boundary=foo_bar_baz'
+          'Content-Type': 'multipart/related; boundary=boundary'
         },
-        body: this.createMultipartBody(metadata, fileContent)
+        body: this.createMultipartBody(fileName, fileContent)
       });
 
       if (!response.ok) {
-        throw new Error(`Upload failed: ${response.statusText}`);
+        const errorText = await response.text();
+        throw new Error(`Upload failed: ${response.statusText} - ${errorText}`);
       }
 
       const result = await response.json();
-      console.log('✅ File uploaded to Google Drive:', result.id);
-      
-      return { success: true, fileId: result.id, fileName };
+      return { success: true, fileId: result.id, fileName: result.name };
     } catch (error) {
-      console.error('❌ Error uploading to Google Drive:', error);
+      console.error('Upload to Google Drive error:', error);
       return { success: false, error: error.message };
     }
   }
 
-  // Update existing file in Google Drive
+  static createMultipartBody(fileName, fileContent) {
+    const boundary = 'boundary';
+    const metadata = {
+      name: fileName,
+      parents: ['root']
+    };
+
+    const multipartBody = [
+      `--${boundary}`,
+      'Content-Type: application/json; charset=UTF-8',
+      '',
+      JSON.stringify(metadata),
+      `--${boundary}`,
+      'Content-Type: application/json',
+      '',
+      fileContent,
+      `--${boundary}--`
+    ].join('\r\n');
+
+    return multipartBody;
+  }
+
   static async updateFileInGoogleDrive(fileId, filePath, fileName) {
     try {
       const fileContent = await FileSystem.readAsStringAsync(filePath);
       
-      // Update file content
       const response = await fetch(`${this.GOOGLE_DRIVE_API}/files/${fileId}?uploadType=media`, {
         method: 'PATCH',
         headers: {
@@ -201,37 +139,17 @@ class GoogleDriveService {
         throw new Error(`Update failed: ${response.statusText}`);
       }
 
-      console.log('✅ File updated in Google Drive:', fileId);
       return { success: true, fileId, fileName };
     } catch (error) {
-      console.error('❌ Error updating file in Google Drive:', error);
+      console.error('Update file in Google Drive error:', error);
       return { success: false, error: error.message };
     }
   }
 
-  // Create multipart body for upload
-  static createMultipartBody(metadata, fileContent) {
-    const boundary = 'foo_bar_baz';
-    const delimiter = `\r\n--${boundary}\r\n`;
-    const closeDelimiter = `\r\n--${boundary}--`;
-
-    const multipartBody = 
-      delimiter +
-      'Content-Type: application/json\r\n\r\n' +
-      JSON.stringify(metadata) +
-      delimiter +
-      'Content-Type: application/json\r\n\r\n' +
-      fileContent +
-      closeDelimiter;
-
-    return multipartBody;
-  }
-
-  // List backup files from Google Drive
   static async listBackupFiles() {
     try {
       const response = await fetch(
-        `${this.GOOGLE_DRIVE_API}/files?q=name contains 'brojgar_backup' and trashed=false&orderBy=createdTime desc`,
+        `${this.GOOGLE_DRIVE_API}/files?q=name contains 'brojgar_backup' or name contains 'brojgar_daily_backup'&fields=files(id,name,createdTime,size)`,
         {
           headers: {
             'Authorization': `Bearer ${this.accessToken}`
@@ -240,200 +158,132 @@ class GoogleDriveService {
       );
 
       if (!response.ok) {
-        throw new Error(`Failed to list files: ${response.statusText}`);
+        throw new Error('Failed to list files');
       }
 
       const result = await response.json();
       return { success: true, files: result.files || [] };
     } catch (error) {
-      console.error('❌ Error listing backup files:', error);
+      console.error('List backup files error:', error);
       return { success: false, error: error.message };
     }
   }
 
-  // Download backup file from Google Drive
   static async downloadBackupFile(fileId) {
     try {
-      const response = await fetch(
-        `${this.GOOGLE_DRIVE_API}/files/${fileId}?alt=media`,
-        {
-          headers: {
-            'Authorization': `Bearer ${this.accessToken}`
-          }
+      const response = await fetch(`${this.GOOGLE_DRIVE_API}/files/${fileId}?alt=media`, {
+        headers: {
+          'Authorization': `Bearer ${this.accessToken}`
         }
-      );
+      });
 
       if (!response.ok) {
-        throw new Error(`Download failed: ${response.statusText}`);
+        throw new Error('Failed to download file');
       }
 
-      const backupData = await response.json();
-      return { success: true, backupData };
+      const fileContent = await response.text();
+      return { success: true, content: fileContent };
     } catch (error) {
-      console.error('❌ Error downloading backup file:', error);
+      console.error('Download backup file error:', error);
       return { success: false, error: error.message };
     }
   }
 
-  // Create manual backup (creates new file)
   static async createBackup() {
     try {
-      console.log('🔄 Creating manual backup...');
+      const backupData = await DatabaseService.backup();
+      const timestamp = new Date().toISOString().replace(/[:.]/g, '-');
+      const fileName = `brojgar_backup_${timestamp}.json`;
+      const filePath = `${FileSystem.documentDirectory}${fileName}`;
       
-      // Step 1: Create backup file
-      const backupResult = await this.createBackupFile();
-      if (!backupResult.success) {
-        throw new Error(backupResult.error);
-      }
-
-      // Step 2: Upload to Google Drive
-      const uploadResult = await this.uploadToGoogleDrive(
-        backupResult.filePath, 
-        backupResult.fileName
-      );
+      await FileSystem.writeAsStringAsync(filePath, JSON.stringify(backupData, null, 2));
       
-      if (!uploadResult.success) {
+      const uploadResult = await this.uploadToGoogleDrive(filePath, fileName);
+      
+      if (uploadResult.success) {
+        await FileSystem.deleteAsync(filePath);
+        return { success: true, fileName: uploadResult.fileName, fileId: uploadResult.fileId };
+      } else {
         throw new Error(uploadResult.error);
       }
-
-      // Step 3: Clean up local file
-      await FileSystem.deleteAsync(backupResult.filePath);
-
-      // Step 4: Update last backup date
-      this.lastBackupDate = new Date().toISOString();
-      await this.saveBackupSettings();
-
-      console.log('✅ Manual backup created and uploaded successfully');
-      return { 
-        success: true, 
-        fileName: uploadResult.fileName,
-        fileId: uploadResult.fileId 
-      };
     } catch (error) {
-      console.error('❌ Manual backup failed:', error);
+      console.error('Create backup error:', error);
       return { success: false, error: error.message };
     }
   }
 
-  // Create daily backup (replaces existing file)
   static async createDailyBackup() {
     try {
-      console.log('🔄 Creating daily backup...');
-      
-      // Step 1: Create daily backup file
       const backupResult = await this.createDailyBackupFile();
       if (!backupResult.success) {
         throw new Error(backupResult.error);
       }
 
       let uploadResult;
-
       if (this.dailyBackupFileId) {
-        // Step 2A: Update existing daily backup file
-        console.log('📝 Updating existing daily backup file...');
         uploadResult = await this.updateFileInGoogleDrive(
-          this.dailyBackupFileId,
+          this.dailyBackupFileId, 
           backupResult.filePath, 
           backupResult.fileName
         );
       } else {
-        // Step 2B: Upload new daily backup file
-        console.log('📝 Creating new daily backup file...');
-        uploadResult = await this.uploadToGoogleDrive(
-          backupResult.filePath, 
-          backupResult.fileName
-        );
-        
-        // Store the file ID for future updates
+        uploadResult = await this.uploadToGoogleDrive(backupResult.filePath, backupResult.fileName);
         if (uploadResult.success) {
           this.dailyBackupFileId = uploadResult.fileId;
         }
       }
-      
+
       if (!uploadResult.success) {
         throw new Error(uploadResult.error);
       }
 
-      // Step 3: Clean up local file
       await FileSystem.deleteAsync(backupResult.filePath);
-
-      // Step 4: Update last backup date
       this.lastBackupDate = new Date().toISOString();
       await this.saveBackupSettings();
-
-      console.log('✅ Daily backup created/updated successfully');
-      return { 
-        success: true, 
-        fileName: uploadResult.fileName,
-        fileId: uploadResult.fileId 
-      };
+      
+      return { success: true, fileName: uploadResult.fileName, fileId: uploadResult.fileId };
     } catch (error) {
-      console.error('❌ Daily backup failed:', error);
+      console.error('Create daily backup error:', error);
       return { success: false, error: error.message };
     }
   }
 
-  // Restore backup from Google Drive
   static async restoreBackup(fileId) {
     try {
-      console.log('🔄 Restoring backup...');
-      
-      // Step 1: Download backup file
       const downloadResult = await this.downloadBackupFile(fileId);
+      
       if (!downloadResult.success) {
         throw new Error(downloadResult.error);
       }
 
-      // Step 2: Restore to database
-      const restoreResult = await DatabaseService.restore(downloadResult.backupData);
-      if (!restoreResult) {
-        throw new Error('Database restore failed');
-      }
-
-      console.log('✅ Backup restored successfully');
+      const backupData = JSON.parse(downloadResult.content);
+      await DatabaseService.restore(backupData);
+      
       return { success: true };
     } catch (error) {
-      console.error('❌ Restore failed:', error);
+      console.error('Restore backup error:', error);
       return { success: false, error: error.message };
     }
   }
 
-  // Enable auto backup
   static async enableAutoBackup() {
-    try {
-      this.autoBackupEnabled = true;
-      await this.saveBackupSettings();
-      await this.scheduleAutoBackup();
-      console.log('✅ Auto backup enabled');
-      return { success: true };
-    } catch (error) {
-      console.error('❌ Error enabling auto backup:', error);
-      return { success: false, error: error.message };
-    }
+    this.autoBackupEnabled = true;
+    await this.saveBackupSettings();
+    await this.scheduleAutoBackup();
   }
 
-  // Disable auto backup
   static async disableAutoBackup() {
-    try {
-      this.autoBackupEnabled = false;
-      await this.saveBackupSettings();
-      await this.cancelAutoBackup();
-      console.log('✅ Auto backup disabled');
-      return { success: true };
-    } catch (error) {
-      console.error('❌ Error disabling auto backup:', error);
-      return { success: false, error: error.message };
-    }
+    this.autoBackupEnabled = false;
+    await this.saveBackupSettings();
+    await this.cancelAutoBackup();
   }
 
-  // Schedule auto backup
   static async scheduleAutoBackup() {
     try {
-      // Schedule daily backup at 2 AM
       await Notifications.scheduleNotificationAsync({
         content: {
           title: 'Auto Backup',
-          body: 'Creating daily backup of your data...',
+          body: 'Creating daily backup...',
           data: { type: 'auto_backup' }
         },
         trigger: {
@@ -442,128 +292,82 @@ class GoogleDriveService {
           repeats: true
         }
       });
-
-      console.log('✅ Auto backup scheduled');
     } catch (error) {
-      console.error('❌ Error scheduling auto backup:', error);
+      console.error('Schedule auto backup error:', error);
     }
   }
 
-  // Cancel auto backup
   static async cancelAutoBackup() {
     try {
       await Notifications.cancelAllScheduledNotificationsAsync();
-      console.log('✅ Auto backup cancelled');
     } catch (error) {
-      console.error('❌ Error cancelling auto backup:', error);
+      console.error('Cancel auto backup error:', error);
     }
   }
 
-  // Check if backup is needed
   static async checkBackupNeeded() {
-    try {
-      if (!this.autoBackupEnabled || !this.isAuthenticated()) {
-        return false;
-      }
-
-      const lastBackup = this.lastBackupDate;
-      if (!lastBackup) {
-        return true; // No backup ever created
-      }
-
-      const lastBackupDate = new Date(lastBackup);
-      const now = new Date();
-      const daysSinceLastBackup = (now - lastBackupDate) / (1000 * 60 * 60 * 24);
-
-      return daysSinceLastBackup >= 1; // Backup needed if more than 1 day
-    } catch (error) {
-      console.error('❌ Error checking backup needed:', error);
+    if (!this.autoBackupEnabled) {
       return false;
     }
+
+    if (!this.lastBackupDate) {
+      return true;
+    }
+
+    const lastBackup = new Date(this.lastBackupDate);
+    const now = new Date();
+    const hoursSinceLastBackup = (now - lastBackup) / (1000 * 60 * 60);
+
+    return hoursSinceLastBackup >= 24;
   }
 
-  // Perform auto backup
   static async performAutoBackup() {
-    try {
-      if (await this.checkBackupNeeded()) {
-        console.log('🔄 Performing auto backup...');
-        const result = await this.createDailyBackup(); // Use daily backup (replaces file)
-        
-        if (result.success) {
-          // Send notification
-          await Notifications.scheduleNotificationAsync({
-            content: {
-              title: 'Backup Complete',
-              body: 'Your data has been backed up to Google Drive',
-              data: { type: 'backup_complete' }
-            },
-            trigger: null
-          });
-        }
-        
-        return result;
+    if (await this.checkBackupNeeded()) {
+      const result = await this.createDailyBackup();
+      if (result.success) {
+        console.log('Auto backup completed successfully');
       }
-      
-      return { success: true, message: 'No backup needed' };
-    } catch (error) {
-      console.error('❌ Auto backup failed:', error);
-      return { success: false, error: error.message };
+      return result;
     }
+    return { success: true, message: 'No backup needed' };
   }
 
-  // Save backup settings
   static async saveBackupSettings() {
-    try {
-      const settings = {
-        autoBackupEnabled: this.autoBackupEnabled,
-        lastBackupDate: this.lastBackupDate,
-        userEmail: this.userEmail,
-        dailyBackupFileId: this.dailyBackupFileId
-      };
-
-      await DatabaseService.setSetting('backup_settings', JSON.stringify(settings));
-    } catch (error) {
-      console.error('❌ Error saving backup settings:', error);
-    }
+    const settings = {
+      autoBackupEnabled: this.autoBackupEnabled,
+      lastBackupDate: this.lastBackupDate,
+      userEmail: this.userEmail,
+      dailyBackupFileId: this.dailyBackupFileId
+    };
+    await DatabaseService.setSetting('backup_settings', JSON.stringify(settings));
   }
 
-  // Load backup settings
   static async loadBackupSettings() {
-    try {
-      const settingsJson = await DatabaseService.getSetting('backup_settings');
-      if (settingsJson) {
-        const settings = JSON.parse(settingsJson);
-        this.autoBackupEnabled = settings.autoBackupEnabled || false;
-        this.lastBackupDate = settings.lastBackupDate;
-        this.userEmail = settings.userEmail;
-        this.dailyBackupFileId = settings.dailyBackupFileId;
-      }
-    } catch (error) {
-      console.error('❌ Error loading backup settings:', error);
+    const settingsJson = await DatabaseService.getSetting('backup_settings');
+    if (settingsJson) {
+      const settings = JSON.parse(settingsJson);
+      this.autoBackupEnabled = settings.autoBackupEnabled || false;
+      this.lastBackupDate = settings.lastBackupDate;
+      this.userEmail = settings.userEmail;
+      this.dailyBackupFileId = settings.dailyBackupFileId;
     }
   }
 
-  // Check if user is authenticated
   static isAuthenticated() {
-    return this.accessToken !== null;
+    return !!this.accessToken;
   }
 
-  // Get user email
   static getUserEmail() {
     return this.userEmail;
   }
 
-  // Get auto backup status
   static getAutoBackupStatus() {
     return {
       enabled: this.autoBackupEnabled,
-      lastBackup: this.lastBackupDate,
-      userEmail: this.userEmail,
-      dailyBackupFileId: this.dailyBackupFileId
+      lastBackup: this.lastBackupDate
     };
   }
 
-  // Logout
   static async logout() {
     this.accessToken = null;
     this.userEmail = null;
@@ -571,7 +375,6 @@ class GoogleDriveService {
     this.lastBackupDate = null;
     this.dailyBackupFileId = null;
     await this.cancelAutoBackup();
-    console.log('✅ Logged out from Google Drive');
   }
 }
 
