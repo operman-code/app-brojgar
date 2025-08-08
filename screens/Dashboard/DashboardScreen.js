@@ -181,7 +181,7 @@ const DashboardScreen = ({ navigation }) => {
   const renderReminders = () => (
     <View style={styles.section}>
       <View style={styles.sectionHeader}>
-        <Text style={styles.sectionTitle}>🔔 Reminders</Text>
+        <Text style={styles.sectionTitle}>Reminders</Text>
         <TouchableOpacity>
           <Text style={styles.viewAllText}>View All</Text>
         </TouchableOpacity>

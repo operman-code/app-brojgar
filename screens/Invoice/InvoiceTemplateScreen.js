@@ -19,7 +19,6 @@ const { width } = Dimensions.get('window');
 
 const InvoiceTemplateScreen = ({ navigation, route }) => {
   const [selectedTemplate, setSelectedTemplate] = useState('classic');
-  const [selectedTheme, setSelectedTheme] = useState('standard');
   const [invoiceData, setInvoiceData] = useState(null);
   const [businessProfile, setBusinessProfile] = useState({});
   const [loading, setLoading] = useState(true);
@@ -30,7 +29,7 @@ const InvoiceTemplateScreen = ({ navigation, route }) => {
       name: 'Classic',
       description: 'Clean and professional design',
       preview: '📄',
-      color: '#3B82F6',
+      color: '#222',
       category: 'standard'
     },
     {
@@ -46,7 +45,7 @@ const InvoiceTemplateScreen = ({ navigation, route }) => {
       name: 'Minimal',
       description: 'Simple and elegant design',
       preview: '📋',
-      color: '#8B5CF6',
+      color: '#444',
       category: 'standard'
     },
     {
@@ -54,7 +53,7 @@ const InvoiceTemplateScreen = ({ navigation, route }) => {
       name: 'Corporate',
       description: 'Professional business template',
       preview: '🏢',
-      color: '#F59E0B',
+      color: '#666',
       category: 'standard'
     },
     {
@@ -86,7 +85,7 @@ const InvoiceTemplateScreen = ({ navigation, route }) => {
       name: 'GST Compliant',
       description: 'GST-compliant invoice with tax details',
       preview: '🏛️',
-      color: '#059669',
+      color: '#111',
       category: 'gst'
     },
     {
@@ -94,7 +93,7 @@ const InvoiceTemplateScreen = ({ navigation, route }) => {
       name: 'Thermal 80mm',
       description: 'Standard thermal printer format',
       preview: '🧾',
-      color: '#059669',
+      color: '#333',
       category: 'thermal'
     },
     {
@@ -120,44 +119,6 @@ const InvoiceTemplateScreen = ({ navigation, route }) => {
       preview: '🧾',
       color: '#BE185D',
       category: 'thermal'
-    }
-  ];
-
-  const themes = [
-    {
-      id: 'standard',
-      name: 'Standard',
-      description: 'Regular business colors',
-      preview: '🎨',
-      color: '#3B82F6'
-    },
-    {
-      id: 'dark',
-      name: 'Dark Theme',
-      description: 'Dark mode for better contrast',
-      preview: '🌙',
-      color: '#1F2937'
-    },
-    {
-      id: 'colorful',
-      name: 'Colorful',
-      description: 'Vibrant and eye-catching',
-      preview: '🌈',
-      color: '#EC4899'
-    },
-    {
-      id: 'monochrome',
-      name: 'Monochrome',
-      description: 'Black and white only',
-      preview: '⚫',
-      color: '#374151'
-    },
-    {
-      id: 'pastel',
-      name: 'Pastel',
-      description: 'Soft and gentle colors',
-      preview: '🌸',
-      color: '#F472B6'
     }
   ];
 
@@ -218,7 +179,6 @@ const InvoiceTemplateScreen = ({ navigation, route }) => {
   console.log('🔄 Navigating to preview with:', {
     invoiceData: { invoiceId: invoiceData.id },
     selectedTemplate,
-    selectedTheme
   });
   
   navigation.navigate('InvoicePreview', {
@@ -226,7 +186,6 @@ const InvoiceTemplateScreen = ({ navigation, route }) => {
       invoiceId: invoiceData.id
     },
     selectedTemplate,
-    selectedTheme
   });
 };
 
@@ -235,8 +194,7 @@ const InvoiceTemplateScreen = ({ navigation, route }) => {
       const result = await InvoiceTemplateService.generatePDF(
         invoiceData, 
         businessProfile, 
-        selectedTemplate,
-        selectedTheme
+        selectedTemplate
       );
       
       if (result.success) {
@@ -255,8 +213,7 @@ const InvoiceTemplateScreen = ({ navigation, route }) => {
 
   const renderTemplatePreview = (templateId) => {
     const template = templates.find(t => t.id === templateId);
-    const theme = themes.find(t => t.id === selectedTheme);
-    const color = template?.color || '#3B82F6';
+    const color = template?.color || '#222';
 
     if (!invoiceData) return null;
 
@@ -468,32 +425,6 @@ const InvoiceTemplateScreen = ({ navigation, route }) => {
     </TouchableOpacity>
   );
 
-  const renderThemeCard = (theme) => (
-    <TouchableOpacity
-      key={theme.id}
-      style={[
-        styles.themeCard,
-        selectedTheme === theme.id && styles.selectedThemeCard
-      ]}
-      onPress={() => setSelectedTheme(theme.id)}
-    >
-      <View style={[styles.themePreview, { backgroundColor: theme.color + '20' }]}>
-        <Text style={[styles.themeIcon, { color: theme.color }]}>
-          {theme.preview}
-        </Text>
-      </View>
-      <View style={styles.themeInfo}>
-        <Text style={styles.themeName}>{theme.name}</Text>
-        <Text style={styles.themeDescription}>{theme.description}</Text>
-      </View>
-      {selectedTheme === theme.id && (
-        <View style={styles.selectedIndicator}>
-          <Text style={styles.checkmark}>✓</Text>
-        </View>
-      )}
-    </TouchableOpacity>
-  );
-
   if (loading) {
     return (
       <View style={styles.loadingContainer}>
@@ -547,15 +478,6 @@ const InvoiceTemplateScreen = ({ navigation, route }) => {
           )}
         </View>
 
-        {/* Theme Selection */}
-        <View style={styles.section}>
-          <Text style={styles.sectionTitle}>Choose Theme</Text>
-          
-          <View style={styles.themesGrid}>
-            {themes.map(renderThemeCard)}
-          </View>
-        </View>
-
         {/* Template Selection */}
         <View style={styles.section}>
           <Text style={styles.sectionTitle}>Choose Template</Text>
@@ -571,8 +493,6 @@ const InvoiceTemplateScreen = ({ navigation, route }) => {
             <Text style={styles.sectionTitle}>Live Preview</Text>
             <Text style={styles.previewSubtitle}>
               {templates.find(t => t.id === selectedTemplate)?.name} Template
-              {' • '}
-              {themes.find(t => t.id === selectedTheme)?.name} Theme
             </Text>
           </View>
           
@@ -708,47 +628,6 @@ const styles = StyleSheet.create({
   totalAmount: {
     fontSize: 16,
     color: '#3B82F6',
-  },
-  themesGrid: {
-    gap: 12,
-  },
-  themeCard: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    backgroundColor: '#F8FAFC',
-    borderRadius: 12,
-    padding: 16,
-    borderWidth: 2,
-    borderColor: 'transparent',
-    marginBottom: 12,
-  },
-  selectedThemeCard: {
-    borderColor: '#3B82F6',
-    backgroundColor: '#EFF6FF',
-  },
-  themePreview: {
-    width: 50,
-    height: 50,
-    borderRadius: 25,
-    alignItems: 'center',
-    justifyContent: 'center',
-    marginRight: 16,
-  },
-  themeIcon: {
-    fontSize: 24,
-  },
-  themeInfo: {
-    flex: 1,
-  },
-  themeName: {
-    fontSize: 16,
-    fontWeight: 'bold',
-    color: '#1E293B',
-    marginBottom: 4,
-  },
-  themeDescription: {
-    fontSize: 14,
-    color: '#64748B',
   },
   templatesGrid: {
     gap: 12,
