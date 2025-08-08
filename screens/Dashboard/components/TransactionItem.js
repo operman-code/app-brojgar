@@ -44,6 +44,16 @@ const TransactionItem = ({ transaction, onPress }) => {
     return amount || '0';
   };
 
+  // Label logic
+  let partyLabel = 'Transaction';
+  if (transaction.type === 'expense') {
+    partyLabel = `Supplier: ${transaction.customer || transaction.description || 'N/A'}`;
+  } else if (transaction.type === 'income' || transaction.type === 'sale') {
+    partyLabel = `Customer: ${transaction.customer || transaction.description || 'N/A'}`;
+  } else {
+    partyLabel = transaction.customer || transaction.description || 'Transaction';
+  }
+
   return (
     <TouchableOpacity style={styles.container} onPress={onPress}>
       <View style={styles.leftSection}>
@@ -51,15 +61,13 @@ const TransactionItem = ({ transaction, onPress }) => {
           <Text style={styles.icon}>{getTypeIcon(transaction.type)}</Text>
         </View>
         <View style={styles.details}>
-          <Text style={styles.customer}>{transaction.customer || transaction.description || 'Transaction'}</Text>
+          <Text style={styles.customer}>{partyLabel}</Text>
           <Text style={styles.reference}>{transaction.reference || `#${transaction.id}`}</Text>
           <Text style={styles.date}>{formatDate(transaction.date || transaction.created_at)}</Text>
         </View>
       </View>
       <View style={styles.rightSection}>
-        <Text style={[styles.amount, { color: getTypeColor(transaction.type) }]}>
-          ₹{formatAmount(transaction.amount)}
-        </Text>
+        <Text style={[styles.amount, { color: getTypeColor(transaction.type) }]}>₹{formatAmount(transaction.amount)}</Text>
         <Text style={styles.type}>{transaction.type}</Text>
       </View>
     </TouchableOpacity>
