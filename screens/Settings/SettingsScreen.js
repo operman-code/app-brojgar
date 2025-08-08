@@ -325,15 +325,6 @@ const SettingsScreen = ({ navigation }) => {
             <Text style={[styles.headerTitle, { color: theme.text }]}>Settings</Text>
             <Text style={[styles.headerSubtitle, { color: theme.textSecondary }]}>Manage your app preferences</Text>
           </View>
-          <TouchableOpacity 
-            style={styles.notificationButton} 
-            onPress={() => navigation.navigate('Notifications')}
-          >
-            <Text style={styles.notificationIcon}>🔔</Text>
-            <View style={styles.notificationBadge}>
-              <Text style={styles.notificationBadgeText}>3</Text>
-            </View>
-          </TouchableOpacity>
         </View>
 
         <ScrollView 
@@ -495,29 +486,6 @@ const styles = StyleSheet.create({
     fontSize: 14,
     color: '#64748b',
     marginTop: 2,
-  },
-  notificationButton: {
-    position: 'relative',
-    padding: 8,
-  },
-  notificationIcon: {
-    fontSize: 24,
-  },
-  notificationBadge: {
-    position: 'absolute',
-    top: 4,
-    right: 4,
-    backgroundColor: '#ef4444',
-    borderRadius: 10,
-    width: 20,
-    height: 20,
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  notificationBadgeText: {
-    color: '#ffffff',
-    fontSize: 12,
-    fontWeight: 'bold',
   },
   scrollContent: {
     flex: 1,
