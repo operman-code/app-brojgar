@@ -11,6 +11,7 @@ import InvoicePreviewScreen from "../screens/Invoice/InvoicePreviewScreen";
 import NotificationScreen from "../screens/Notifications/NotificationScreen";
 import GlobalSearchScreen from "../screens/Search/GlobalSearchScreen";
 import BackupRestoreScreen from "../screens/Settings/BackupRestoreScreen";
+import PurchaseDashboardScreen from '../screens/Purchase/PurchaseDashboardScreen';
 import { View, Text, TouchableOpacity } from "react-native";
 
 // Import new navigation components
@@ -118,6 +119,13 @@ const EnhancedNavigator = () => {
           </MainLayout>
         );
       
+      case 'Purchase':
+        return (
+          <MainLayout title="Purchase Dashboard">
+            <PurchaseDashboardScreen navigation={navigation} route={route} />
+          </MainLayout>
+        );
+      
       case 'Dashboard':
       default:
         return (
@@ -129,7 +137,7 @@ const EnhancedNavigator = () => {
   };
 
   // Show bottom tab bar only for main screens
-  const mainScreens = ['Dashboard', 'Parties', 'Inventory', 'Reports', 'Settings'];
+  const mainScreens = ['Dashboard', 'Parties', 'Inventory', 'Purchase', 'Reports', 'Settings'];
   const showBottomTabs = mainScreens.includes(currentRoute);
 
   return (
